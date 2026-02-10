@@ -1,0 +1,108 @@
+{% extends 'django_bootstrap5/bootstrap5.html' %}
+
+{% block bootstrap5_title %}{% block title %}{% endblock %}{% endblock %}
+
+{% load static %}
+
+{% block bootstrap5_extra_head %}
+    <link rel="icon" type="image/x-icon" href="{% static 'operations_portalcms_django/img/favicon.ico' %}">
+    <link type="text/css" href="//code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css" rel="stylesheet" />
+    <link type="text/css" href="{% static 'operations_portalcms_django/style-portalcms.css' %}" rel="stylesheet" />
+    <link type="text/css" href="{% static 'operations_portalcms_django/style-serviceindex.css' %}" rel="stylesheet" />
+    <link rel="stylesheet" 
+          href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,70,400;0,100,400;0,100,500;0,100,600;0,100,700;0,100,800;1,100,400&display=swap" 
+          media="all">
+{% endblock %}
+
+{% block bootstrap5_extra_script %}
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js" integrity="sha256-lSjKY0/srUM9BE3dPm+c4fBo1dky2v27Gdjm2uoZaL0=" crossorigin="anonymous"></script>
+    
+    {# ACCESS Universal Menus Script #}
+    <script type="module">
+        import { universalMenus } from "https://esm.sh/@access-ci/ui@0.8.0";
+        
+        universalMenus({
+            siteName: "Operations Portal",
+            target: document.getElementById("universal-menus"),
+        });
+    </script>
+    
+    {% block page_extra_scripts %}{% endblock %}
+{% endblock %}
+
+{% block serviceindex_global_header %}
+<style media="screen" type="text/css">
+    .access-header {
+        background-color: white;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .access-header .container {
+        box-sizing: content-box;
+        height: 84px;
+        padding-top: 20px;
+    }
+    
+    .logo {
+        align-items: start;
+        display: flex;
+        flex-direction: row;
+    }
+    
+    .nsf-logo {
+        height: 49px;
+    }
+    
+    .access-logo {
+        height: 23px;
+        margin-top: 12px;
+    }
+    
+    .logo .divider {
+        border-right: 2px solid #bbbbbb;
+        height: 40px;
+        margin: 4px 15px 0 12px;
+        width: 0;
+    }
+    
+    @media (min-width: 900px) {
+        .access-header .container {
+            height: 144px;
+            padding-top: 52px;
+        }
+        
+        .nsf-logo {
+            height: 82px;
+        }
+        
+        .access-logo {
+            height: auto;
+            margin-top: 22px;
+            width: 253px;
+        }
+        
+        .logo .divider {
+            height: 70px;
+            margin: 6px 23px 0 20px;
+        }
+    }
+</style>
+
+{# ACCESS Universal Navigation #}
+<div id="universal-menus"></div>
+
+<header class="access-header">
+    <div class="container">
+        <div class="logo">
+            <a href="https://www.nsf.gov" target="_blank" class="nsf">
+                <img class="nsf-logo" src="{% static 'operations_portalcms_django/img/nsf-logo.png' %}" alt="National Science Foundation">
+            </a>
+            <div class="divider"></div>
+            <a href="/" class="access">
+                <img class="access-logo" src="{% static 'operations_portalcms_django/img/ACCESS-operations.svg' %}" alt="ACCESS Operations Portal">
+            </a>
+        </div>
+    </div>
+</header>
+{% endblock %}

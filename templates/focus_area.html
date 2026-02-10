@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load cms_tags static sekizai_tags %}
+
+{% block title %}{% page_attribute "page_title" %}{% endblock %}
+
+{% block content %}
+<main role="main" id="main" class="container">
+    <div class="row g-0">
+        <div class="col-12">
+            <article>
+                <div class="container">
+                    <!-- Visually Hidden H1 for Accessibility -->
+                    <h1 class="visually-hidden">{% page_attribute "page_title" %}</h1>
+                    
+                    <!-- Hero Image/Collage Section -->
+                    <div class="row">
+                        <div class="col-lg-12 p-3 text-center">
+                            {% placeholder "hero_image" %}
+                        </div>
+                    </div>
+
+                    <!-- Section 1: Light Background -->
+                    <div class="row bg-light">
+                        <h2 class="col-lg-12 p-3">
+                            {% placeholder "section_1_heading" %}
+                        </h2>
+                        <div class="col-lg-12 p-3 pt-0">
+                            {% placeholder "section_1_content" %}
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Dark Background -->
+                    <div class="row bg-dark text-light">
+                        <h2 class="col-lg-12 p-3">
+                            {% placeholder "section_2_heading" %}
+                        </h2>
+                        <div class="col-lg-12 p-3 pt-0">
+                            {% placeholder "section_2_content" %}
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Light Background (optional) -->
+                    <div class="row bg-light">
+                        <h2 class="col-lg-12 p-3">
+                            {% placeholder "section_3_heading" %}
+                        </h2>
+                        <div class="col-lg-12 p-3 pt-0">
+                            {% placeholder "section_3_content" %}
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Dark Background (optional) -->
+                    <div class="row bg-dark text-light">
+                        <h2 class="col-lg-12 p-3">
+                            {% placeholder "section_4_heading" %}
+                        </h2>
+                        <div class="col-lg-12 p-3 pt-0">
+                            {% placeholder "section_4_content" %}
+                        </div>
+                    </div>
+
+                    <!-- Section 5: Light Background (optional) -->
+                    <div class="row bg-light">
+                        <h2 class="col-lg-12 p-3">
+                            {% placeholder "section_5_heading" %}
+                        </h2>
+                        <div class="col-lg-12 p-3 pt-0">
+                            {% placeholder "section_5_content" %}
+                        </div>
+                    </div>
+
+                    <!-- Additional Content/Links Section (optional) -->
+                    <div class="row">
+                        <div class="col-lg-12 p-5 text-center bg-light">
+                            {% placeholder "additional_links" %}
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+    </div>
+</main>
+{% endblock %}

@@ -1,0 +1,17 @@
+{
+    "DEBUG": true,
+    "ALLOWED_HOSTS": ["*"],
+    "DB_DATABASE": "portalcms1",
+    "DB_PORT": "5432",
+    "DB_HOSTNAME_READ": "{{ AMAZON_RDS_HOST_PROD }}",
+    "DB_HOSTNAME_WRITE": "{{ AMAZON_RDS_HOST_PROD }}",
+    "DJANGO_USER": "portalcms_django",
+    "DJANGO_PASS": "{{ DJANGO_PASS }}",
+    "DJANGO_SECRET_KEY": "{{ DJANGO_SECRET_KEY }}",
+    "STATIC_ROOT": "{{ app_home }}/www/static",
+    "APP_LOG": "{{ app_home }}/var/{{ app_name }}.log",
+    "APP_VERSION": "{{ app_tag }}",
+    "SYSLOG_SOCK": "/var/run/syslog",
+    "API_BASE": "",
+     "API_KEY": "{{ API_KEY }}"
+}

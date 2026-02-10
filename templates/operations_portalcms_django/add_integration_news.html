@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Integration News{% endblock %}
+
+{% block content %}
+<div class="mt-4">
+    <h1>Add Integration News</h1>
+    
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+        
+        {# Subject #}
+        <div class="mb-3">
+            {{ form.title.label_tag }}
+            {{ form.title }}
+            {% if form.title.errors %}
+                <div class="text-danger">{{ form.title.errors }}</div>
+            {% endif %}
+        </div>
+        
+        {# News Content #}
+        <div class="mb-3">
+            {{ form.content.label_tag }}
+            {{ form.content }}
+            <div class="form-text">
+                {{ form.content.help_text|safe }}
+            </div>
+            {% if form.content.errors %}
+                <div class="text-danger">{{ form.content.errors }}</div>
+            {% endif %}
+        </div>
+        
+        {# Integration News Type #}
+        <div class="mb-3">
+            {{ form.news_type.label_tag }}
+            {{ form.news_type }}
+            {% if form.news_type.errors %}
+                <div class="text-danger">{{ form.news_type.errors }}</div>
+            {% endif %}
+        </div>
+        
+        {# Affected Element #}
+        <div class="mb-3">
+            {{ form.affected_element.label_tag }}
+            {{ form.affected_element }}
+            {% if form.affected_element.errors %}
+                <div class="text-danger">{{ form.affected_element.errors }}</div>
+            {% endif %}
+        </div>
+        
+        {# Distribution Options #}
+        <div class="mb-3">
+            <label class="form-label">Distribution Options</label>
+            <div class="form-text mb-2">Email everyone and Post to Slack aren't implemented yet. All integration elements news is viewable on the web.</div>
+            <div class="form-check">
+                {{ form.email_notification }}
+                {{ form.email_notification.label_tag }}
+                <div class="form-text">{{ form.email_notification.help_text }}</div>
+            </div>
+            <div class="form-check">
+                {{ form.slack_notification }}
+                {{ form.slack_notification.label_tag }}
+                <div class="form-text">{{ form.slack_notification.help_text }}</div>
+            </div>
+        </div>
+        
+        {# Effective Date #}
+        <div class="mb-3">
+            {{ form.effective_date.label_tag }}
+            {{ form.effective_date }}
+            <div class="form-text">{{ form.effective_date.help_text }}</div>
+            {% if form.effective_date.errors %}
+                <div class="text-danger">{{ form.effective_date.errors }}</div>
+            {% endif %}
+        </div>
+        
+        {# Expiration Date #}
+        <div class="mb-3">
+            {{ form.expiration_date.label_tag }}
+            {{ form.expiration_date }}
+            <div class="form-text">{{ form.expiration_date.help_text }}</div>
+            {% if form.expiration_date.errors %}
+                <div class="text-danger">{{ form.expiration_date.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">Save Integration News</button>
+            <a href="{% url 'operations_portalcms_django:integration_news' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

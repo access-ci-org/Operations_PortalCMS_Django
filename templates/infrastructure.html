@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% load cms_tags static %}
+
+{% block title %}ACCESS Infrastructure Integration | Operations{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item">
+    ACCESS Infrastructure Integration
+</li>
+{% endblock %}
+
+{% block content %}
+<article data-history-node-id="infrastructure-integration">
+    <div class="container">
+        <div class="layout layout--onecol">
+            <div class="layout__region layout__region--content">
+                {% placeholder "main_content" %}
+                
+                {# Default Content if Placeholder is Empty #}
+                <div class="clearfix text-formatted field field--name-body field--type-text-with-summary field--label-hidden field__item">
+                    <div class="row">
+                        <div class="col-md-6 p-3 lead">
+                            <p>
+                                ACCESS uses an <em>Integration Roadmaps Framework</em> to define how operators can 
+                                integrate classes of infrastructure into the ACCESS environment to achieve a defined 
+                                operational status. This framework defines, for example, how HPC compute clusters can 
+                                achieve the ACCESS allocated operational status, and will also be used to define how 
+                                many new classes of emerging infrastructure can integrated to achieve ACCESS allocated, 
+                                un-allocated, discoverable, or other statuses.
+                            </p>
+                        </div>
+                        <div class="col-md-6 p-3">
+                            {% placeholder "hero_image" %}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <h2 class="col-lg-12 p-3">Additional Information</h2>
+                        <div class="pt-2 pb-2">
+                            <a class="btn btn-primary" href="https://access-ci.org/get-started/for-resource-providers/">
+                                ACCESS RP Landing Page
+                            </a>
+                            <a class="btn btn-primary ms-2" href="https://dashboard.operations.access-ci.org/IntegrationBadgesUI/organizations/">
+                                ACCESS Integration Dashboard
+                            </a>
+                        </div>
+                        
+                        <h2 class="col-lg-12 p-3">Existing ACCESS Infrastructure Classes</h2>
+                        <p class="col-lg-12 p-3">
+                            ACCESS has defined Integration Roadmaps for the following classes of infrastructure:
+                        </p>
+                        
+                        {# Infrastructure Cards #}
+                        <div class="col-lg-6 pb-3">
+                            <div class="bg-light text-dark p-5 h-100">
+                                <div class="mb-3">
+                                    <i class="bi bi-cpu" style="font-size: 3rem; color: var(--teal-600);"></i>
+                                </div>
+                                <h3>High-Performance Computing</h3>
+                                <p>
+                                    High-performance computing clusters are used by logging in to front-end nodes, 
+                                    installing application software, and running batch computing jobs under a scheduler. 
+                                    These compute resources may include GPUs, and always provide some tightly coupled 
+                                    local storage.
+                                </p>
+                                <div class="pt-3">
+                                    <h4>Integration options (roadmaps):</h4>
+                                    <ul class="list-unstyled">
+                                        <li>
+                                            <a class="btn btn-link" href="https://operations-api.access-ci.org/wh2/integration_badges/v1/roadmap_review/67/">
+                                                ACCESS Allocated Compute
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6 pb-3">
+                            <div class="bg-light text-dark p-5 h-100">
+                                <div class="mb-3">
+                                    <i class="bi bi-hdd-rack" style="font-size: 3rem; color: var(--teal-600);"></i>
+                                </div>
+                                <h3>Storage</h3>
+                                <p>
+                                    Storage resources are used to store and manage large amounts of data.
+                                </p>
+                                <div class="pt-3">
+                                    <h4>Integration options (roadmaps):</h4>
+                                    <ul class="list-unstyled">
+                                        <li>
+                                            <a class="btn btn-link" href="https://operations-api.access-ci.org/wh2/integration_badges/v1/roadmap_review/68/">
+                                                ACCESS Allocated Storage
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6 pb-3">
+                            <div class="bg-light text-dark p-5 h-100">
+                                <div class="mb-3">
+                                    <i class="bi bi-cloud" style="font-size: 3rem; color: var(--teal-600);"></i>
+                                </div>
+                                <h3>Cloud Infrastructure</h3>
+                                <p>
+                                    Cloud infrastructure is used by launching and running virtual machines or containers.
+                                </p>
+                                <div class="pt-3">
+                                    <h4>Integration options (roadmaps):</h4>
+                                    <ul class="list-unstyled">
+                                        <li>
+                                            <a class="btn btn-link" href="https://operations-api.access-ci.org/wh2/integration_badges/v1/roadmap_review/34/">
+                                                ACCESS Allocated Cloud
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6 pb-3">
+                            <div class="bg-light text-dark p-5 h-100">
+                                <div class="mb-3">
+                                    <i class="bi bi-globe" style="font-size: 3rem; color: var(--teal-600);"></i>
+                                </div>
+                                <h3>Science Gateways</h3>
+                                <p>
+                                    Websites / portals where researchers can run high-level computational science 
+                                    applications without having to directly interact with low level compute, storage, 
+                                    or cloud resources or request ACCESS allocations. These resources will typically 
+                                    allow the researcher to select their input and output datasets, select and configure 
+                                    the application they want to run, and then run that application for the researcher 
+                                    using compute, storage, and/or cloud resources that have been pre-configured for 
+                                    executing science gateway applications.
+                                </p>
+                                <div class="pt-3">
+                                    <h4>Integration options (roadmaps):</h4>
+                                    <ul class="list-unstyled">
+                                        <li>
+                                            <a class="btn btn-link" href="https://operations-api.access-ci.org/wh2/integration_badges/v1/roadmap_review/1/">
+                                                ACCESS Science Gateway
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</article>
+{% endblock %}

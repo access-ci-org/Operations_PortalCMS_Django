@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load cms_tags static %}
+
+{% block title %}{% page_attribute "page_title" %} | Blog | Operations{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item">
+    <a href="/blog/">Blog</a>
+</li>
+<li class="breadcrumb-item">
+    {% page_attribute "page_title" %}
+</li>
+{% endblock %}
+
+{% block content %}
+<article class="blog-post">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                {# Blog Post Header #}
+                <header class="mb-4">
+                    <h1 class="mb-3">{% page_attribute "page_title" %}</h1>
+                    <div class="text-muted mb-3">
+                        <i class="bi bi-calendar3"></i>
+                        <span>{{ request.current_page.publication_date|date:"F d, Y" }}</span>
+                        {% if request.current_page.changed_date %}
+                        <span class="ms-3">
+                            <i class="bi bi-pencil"></i>
+                            Updated: {{ request.current_page.changed_date|date:"F d, Y" }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </header>
+                
+                {# Featured Image #}
+                <div class="mb-4">
+                    {% placeholder "featured_image" %}
+                </div>
+                
+                {# Blog Content #}
+                <div class="blog-content mb-5">
+                    {% placeholder "content" %}
+                </div>
+                
+                {# Tags and Categories #}
+                <div class="mb-4">
+                    {% placeholder "tags" %}
+                </div>
+                
+                {# Author Info #}
+                <div class="card bg-light mb-4">
+                    <div class="card-body">
+                        {% placeholder "author_info" %}
+                    </div>
+                </div>
+                
+                {# Related Posts #}
+                <div class="mt-5">
+                    <h3 class="mb-3">Related Posts</h3>
+                    {% placeholder "related_posts" %}
+                </div>
+            </div>
+        </div>
+    </div>
+</article>
+{% endblock %}

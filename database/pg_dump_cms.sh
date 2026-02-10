@@ -4,7 +4,7 @@ DATE=`date +'%s'`
 FILE=dump/cms.dump.${DATE}
 echo "pg_dump to: ${FILE}"
 
-pg_dump -a -p 5434 -U cms_django \
+pg_dump -a -p 5434 -U portalcms_django \
     -t cms.availability -t cms.site -t cms.staff -t cms.support \
     -t cms.service -t cms.host -t cms.link -t cms.logentry \
     -t cms.event -t cms.hosteventlog -t cms.hosteventstatus \

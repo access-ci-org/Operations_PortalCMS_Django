@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Operations Portal{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-7 p-5">
+            <h1 class="text-dark">ACCESS Infrastructure Integration and Operations</h1>
+            <p class="mt-5 mb-5 lead">
+                ACCESS Operations enables ACCESS resource providers (RPs), ACCESS projects, and developers to seamlessly integrate and operate infrastructure into an expansive federation.
+            </p>
+            <p>
+                <a class="btn btn-warning" href="/pub/about">About ACCESS Operations</a>
+            </p>
+        </div>
+        <div class="col-md-5 p-5">
+            <img class="w-100" src="{% static 'operations_portalcms_django/img/ci-workers.png' %}" alt="ACCESS Operations Team">
+        </div>
+    </div>
+    
+    <div class="row bg-light text-dark mt-4">
+        <div class="col-md-5">
+            <img class="p-5 w-100" src="{% static 'operations_portalcms_django/img/community_support.png' %}" alt="Integration and Operations Help">
+        </div>
+        <div class="col-md-7">
+            <div class="p-5">
+                <h1>Integration and Operations Help</h1>
+                <p class="mt-5">
+                    ACCESS Operations and other ACCESS projects help operators integrate and operate infrastructure in ACCESS by providing documentation and by responding to support requests. Other help resources for operators include: Ask.CI Q&amp;A spaces, a community-sourced Knowledge Base, and the Campus Champions Community.
+                </p>
+                <p>
+                    <a class="btn btn-warning" href="/pub/help">Show help resources</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-100 p-5"><h1 class="text-dark">Focus areas</h1></div>
+    
+    <div class="row p-5 pt-0">
+        <div class="col-md-6 pt-2 pb-2">
+            <div class="bg-dark d-flex h-100">
+                <div class="w-25" style="background-image:url('{% static "operations_portalcms_django/img/focus_area_cybersecurity.png" %}');background-size:cover;background-position:center;">&nbsp;</div>
+                <div class="w-75 p-3">
+                    <h3 style="color: #48C0B9;">Cybersecurity</h3>
+                    <p style="color: #FFFFFF;">Developing and maintaining policies, procedures and services, to protect the security of the ACCESS cyberinfrastructure.</p>
+                    <div><a class="btn btn-link text-yellow" href="/pub/cybersecurity">Learn more</a></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 pt-2 pb-2">
+            <div class="bg-dark d-flex h-100">
+                <div class="w-25" style="background-image:url('{% static "operations_portalcms_django/img/focus_area_operations_support.png" %}');background-size:cover;background-position:center;">&nbsp;</div>
+                <div class="w-75 p-3">
+                    <h3 style="color: #48C0B9;">Operational Support</h3>
+                    <p style="color: #FFFFFF;">Coordinating the integration and operations of RP, ACCESS project, and community services.</p>
+                    <div><a class="btn btn-link text-yellow" href="/pub/operational_support">Learn more</a></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 pt-2 pb-2">
+            <div class="bg-dark d-flex h-100">
+                <div class="w-25" style="background-image:url('{% static "operations_portalcms_django/img/focus_area_data_and_networking.png" %}');background-size:cover;background-position:center;">&nbsp;</div>
+                <div class="w-75 p-3">
+                    <h3 style="color: #48C0B9;">Networking &amp; Data Transfer</h3>
+                    <p style="color: #FFFFFF;">Provides an efficient and resilient data transfer capability between instruments, resources, centers, and campuses in the CI ecosystem and engages with the US national research and education backbone network.</p>
+                    <div><a class="btn btn-link text-yellow" href="/pub/data_n_networking">Learn more</a></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 pt-2 pb-2">
+            <div class="bg-dark d-flex h-100">
+                <div class="w-25" style="background-image:url('{% static "operations_portalcms_django/img/focus_area_step.png" %}');background-size:cover;background-position:center;">&nbsp;</div>
+                <div class="w-75 p-3">
+                    <h3 style="color: #48C0B9;">STEP</h3>
+                    <p style="color: #FFFFFF;">This student training program is designed to encourage students to consider careers in the field of cyberinfrastructure. US-based domestic and international students are eligible to apply if they are enrolled at a US-based educational institution.</p>
+                    <div><a class="btn btn-link text-yellow" href="/pub/step">Learn more</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-newspaper"></i> ACCESS News
+                    </h5>
+                    <p class="card-text">
+                        Stay informed about ACCESS announcements, events, and community updates.
+                    </p>
+                    <a href="https://access-ci.org/news/" target="_blank" class="btn btn-primary">
+                        View ACCESS News <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-exclamation-triangle"></i> System Status News
+                    </h5>
+                    <p class="card-text">
+                        Check system status, maintenance schedules, and outage notifications.
+                    </p>
+                    <a href="{% url 'operations_portalcms_django:system_status_news' %}" class="btn btn-warning">
+                        View System Status News
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-hdd-network"></i> Integration News
+                    </h5>
+                    <p class="card-text">
+                        Learn about integrations, resource connections, and new service deployments.
+                    </p>
+                    <a href="{% url 'operations_portalcms_django:integration_news' %}" class="btn btn-success">
+                        View Integration News
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+
+
+</div>
+{% endblock %}

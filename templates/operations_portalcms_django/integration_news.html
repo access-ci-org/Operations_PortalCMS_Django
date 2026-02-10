@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Integration News{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="w-100 p-3 d-flex">
+        <h2 align="center">News for resource providers about ACCESS infrastructure integration roadmaps, tasks, and related software</h2>
+    </div>
+    <div class="container">
+        <div class="w-100 p-3 d-flex">
+            <div class="p-2 flex-wrap">
+                <a class="btn btn-access-primary" href="{% url 'operations_portalcms_django:add_integration_news' %}">Publish new news</a>
+            </div>
+            <div class="p-2 flex-wrap"><b>OR</b> update existing news by clicking on the Subject below.</div>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4">
+    {% if integration_news %}
+        <div class="row">
+            {% for news in integration_news %}
+                <div class="col-md-12 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ news.title }}</h5>
+                            <p class="card-text">{{ news.content }}</p>
+                            <p class="text-muted">
+                                <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
+                            </p>
+                            {% if user.is_staff %}
+                                <a href="{% url 'operations_portalcms_django:update_integration_news' news.id %}" class="btn btn-sm btn-primary">Edit</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No integration news available.</p>
+    {% endif %}
+</div>
+{% endblock %}

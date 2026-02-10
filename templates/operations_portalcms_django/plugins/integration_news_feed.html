@@ -1,0 +1,15 @@
+{# Template for Integration News Feed Container #}
+<div class="news-feed integration-news-feed">
+    <div class="news-feed-header mb-4">
+        <h2>Integration News</h2>
+        <p class="text-muted">Updates about resource integrations, service deployments, and partnerships</p>
+    </div>
+    <div class="news-items">
+        {% for plugin in instance.child_plugin_instances %}
+            {% load cms_tags %}
+            {% render_plugin plugin %}
+        {% empty %}
+            <p class="text-muted">No news items yet. Add your first news item using the CMS toolbar above.</p>
+        {% endfor %}
+    </div>
+</div>

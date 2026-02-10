@@ -1,0 +1,11 @@
+{# Template for individual System Status News item #}
+<div class="news-item mb-4 p-3 border-bottom">
+    <h3 class="news-title">{{ instance.title }}</h3>
+    <div class="news-meta text-muted small mb-2">
+        <span class="news-author">By {{ instance.author.get_full_name|default:instance.author.username }}</span>
+        <span class="news-date ms-2">{{ instance.published_date|date:"F j, Y g:i A" }}</span>
+    </div>
+    <div class="news-content">
+        {{ instance.content|linebreaks }}
+    </div>
+</div>

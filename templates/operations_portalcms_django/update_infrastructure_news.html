@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Update System and Infrastructure Status News{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Update System and Infrastructure Status News</h1>
+    
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="subject" name="subject" value="{{ news.subject }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content</label>
+            <textarea class="form-control" id="content" name="content" rows="5" required>{{ news.content }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Update</button>
+        <a href="{% url 'operations_portalcms_django:system_status_news' %}" class="btn btn-secondary">Cancel</a>
+        {% if user.is_staff %}
+            <button type="submit" name="delete" class="btn btn-danger float-end">Delete</button>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}

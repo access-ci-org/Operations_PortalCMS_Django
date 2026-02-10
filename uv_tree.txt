@@ -1,119 +1,88 @@
-djangocms v1.0.0
+portalcms v0.1.0
 ├── access-django-user-admin v1.5.3
-├── django v5.2.10
+├── django v5.2.9
 │   ├── asgiref v3.11.0
-│   └── sqlparse v0.5.5
+│   └── sqlparse v0.5.4
 ├── django-allauth[socialaccount] v65.13.1
 │   ├── asgiref v3.11.0
-│   ├── django v5.2.10 (*)
+│   ├── django v5.2.9 (*)
 │   ├── oauthlib v3.3.1 (extra: socialaccount)
 │   ├── pyjwt[crypto] v2.10.1 (extra: socialaccount)
 │   │   └── cryptography v46.0.3 (extra: crypto)
 │   │       └── cffi v2.0.0
 │   │           └── pycparser v2.23
 │   └── requests v2.32.5 (extra: socialaccount)
-│       ├── certifi v2026.1.4
+│       ├── certifi v2025.11.12
 │       ├── charset-normalizer v3.4.4
 │       ├── idna v3.11
-│       └── urllib3 v2.6.3
+│       └── urllib3 v2.5.0
 ├── django-bootstrap5 v25.3
-│   └── django v5.2.10 (*)
+│   └── django v5.2.9 (*)
 ├── django-cms v5.0.5
-│   ├── django v5.2.10 (*)
+│   ├── django v5.2.9 (*)
 │   ├── django-classy-tags v4.1.0
-│   │   └── django v5.2.10 (*)
+│   │   └── django v5.2.9 (*)
 │   ├── django-formtools v2.5.1
-│   │   └── django v5.2.10 (*)
+│   │   └── django v5.2.9 (*)
 │   ├── django-sekizai v4.1.0
-│   │   ├── django v5.2.10 (*)
+│   │   ├── django v5.2.9 (*)
 │   │   └── django-classy-tags v4.1.0 (*)
-│   ├── django-treebeard v4.8.0
-│   │   └── django v5.2.10 (*)
+│   ├── django-treebeard v4.7.1
+│   │   └── django v5.2.9 (*)
 │   ├── djangocms-admin-style v3.3.1
-│   │   └── django v5.2.10 (*)
+│   │   └── django v5.2.9 (*)
 │   ├── packaging v25.0
 │   └── setuptools v80.9.0
+├── django-filer v3.4.3
+│   ├── django v5.2.9 (*)
+│   ├── django-polymorphic v4.10.5
+│   │   └── django v5.2.9 (*)
+│   ├── easy-thumbnails[svg] v2.10.1
+│   │   ├── django v5.2.9 (*)
+│   │   ├── pillow v12.1.0
+│   │   ├── reportlab v4.4.9 (extra: svg)
+│   │   │   ├── charset-normalizer v3.4.4
+│   │   │   └── pillow v12.1.0
+│   │   └── svglib v1.5.1 (extra: svg)
+│   │       ├── cssselect2 v0.8.0
+│   │       │   ├── tinycss2 v1.5.1
+│   │       │   │   └── webencodings v0.5.1
+│   │       │   └── webencodings v0.5.1
+│   │       ├── lxml v6.0.2
+│   │       ├── reportlab v4.4.9 (*)
+│   │       └── tinycss2 v1.5.1 (*)
+│   └── svglib v1.5.1 (*)
 ├── djangocms-admin-style v3.3.1 (*)
-├── djangocms-blog v2.0.6
-│   ├── aldryn-apphooks-config v0.7.0
-│   │   ├── django-appdata v0.4.0
-│   │   │   └── django v5.2.10 (*)
-│   │   └── django-cms v5.0.5 (*)
-│   ├── django-cms v5.0.5 (*)
-│   ├── django-filer v3.4.2
-│   │   ├── django v5.2.10 (*)
-│   │   ├── django-polymorphic v4.10.2
-│   │   │   └── django v5.2.10 (*)
-│   │   ├── easy-thumbnails[svg] v2.10.1
-│   │   │   ├── django v5.2.10 (*)
-│   │   │   ├── pillow v12.1.0
-│   │   │   ├── reportlab v4.4.7 (extra: svg)
-│   │   │   │   ├── charset-normalizer v3.4.4
-│   │   │   │   └── pillow v12.1.0
-│   │   │   └── svglib v1.5.1 (extra: svg)
-│   │   │       ├── cssselect2 v0.8.0
-│   │   │       │   ├── tinycss2 v1.5.1
-│   │   │       │   │   └── webencodings v0.5.1
-│   │   │       │   └── webencodings v0.5.1
-│   │   │       ├── lxml v6.0.2
-│   │   │       ├── reportlab v4.4.7 (*)
-│   │   │       └── tinycss2 v1.5.1 (*)
-│   │   └── svglib v1.5.1 (*)
-│   ├── django-meta v2.5.0
-│   ├── django-parler v2.3
-│   │   └── django v5.2.10 (*)
-│   ├── django-sortedm2m v4.0.0
-│   ├── django-taggit v6.1.0
-│   │   └── django v5.2.10 (*)
-│   ├── django-taggit-autosuggest v0.4.2
-│   │   └── django-taggit v6.1.0 (*)
-│   ├── django-taggit-templatetags v0.2.5
-│   │   ├── django v5.2.10 (*)
-│   │   ├── django-taggit v6.1.0 (*)
-│   │   └── django-templatetag-sugar v1.0
-│   ├── djangocms-apphook-setup v0.5.0
-│   │   └── django-cms v5.0.5 (*)
-│   ├── djangocms-text-ckeditor v5.1.7
-│   │   ├── django-cms v5.0.5 (*)
-│   │   ├── html5lib v1.1
-│   │   │   ├── six v1.17.0
-│   │   │   └── webencodings v0.5.1
-│   │   ├── packaging v25.0
-│   │   └── pillow v12.1.0
-│   ├── easy-thumbnails v2.10.1 (*)
-│   ├── lxml v6.0.2
-│   └── pytz v2025.2
-├── djangocms-bootstrap5 v0.1.0
-│   ├── django-cms v5.0.5 (*)
-│   ├── django-filer v3.4.2 (*)
-│   ├── djangocms-attributes-field v4.1.2
-│   │   └── django-cms v5.0.5 (*)
-│   ├── djangocms-icon v2.1.1
-│   │   ├── django-cms v5.0.5 (*)
-│   │   └── djangocms-attributes-field v4.1.2 (*)
-│   ├── djangocms-link v5.1.0
-│   │   ├── django-cms v5.0.5 (*)
-│   │   └── djangocms-attributes-field v4.1.2 (*)
-│   ├── djangocms-picture v4.1.1
-│   │   ├── django-cms v5.0.5 (*)
-│   │   ├── django-filer v3.4.2 (*)
-│   │   ├── djangocms-attributes-field v4.1.2 (*)
-│   │   └── easy-thumbnails v2.10.1 (*)
-│   └── djangocms-text-ckeditor v5.1.7 (*)
 ├── djangocms-file v3.0.1
 │   ├── django-cms v5.0.5 (*)
-│   ├── django-filer v3.4.2 (*)
+│   ├── django-filer v3.4.3 (*)
+│   └── djangocms-attributes-field v4.1.2
+│       └── django-cms v5.0.5 (*)
+├── djangocms-link v5.1.0
+│   ├── django-cms v5.0.5 (*)
 │   └── djangocms-attributes-field v4.1.2 (*)
-├── djangocms-picture v4.1.1 (*)
-├── djangocms-text-ckeditor v5.1.7 (*)
+├── djangocms-picture v4.1.1
+│   ├── django-cms v5.0.5 (*)
+│   ├── django-filer v3.4.3 (*)
+│   ├── djangocms-attributes-field v4.1.2 (*)
+│   └── easy-thumbnails v2.10.1 (*)
+├── djangocms-text-ckeditor v5.1.7
+│   ├── django-cms v5.0.5 (*)
+│   ├── html5lib v1.1
+│   │   ├── six v1.17.0
+│   │   └── webencodings v0.5.1
+│   ├── packaging v25.0
+│   └── pillow v12.1.0
 ├── djangocms-video v3.1.0
 │   ├── django-cms v5.0.5 (*)
-│   ├── django-filer v3.4.2 (*)
+│   ├── django-filer v3.4.3 (*)
 │   └── djangocms-attributes-field v4.1.2 (*)
-├── djangorestframework v3.16.1
-│   └── django v5.2.10 (*)
+├── djangorestframework v3.15.0
+│   └── django v5.2.9 (*)
+├── easy-thumbnails v2.10.1 (*)
 ├── gunicorn v23.0.0
 │   └── packaging v25.0
 ├── psycopg2-binary v2.9.11
+├── python-dotenv v1.2.1
 └── requests v2.32.5 (*)
 (*) Package tree already displayed
