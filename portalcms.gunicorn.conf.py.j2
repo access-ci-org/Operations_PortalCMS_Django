@@ -1,0 +1,17 @@
+proc_name = '{{ app_name }}'
+user = 'software'
+group = 'software'
+daemon = False
+workers = 3
+loglevel = 'debug'
+spew = False
+#bind = ':8080'
+bind = 'unix:{{ app_home }}/run/{{ app_name }}.socket'
+pidfile = '{{ app_home }}/run/{{ app_name }}.pid'
+accesslog = '{{ app_home }}/var/{{ app_name }}.log'
+access_log_format = '%({x-forwarded-for}i)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+errorlog = '{{ app_home }}/var/{{ app_name }}.error.log'
+chdir = '{{ app_home }}/PROD/{{ app_source_name }}'
+raw_env = [
+        "APP_CONFIG={{ app_home }}/conf/{{ app_name }}.conf"
+]

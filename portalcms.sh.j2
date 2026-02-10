@@ -1,0 +1,7 @@
+#! /bin/sh
+APP_NAME={{ app_name }}
+APP_HOME={{ app_home }}
+APP_SOURCE_NAME={{ app_source_name }}
+
+export APP_CONFIG=$APP_HOME/conf/$APP_NAME.conf
+exec $APP_HOME/python/bin/gunicorn --config=$APP_HOME/conf/$APP_NAME.gunicorn.conf.py $APP_SOURCE_NAME.wsgi:application
