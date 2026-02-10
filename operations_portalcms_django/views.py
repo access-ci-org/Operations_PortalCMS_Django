@@ -17,6 +17,11 @@ def index(request):
     return render(request, 'operations_portalcms_django/index.html', context)
 
 
+def unprivileged(request):
+    """Error page for users without required permissions"""
+    return render(request, 'web/unprivileged.html')
+
+
 def system_status_news(request):
     """System and Infrastructure Status News listing page"""
     news_items = SystemStatusNews.objects.filter(is_active=True)
@@ -40,7 +45,7 @@ def integration_news(request):
 # News management views with permission checks
 
 @login_required
-@permission_required('operations_portalcms_django.add_systemstatusnews', login_url=reverse_lazy('web:unprivileged'))
+@permission_required('operations_portalcms_django.add_systemstatusnews', login_url=reverse_lazy('operations_portalcms_django:unprivileged'))
 def add_system_status_news(request):
     """Add new system and infrastructure status news item"""
     if request.method == 'POST':
@@ -62,7 +67,7 @@ def add_system_status_news(request):
 
 
 @login_required
-@permission_required('operations_portalcms_django.change_systemstatusnews', login_url=reverse_lazy('web:unprivileged'))
+@permission_required('operations_portalcms_django.change_systemstatusnews', login_url=reverse_lazy('operations_portalcms_django:unprivileged'))
 def update_system_status_news(request, pk):
     """Update existing system and infrastructure status news item"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
@@ -85,7 +90,7 @@ def update_system_status_news(request, pk):
 
 
 @login_required
-@permission_required('operations_portalcms_django.add_integrationnews', login_url=reverse_lazy('web:unprivileged'))
+@permission_required('operations_portalcms_django.add_integrationnews', login_url=reverse_lazy('operations_portalcms_django:unprivileged'))
 def add_integration_news(request):
     """Add new integration news item"""
     if request.method == 'POST':
@@ -112,7 +117,7 @@ def add_integration_news(request):
 
 
 @login_required
-@permission_required('operations_portalcms_django.change_integrationnews', login_url=reverse_lazy('web:unprivileged'))
+@permission_required('operations_portalcms_django.change_integrationnews', login_url=reverse_lazy('operations_portalcms_django:unprivileged'))
 def update_integration_news(request, pk):
     """Update existing integration news item"""
     news = get_object_or_404(IntegrationNews, pk=pk)

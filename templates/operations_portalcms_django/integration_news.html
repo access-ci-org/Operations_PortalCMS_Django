@@ -10,10 +10,12 @@
     </div>
     <div class="container">
         <div class="w-100 p-3 d-flex">
+            {% if perms.operations_portalcms_django.add_integrationnews %}
             <div class="p-2 flex-wrap">
                 <a class="btn btn-access-primary" href="{% url 'operations_portalcms_django:add_integration_news' %}">Publish new news</a>
             </div>
             <div class="p-2 flex-wrap"><b>OR</b> update existing news by clicking on the Subject below.</div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -30,7 +32,7 @@
                             <p class="text-muted">
                                 <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
                             </p>
-                            {% if user.is_staff %}
+                            {% if perms.operations_portalcms_django.change_integrationnews %}
                                 <a href="{% url 'operations_portalcms_django:update_integration_news' news.id %}" class="btn btn-sm btn-primary">Edit</a>
                             {% endif %}
                         </div>

@@ -94,7 +94,7 @@
         <div class="mt-4">
             <button type="submit" class="btn btn-primary">Update Integration News</button>
             <a href="{% url 'operations_portalcms_django:integration_news' %}" class="btn btn-secondary">Cancel</a>
-            {% if user.is_staff %}
+            {% if perms.operations_portalcms_django.delete_integrationnews %}
                 <button type="submit" name="delete" class="btn btn-danger float-end">Delete</button>
             {% endif %}
         </div>

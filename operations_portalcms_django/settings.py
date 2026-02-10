@@ -85,7 +85,7 @@ INSTALLED_APPS = [
     'treebeard',
     'sekizai',
     'django_bootstrap5',
-    'operations_portalcms_django',
+    'operations_portalcms_django.apps.OperationsPortalcmsDjangoConfig',
     # Django CMS plugins
     'djangocms_text_ckeditor',
     'djangocms_picture',
@@ -284,6 +284,51 @@ SYSLOG_SOCK = os.environ.get('SYSLOG_SOCK', '/var/run/syslog')
 
 # API Configuration
 API_BASE = os.environ.get('API_BASE', '')
+
+# ==================== ALLAUTH SOCIALACCOUNT CONFIGURATION ====================
+# CILogon OAuth2 Configuration - matches Service Index functionality
+
+SOCIALACCOUNT_PROVIDERS = {
+    'cilogon': {
+        'SCOPE': [
+            'openid',
+            'profile',
+            'email',
+            'org.cilogon.userinfo',
+        ],
+        'VERIFIED_EMAIL': True,
+        'VERSION': 'v1',
+        'FIELDS_MAPPING': {
+            'email': 'email',
+            'name': 'name',
+            'first_name': 'given_name',
+            'last_name': 'family_name',
+            'picture': 'picture',
+            'eppn': 'eppn',
+        },
+        'APP': {
+            'client_id': os.environ.get('CILOGON_CLIENT_ID', ''),
+            'secret': os.environ.get('CILOGON_CLIENT_SECRET', ''),
+            'key': '',
+        },
+    },
+}
+
+AUTHENTICATION_BACKENDS = [
+    # Allauth authentication backend (required for socialaccount)
+    'allauth.account.auth_backends.AuthenticationBackend',
+    
+    # Django's default auth backend (for superuser/staff users)
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Allauth Account Settings
+ACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'optional'
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_STORE_TOKENS = True
+SOCIALACCOUNT_PROFILE_FIELDS = ['email', 'first_name', 'last_name']
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
