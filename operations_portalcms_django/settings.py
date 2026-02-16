@@ -323,7 +323,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Allauth Account Settings
-ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
 SOCIALACCOUNT_EMAIL_REQUIRED = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = 'optional'
 SOCIALACCOUNT_AUTO_SIGNUP = True
@@ -334,3 +334,52 @@ SOCIALACCOUNT_PROFILE_FIELDS = ['email', 'first_name', 'last_name']
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CMS related settings
+CMS_PAGE_WIZARD_CONTENT_PLACEHOLDER = "content"
+CMS_PAGE_WIZARD_CONTENT_PLUGIN = "TextPlugin"
+
+# Logging setup
+import logging
+from logging.handlers import SysLogHandler
+
+if DEBUG or not os.path.exists('/dev/log'):
+    DEFAULT_LOG = 'console'
+else:
+    DEFAULT_LOG = 'syslog'
+
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'formatters': {
+#         'simple': {
+#             'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s'
+#         }
+#     },
+#     'handlers': {
+#         'file': {
+#             'level': 'DEBUG',
+#             'class': 'logging.FileHandler',
+#             'filename': CONF['APP_LOG'],
+#             'formatter': 'simple'
+#         }
+#     },
+#     'loggers': {
+#         'django': {
+#             'handlers': ['file'],
+#             'level': 'WARNING'
+#         },
+#         'django.server': {
+#             'handlers': ['file'],
+# #            'propagate': True,
+#             'level': 'DEBUG'
+#         },
+#         'services': {
+#             'handlers': ['file'],
+#             'level': 'DEBUG'
+#         }
+#     }
+# }
+
+APP_NAME = 'Portal CMS'
+# APP_VERSION = CONF['APP_VERSION']

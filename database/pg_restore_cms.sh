@@ -8,4 +8,4 @@ if [[ ! -r ${FILE} ]]; then
 fi
 echo "restore dump: ${FILE}"
 
-psql -p 5434 -U portalcms_django cms1 <${FILE}
+psql -p 5434 -U portalcms_django cms2 <${FILE}

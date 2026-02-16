@@ -14,6 +14,9 @@ urlpatterns = [
     path('infrastructure-news/', views.system_status_news, name='system_status_news'),
     path('integration-news/', views.integration_news, name='integration_news'),
     path('resources/access-allocated/', views.access_allocated_resources, name='access_allocated'),
+    path('resources/access-online-services/', views.access_online_services, name='access_online_services'),
+    path('resources/software-discovery/', views.software_discovery, name='software_discovery'),
+    path('resources/software/<path:software_id>/', views.software_detail, name='software_detail'),
     
     # Resource detail page
     path('node/<int:node_id>/', views.resource_detail, name='resource_detail'),

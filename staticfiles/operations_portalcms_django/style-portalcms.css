@@ -79,7 +79,7 @@ a:hover {
 /* ============================================
    HEADER STYLES
    ============================================ */
-header.access-operations-drupal-portal {
+header {
     background-color: white;
     border-bottom: 1px solid var(--contrast-9);
 }
@@ -111,7 +111,7 @@ header.access-operations-drupal-portal {
 /* ============================================
    NAVIGATION
    ============================================ */
-.region-nav-main {
+.navbar nav {
     width: 100%;
     display: flex;
     justify-content: flex-end;
@@ -211,13 +211,23 @@ main {
    BUTTONS
    ============================================ */
 .btn-primary {
-    background-color: var(--teal-600);
-    border-color: var(--teal-600);
+    font-family: "Archivo", sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #000;
+    background-color: #fec42d;
+    border-color: #fec42d;
+    border-radius: 0;
+    border-width: 4px;
+    padding: 8px;
+    text-decoration: none;
+    vertical-align: middle;
 }
 
 .btn-primary:hover {
-    background-color: var(--teal-700);
-    border-color: var(--teal-700);
+    color: #000;
+    background-color: #fff;
+    border-color: #000;
 }
 
 /* ACCESS Primary Button (Yellow) */
@@ -695,12 +705,38 @@ td.outlined {
 
 /* Links inside accordion bodies */
 .accordion-body .btn-link {
-    color: #FFC42D;
+    color: #008597;
     text-decoration: none;
+    padding: 0;
+    vertical-align: baseline;
 }
 
 .accordion-body .btn-link:hover {
-    color: #FFD666;
+    color: #1A5B6E;
+    text-decoration: underline;
+}
+
+/* Resource links in accordions - dark teal styling */
+.accordion-body .resource-link {
+    color: #008597 !important;
+    text-decoration: none;
+}
+
+.accordion-body .resource-link:hover {
+    color: #1A5B6E !important;
+    text-decoration: underline;
+}
+
+/* Links inside dark backgrounds - yellow for visibility */
+.bg-dark .btn-link {
+    color: #FFC42D !important;
+    text-decoration: none;
+    padding: 0;
+    vertical-align: baseline;
+}
+
+.bg-dark .btn-link:hover {
+    color: #FFE69C !important;
     text-decoration: underline;
 }
 

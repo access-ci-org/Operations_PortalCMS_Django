@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}ACCESS Resource Provider Software Discovery | Operations{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item">
+    Software Discovery
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">ACCESS Resource Provider Software Discovery</h1>
+    
+    {% if error_message %}
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle"></i> {{ error_message }}
+    </div>
+    {% endif %}
+    
+    {# Search Form #}
+    <form method="get" action="{% url 'operations_portalcms_django:software_discovery' %}" class="mb-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="input-group mb-3">
+                    <input type="text" name="q" class="form-control" placeholder="Search software..." value="{{ search_query }}" aria-label="Search software">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-12">
+                <strong class="me-3">Search Fields (at least one required):</strong>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" name="search_name" id="search_name" value="on" {% if search_name %}checked{% endif %}>
+                    <label class="form-check-label" for="search_name">Name & Version & Resource</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" name="search_desc" id="search_desc" value="on" {% if search_desc %}checked{% endif %}>
+                    <label class="form-check-label" for="search_desc">Description & Module</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" name="search_topics" id="search_topics" value="on" {% if search_topics %}checked{% endif %}>
+                    <label class="form-check-label" for="search_topics">Domain</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" name="search_keywords" id="search_keywords" value="on" {% if search_keywords %}checked{% endif %}>
+                    <label class="form-check-label" for="search_keywords">Keywords</label>
+                </div>
+            </div>
+        </div>
+        
+        {# Hidden fields to preserve provider filter #}
+        {% if selected_provider %}
+        <input type="hidden" name="provider" value="{{ selected_provider }}">
+        {% endif %}
+    </form>
+    
+    {# Results Count #}
+    <div class="mb-3">
+        <small>Viewing: {{ start_index }} - {{ end_index }} of {{ total_count }} &nbsp;&nbsp;&nbsp;&nbsp; Click on a title to view item details.</small>
+    </div>
+    
+    <div class="row">
+        {# Left Sidebar - Filters #}
+        <div class="col-lg-3 col-md-4 mb-4">
+            <a href="{% url 'operations_portalcms_django:software_discovery' %}" class="btn btn-outline-secondary w-100 mb-3">
+                <i class="bi bi-arrow-clockwise"></i> Reset Filters
+            </a>
+            
+            {% if providers %}
+            <div class="card">
+                <div class="card-header">
+                    <strong>By Resource:</strong>
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    <ul class="list-unstyled">
+                        {% for provider, count in providers.items %}
+                        <li class="mb-2">
+                            <a href="?provider={{ provider|urlencode }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if search_name %}&search_name=on{% endif %}{% if search_desc %}&search_desc=on{% endif %}{% if search_topics %}&search_topics=on{% endif %}{% if search_keywords %}&search_keywords=on{% endif %}" 
+                               class="{% if selected_provider == provider %}text-primary fw-bold{% else %}text-decoration-none{% endif %}">
+                                <small>{{ provider }}</small>
+                            </a>
+                            <span class="text-muted">({{ count }})</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        {# Main Content - Software List #}
+        <div class="col-lg-9 col-md-8">
+            {% if page_obj.object_list %}
+                {% for software in page_obj %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title mb-2">
+                            <a href="{% url 'operations_portalcms_django:software_detail' software.ID %}" class="text-decoration-none">
+                                {{ software.AppName|default:"Unknown Software" }}{% if software.AppVersion %} <span class="text-muted">v{{ software.AppVersion }}</span>{% endif %}
+                            </a>
+                        </h5>
+                        
+                        <div class="d-flex flex-wrap gap-3 text-muted small mb-2">
+                            {% if software.Handle.HandleType %}
+                            <div>
+                                <i class="bi bi-play-circle"></i>
+                                <span>{{ software.Handle.HandleType|title }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if software.ResourceID %}
+                            <div>
+                                <i class="bi bi-building"></i>
+                                <span>{{ software.ResourceID }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if software.Handle.HandleKey %}
+                        <p class="card-text mt-2 mb-2">
+                            <strong>Module:</strong> <code>{{ software.Handle.HandleKey }}</code>
+                        </p>
+                        {% endif %}
+                        
+                        {% if software.Description %}
+                        <p class="card-text mb-2">
+                            {{ software.Description }}
+                        </p>
+                        {% endif %}
+                        
+                        {% if software.Domain %}
+                        <p class="card-text mb-2">
+                            <strong>Domain:</strong> <span class="badge rounded-pill bg-primary">{{ software.Domain|join:"</span> <span class='badge rounded-pill bg-primary'>" }}</span>
+                        </p>
+                        {% endif %}
+                        
+                        {% if software.Keywords %}
+                        <p class="card-text mb-0">
+                            <strong>Keywords:</strong> <span class="badge rounded-pill bg-secondary">{{ software.Keywords|join:"</span> <span class='badge rounded-pill bg-secondary'>" }}</span>
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                
+                {# Pagination Controls #}
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if selected_provider %}&provider={{ selected_provider|urlencode }}{% endif %}{% if search_name %}&search_name=on{% endif %}{% if search_desc %}&search_desc=on{% endif %}{% if search_topics %}&search_topics=on{% endif %}{% if search_keywords %}&search_keywords=on{% endif %}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">&laquo;</span>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if selected_provider %}&provider={{ selected_provider|urlencode }}{% endif %}{% if search_name %}&search_name=on{% endif %}{% if search_desc %}&search_desc=on{% endif %}{% if search_topics %}&search_topics=on{% endif %}{% if search_keywords %}&search_keywords=on{% endif %}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if selected_provider %}&provider={{ selected_provider|urlencode }}{% endif %}{% if search_name %}&search_name=on{% endif %}{% if search_desc %}&search_desc=on{% endif %}{% if search_topics %}&search_topics=on{% endif %}{% if search_keywords %}&search_keywords=on{% endif %}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">&raquo;</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle"></i> No software found matching your search criteria.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

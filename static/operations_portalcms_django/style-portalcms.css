@@ -79,7 +79,7 @@ a:hover {
 /* ============================================
    HEADER STYLES
    ============================================ */
-header.access-operations-drupal-portal {
+header {
     background-color: white;
     border-bottom: 1px solid var(--contrast-9);
 }
@@ -111,7 +111,7 @@ header.access-operations-drupal-portal {
 /* ============================================
    NAVIGATION
    ============================================ */
-.region-nav-main {
+.navbar nav {
     width: 100%;
     display: flex;
     justify-content: flex-end;

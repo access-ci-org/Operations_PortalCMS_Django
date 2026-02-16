@@ -1,6 +1,6 @@
 {% load cms_tags menu_tags sekizai_tags static %}
 <!DOCTYPE html>
-<html lang="en" dir="ltr" class="h-100 access-operations-drupal-portal">
+<html lang="en" dir="ltr" class="h-100">
 <head>
     <meta charset="utf-8" />
     <meta name="Generator" content="Django CMS 5 (https://www.django-cms.org)" />
@@ -24,16 +24,16 @@
     
     {% render_block "css" %}
 </head>
-<body class="path-node page-node-type-people-facing-information d-flex flex-column h-100">
+<body class="d-flex flex-column h-100">
     <a href="#main-content" class="visually-hidden focusable skip-link">
         Skip to main content
     </a>
     
-    <div class="dialog-off-canvas-main-canvas d-flex flex-column" data-off-canvas-main-canvas>
+    <div class="d-flex flex-column">
         {% cms_toolbar %}
         
         {# Header #}
-        <header data-elastic-exclude="true" class="access-operations-drupal-portal">
+        <header data-elastic-exclude="true">
             <div id="universal-menus"></div>
             
             <nav class="navbar navbar-expand-lg d-flex flex-column">
@@ -45,20 +45,16 @@
                         <div class="logo-divider">
                             <img src="{% static 'operations_portalcms_django/img/ACCESS-pipe.svg' %}" alt="" />
                         </div>
-                        <div class="region region-nav-branding">
-                            <div id="block-branding" class="block block-system block-system-branding-block">
-                                <div class="navbar-brand d-flex align-items-center">
-                                    <a href="{% url 'operations_portalcms_django:index' %}" title="Home" rel="home" class="site-logo d-block">
-                                        <img src="{% static 'operations_portalcms_django/img/ACCESS-operations.svg' %}" alt="Home" />
-                                    </a>
-                                </div>
-                            </div>
+                        <div class="navbar-brand d-flex align-items-center">
+                            <a href="{% url 'operations_portalcms_django:index' %}" title="Home" rel="home" class="site-logo d-block">
+                                <img src="{% static 'operations_portalcms_django/img/ACCESS-operations.svg' %}" alt="Home" />
+                            </a>
                         </div>
                     </div>
                     
                     {# Main Navigation #}
-                    <div class="region region-nav-main">
-                        <nav role="navigation" aria-labelledby="block-main-navigation-menu" class="block block-menu navigation menu--main">
+                    <div>
+                        <nav role="navigation" aria-labelledby="block-main-navigation-menu">
                             <h5 class="visually-hidden" id="block-main-navigation-menu">Main navigation</h5>
                             <ul data-block="nav_main" class="navbar-nav justify-content-end flex-wrap nav-level-0">
                                 <li class="nav-item">
@@ -114,8 +110,7 @@
                 {# Messages #}
                 <div class="row g-0">
                     <div class="order-1 order-lg-2">
-                        <div class="region region-content">
-                            <div data-drupal-messages-fallback class="hidden"></div>
+                        <div>
                             
                             {# Page Content #}
                             {% block content %}
@@ -195,6 +190,7 @@
         } from "https://unpkg.com/@access-ci/ui@0.15.0/dist/access-ci-ui.js";
         
         const siteItems = [
+                    { name: "Home", href: "/" },
             {
                 name: "Focus Areas",
                 items: [
@@ -211,7 +207,13 @@
                     { name: "New Infrastructure", href: "/pub/access-infrastructure-integration" },
                 ]
             },
-            { name: "FAQs", href: "/pub/ticketing-faqs" },
+            { 
+                name: "FAQs", 
+                items: [
+                    { name: "Identity Management", href: "/pub/identity-faqs/" },
+                    { name: "Ticketing", href: "/pub/ticketing-faqs" }
+                ],
+            },
             { name: "Help", href: "/pub/help" },
         ];
         

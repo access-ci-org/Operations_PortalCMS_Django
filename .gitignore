@@ -66,6 +66,8 @@ db.sqlite3-journal
 
 # Project Configuration
 portalcms.conf.dev.json
+DEPLOYMENT.md
+QUICKREF.md
 
 # Flask stuff:
 instance/
@@ -211,3 +213,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Database dumps and backups
+# TEMPORARILY COMMENTED OUT FOR INITIAL DEPLOYMENT WITH DEV DATA
+# Re-enable these after first production deployment
+# database/dumps/*.dump
+# database/dumps/*.sql
+# database/dumps/*.gz
+# *.dump
+# *.sql.gz
+# backup.sql
