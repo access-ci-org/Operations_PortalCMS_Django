@@ -68,6 +68,7 @@ db.sqlite3-journal
 portalcms.conf.dev.json
 DEPLOYMENT.md
 QUICKREF.md
+portalcms_django_config
 
 # Flask stuff:
 instance/
