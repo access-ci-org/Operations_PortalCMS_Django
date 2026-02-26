@@ -228,7 +228,7 @@ CMS_TEMPLATES = [
     ('infrastructure.html', 'Infrastructure Integration'),
     ('focus_area.html', 'Focus Area Page'),
 ]
-CMS_PERMISSION = False
+CMS_PERMISSION = True
 CMS_PLACEHOLDER_CONF = {}
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
