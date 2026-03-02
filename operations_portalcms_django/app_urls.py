@@ -9,7 +9,7 @@ app_name = 'operations_portalcms_django'
 
 urlpatterns = [
     # Main navigation pages
-    path('', views.index, name='index'),  # Homepage at root
+    # path('', views.index, name='index'),  # Homepage now handled by CMS
     path('unprivileged/', views.unprivileged, name='unprivileged'),  # Permission error page
     path('infrastructure-news/', views.system_status_news, name='system_status_news'),
     path('integration-news/', views.integration_news, name='integration_news'),

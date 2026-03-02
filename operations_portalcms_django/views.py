@@ -10,14 +10,6 @@ import requests
 from collections import defaultdict
 
 
-def index(request):
-    """Operations Portal landing page"""
-    context = {
-        'page': 'index',
-    }
-    return render(request, 'operations_portalcms_django/index.html', context)
-
-
 def unprivileged(request):
     """Error page for users without required permissions"""
     return render(request, 'web/unprivileged.html')
