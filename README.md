@@ -46,13 +46,6 @@ Operations_PortalCMS_Django/
 - **Web Server:** nginx
 - **Package Manager:** uv
 
-## Documentation
-
-For setup, deployment, and operational instructions, see:
-
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Development setup and production deployment guide
-- **[QUICKREF.md](QUICKREF.md)** - Quick reference for common operations
-
 ## Development Guidelines
 
 - Python code style: Follow Django conventions
