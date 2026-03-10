@@ -5,8 +5,10 @@ ACCESS Operations Portal Django CMS application for managing & publishing infras
 ## Features
 
 - Django CMS 5 with Bootstrap 5
-- CILogon OAuth2 authentication
+- CILogon OAuth2 authentication with automatic group sync
+- **Resource Provider Permissions** - Fine-grained access control based on COmanage groups
 - Integration News & System Status News management
+- CIDER integration for infrastructure, organizations, and RP groups
 - Resource allocation information
 - Focus area pages (Cybersecurity, Networking, Operational Support, STEP)
 - FAQ pages with accordion UI
@@ -40,11 +42,24 @@ Operations_PortalCMS_Django/
 - **Framework:** Django 5.2
 - **CMS:** Django CMS 5.0
 - **Frontend:** Bootstrap 5.3, ACCESS UI Components
-- **Database:** PostgreSQL
+- **Database:** PostgreSQL 15
 - **Authentication:** django-allauth with CILogon
 - **WSGI Server:** Gunicorn
 - **Web Server:** nginx
 - **Package Manager:** uv
+
+## Documentation
+
+**Permissions System:**
+- **[PERMISSIONS_SUMMARY.md](READMEs/PERMISSIONS_SUMMARY.md)** - Start here: Overview of permission model
+- **[NEWS_PERMISSIONS.md](READMEs/NEWS_PERMISSIONS.md)** - RP permissions for news items
+- **[CMS_PAGE_PERMISSIONS.md](READMEs/CMS_PAGE_PERMISSIONS.md)** - Custom groups for page editing
+- **[QUICKSTART_PERMISSIONS.md](READMEs/QUICKSTART_PERMISSIONS.md)** - Setup guide
+- **[PERMISSIONS.md](READMEs/PERMISSIONS.md)** - Technical details
+
+**Coming Soon:**
+- DEPLOYMENT.md - Development setup and production deployment
+- QUICKREF.md - Quick reference for common operations
 
 ## Development Guidelines
 
@@ -54,4 +69,4 @@ Operations_PortalCMS_Django/
 
 ---
 
-Original Django server produced by Claude 4.5 Sonnet
+Original Django server produced by Claude 4.5 Sonnet with assistance from ChatCPT Codex 5.2 & 5.3.

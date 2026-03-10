@@ -10,12 +10,94 @@ Replicates functionality from Service Index to ensure consistent behavior:
 import logging
 from django.dispatch import receiver
 from django.contrib.auth.signals import user_logged_in, user_logged_out
+from django.contrib.auth.models import Group
 from allauth.socialaccount.signals import pre_social_login
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.models import User
 from allauth.account.utils import setup_user_email
 
 logger = logging.getLogger(__name__)
+
+
+def sync_cilogon_groups(user, sociallogin):
+    """
+    Sync user's Django groups from CILogon group memberships.
+    
+    CILogon returns group memberships in the 'isMemberOf' claim as URNs:
+    Example: ['urn:group:access-ci.org:rp.access-ci.org:coordinator', ...]
+    
+    This function:
+    1. Extracts group URNs from CILogon claims
+    2. Matches them to Django groups created by setup_rp_permissions
+    3. Adds user to matching groups
+    4. Removes user from groups they no longer belong to
+    
+    Args:
+        user: Django User object
+        sociallogin: SocialAccount object with CILogon data
+    """
+    try:
+        # Get group memberships from CILogon claims
+        cilogon_groups = sociallogin.extra_data.get('isMemberOf', [])
+        
+        if not isinstance(cilogon_groups, list):
+            cilogon_groups = [cilogon_groups] if cilogon_groups else []
+        
+        logger.info(f"CILogon groups for {user.username}: {len(cilogon_groups)} groups")
+        
+        # Filter to only ACCESS-CI groups (RP groups)
+        access_groups = [
+            g for g in cilogon_groups 
+            if g.startswith('urn:group:access-ci.org:')
+        ]
+        
+        if not access_groups:
+            logger.info(f"No ACCESS-CI groups found for {user.username}")
+            # Remove user from all RP groups if they no longer have membership
+            current_groups = user.groups.filter(name__startswith='urn:group:access-ci.org:')
+            if current_groups.exists():
+                user.groups.remove(*current_groups)
+                logger.info(f"Removed {user.username} from {current_groups.count()} RP groups")
+            return
+        
+        # Get existing Django groups that match the CILogon URNs
+        matching_groups = Group.objects.filter(name__in=access_groups)
+        
+        # Current groups the user is in (RP groups only)
+        current_rp_groups = set(
+            user.groups.filter(name__startswith='urn:group:access-ci.org:')
+            .values_list('name', flat=True)
+        )
+        
+        # Groups from CILogon
+        cilogon_group_set = set(access_groups)
+        
+        # Groups to add (in CILogon but not in Django user.groups)
+        groups_to_add = cilogon_group_set - current_rp_groups
+        
+        # Groups to remove (in Django user.groups but not in CILogon)
+        groups_to_remove = current_rp_groups - cilogon_group_set
+        
+        # Add user to new groups
+        if groups_to_add:
+            new_groups = Group.objects.filter(name__in=groups_to_add)
+            if new_groups.exists():
+                user.groups.add(*new_groups)
+                logger.info(f"Added {user.username} to {new_groups.count()} groups: {list(groups_to_add)}")
+        
+        # Remove user from old groups
+        if groups_to_remove:
+            old_groups = Group.objects.filter(name__in=groups_to_remove)
+            if old_groups.exists():
+                user.groups.remove(*old_groups)
+                logger.info(f"Removed {user.username} from {old_groups.count()} groups: {list(groups_to_remove)}")
+        
+        # Log final group count
+        final_count = user.groups.filter(name__startswith='urn:group:access-ci.org:').count()
+        logger.info(f"User {user.username} now has {final_count} RP groups")
+        
+    except Exception as e:
+        logger.error(f"Error syncing CILogon groups for {user.username}: {e}", exc_info=True)
 
 
 @receiver(user_logged_in)
@@ -63,6 +145,9 @@ def set_username(sender, request, user, **kwargs):
         user.username = username
         user.save()
         logger.info(f"Updated username for CILogon user {subject} -> {username}")
+
+    # Sync user's groups from CILogon claims
+    sync_cilogon_groups(user, sociallogin)
 
     # Log the login with IP
     remote_ip = request.META.get('HTTP_X_FORWARDED_FOR')
