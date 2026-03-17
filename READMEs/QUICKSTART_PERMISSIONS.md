@@ -69,6 +69,22 @@ Simple rule: **If you're in ANY RP group, you can add/edit news**
 └────────────────────────────────────────┘
 ```
 
+## Data Source: CIDER API
+
+The CIDER (Cyber Infrastructure Description Repository) data comes from the **Operations API Warehouse**:
+- API: `https://operations-api.access-ci.org/wh2/cider/`
+- Provides authoritative RP groups, organizations, infrastructure
+
+**Development:** Use test data
+```bash
+uv run python manage.py load_test_cider_data
+```
+
+**Production:** Sync from live API
+```bash
+uv run python manage.py sync_cider_from_api
+```
+
 ## Commands You Ran
 
 ```bash
