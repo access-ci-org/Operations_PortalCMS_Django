@@ -25,15 +25,64 @@
         <div class="row">
             {% for news in integration_news %}
                 <div class="col-md-12 mb-4">
-                    <div class="card">
+                    <div class="card bg-light">
                         <div class="card-body">
-                            <h5 class="card-title">{{ news.title }}</h5>
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title">{{ news.title }}</h5>
+                                <span class="badge bg-{% if news.status == 'published' %}success{% elif news.status == 'approved' %}info{% elif news.status == 'pending_review' %}warning{% elif news.status == 'rejected' %}danger{% else %}secondary{% endif %}">
+                                    {{ news.get_status_display }}
+                                </span>
+                            </div>
                             <p class="card-text">{{ news.content }}</p>
                             <p class="text-muted">
                                 <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
+                                {% if news.status != 'published' %}
+                                    <small class="ms-2">• Author: {{ news.author.get_full_name|default:news.author.username }}</small>
+                                {% endif %}
+                                {% if news.reviewer %}
+                                    <small class="ms-2">• Reviewed by: {{ news.reviewer.get_full_name|default:news.reviewer.username }}</small>
+                                {% endif %}
                             </p>
-                            {% if perms.operations_portalcms_django.change_integrationnews %}
-                                <a href="{% url 'operations_portalcms_django:update_integration_news' news.id %}" class="btn btn-sm btn-primary">Edit</a>
+                            
+                            {% if user.is_authenticated %}
+                                <div class="btn-group" role="group">
+                                    {% if news.status == 'draft' %}
+                                        {% if news.author == user or perms.operations_portalcms_django.change_integrationnews or user.is_superuser %}
+                                            <a href="{% url 'operations_portalcms_django:update_integration_news' news.id %}" class="btn btn-sm btn-primary">Edit</a>
+                                        {% endif %}
+                                        {% if news.author == user %}
+                                            <a href="{% url 'operations_portalcms_django:submit_integration_for_review' news.id %}" class="btn btn-sm btn-success">Submit for Review</a>
+                                        {% endif %}
+                                    {% endif %}
+                                    
+                                    {% if news.status == 'pending_review' and can_review %}
+                                        <a href="{% url 'operations_portalcms_django:approve_integration_news' news.id %}" class="btn btn-sm btn-success">Approve</a>
+                                        <a href="{% url 'operations_portalcms_django:update_integration_news' news.id %}" class="btn btn-sm btn-warning">Reject</a>
+                                    {% endif %}
+                                    
+                                    {% if news.status == 'approved' and can_publish %}
+                                        <a href="{% url 'operations_portalcms_django:publish_integration_news' news.id %}" class="btn btn-sm btn-primary">Publish</a>
+                                    {% endif %}
+                                    
+                                    {% if news.status == 'rejected' and news.author == user %}
+                                        <a href="{% url 'operations_portalcms_django:update_integration_news' news.id %}" class="btn btn-sm btn-primary">Edit & Resubmit</a>
+                                    {% endif %}
+                                    
+                                    {% if news.status == 'published' %}
+                                        {% if perms.operations_portalcms_django.change_integrationnews %}
+                                            <a href="{% url 'operations_portalcms_django:update_integration_news' news.id %}" class="btn btn-sm btn-primary">Edit</a>
+                                        {% endif %}
+                                        {% if news.author == user or user.is_superuser %}
+                                            <a href="{% url 'operations_portalcms_django:unpublish_integration_news' news.id %}" class="btn btn-sm btn-secondary" onclick="return confirm('Are you sure you want to unpublish this news item? It will no longer be visible to the public.');">Unpublish</a>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                
+                                {% if news.review_comments %}
+                                    <div class="alert alert-warning mt-2 mb-0">
+                                        <strong>Review Comments:</strong> {{ news.review_comments }}
+                                    </div>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>

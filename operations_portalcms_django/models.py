@@ -71,14 +71,50 @@ class SystemStatusNews(models.Model):
     # Meta fields
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='authored_systemstatus_news')
     is_active = models.BooleanField(default=True)
+    
+    # Workflow fields
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('draft', 'Draft'),
+            ('pending_review', 'Pending Review'),
+            ('approved', 'Approved'),
+            ('published', 'Published'),
+            ('rejected', 'Rejected'),
+        ],
+        default='published',  # Existing news defaults to published
+        help_text='Current workflow status'
+    )
+    reviewer = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_systemstatus_news',
+        help_text='User assigned to review this news'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_comments = models.TextField(blank=True, help_text='Comments from reviewer')
+    published_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='published_systemstatus_news'
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         ordering = ['-start_datetime']
         verbose_name = 'System and Infrastructure Status News'
         verbose_name_plural = 'System and Infrastructure Status News'
         db_table = 'operations_portalcms_django_systemstatusnews'
+        permissions = [
+            ('can_review_systemstatusnews', 'Can review System Status News'),
+            ('can_publish_systemstatusnews', 'Can publish System Status News'),
+        ]
     
     def __str__(self):
         return self.subject
@@ -106,14 +142,50 @@ class IntegrationNews(models.Model):
     expiration_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='authored_integration_news')
     is_active = models.BooleanField(default=True)
+    
+    # Workflow fields
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('draft', 'Draft'),
+            ('pending_review', 'Pending Review'),
+            ('approved', 'Approved'),
+            ('published', 'Published'),
+            ('rejected', 'Rejected'),
+        ],
+        default='published',  # Existing news defaults to published
+        help_text='Current workflow status'
+    )
+    reviewer = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_integration_news',
+        help_text='User assigned to review this news'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_comments = models.TextField(blank=True, help_text='Comments from reviewer')
+    published_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='published_integration_news'
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Integration News'
         verbose_name_plural = 'Integration News'
         db_table = 'operations_portalcms_django_integrationnews'
+        permissions = [
+            ('can_review_integrationnews', 'Can review Integration News'),
+            ('can_publish_integrationnews', 'Can publish Integration News'),
+        ]
     
     def __str__(self):
         return self.title

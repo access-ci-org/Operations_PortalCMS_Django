@@ -92,7 +92,10 @@
             {% if form.is_active.errors %}<div class="text-danger">{{ form.is_active.errors }}</div>{% endif %}
         </div>
         
-        <button type="submit" class="btn btn-primary">Update</button>
+        <button type="submit" name="draft" class="btn btn-primary">Update</button>
+        {% if can_publish %}
+        <button type="submit" name="publish" class="btn btn-success">Update and Publish</button>
+        {% endif %}
         <a href="{% url 'operations_portalcms_django:system_status_news' %}" class="btn btn-secondary">Cancel</a>
         {% if perms.operations_portalcms_django.delete_systemstatusnews %}
             <button type="submit" name="delete" class="btn btn-danger float-end">Delete</button>

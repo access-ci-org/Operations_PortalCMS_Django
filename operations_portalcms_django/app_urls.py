@@ -4,6 +4,7 @@ Separate from main urls.py to keep CMS urls clean
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
+from . import workflow
 
 app_name = 'operations_portalcms_django'
 
@@ -28,4 +29,18 @@ urlpatterns = [
     # Integration News management
     path('integration-news/add/', views.add_integration_news, name='add_integration_news'),
     path('integration-news/update/<int:pk>/', views.update_integration_news, name='update_integration_news'),
+    
+    # System Status News workflow actions
+    path('infrastructure-news/<int:pk>/submit/', workflow.submit_systemstatus_for_review, name='submit_systemstatus_for_review'),
+    path('infrastructure-news/<int:pk>/approve/', workflow.approve_systemstatus_news, name='approve_systemstatus_news'),
+    path('infrastructure-news/<int:pk>/reject/', workflow.reject_systemstatus_news, name='reject_systemstatus_news'),
+    path('infrastructure-news/<int:pk>/publish/', workflow.publish_systemstatus_news, name='publish_systemstatus_news'),
+    path('infrastructure-news/<int:pk>/unpublish/', workflow.unpublish_systemstatus_news, name='unpublish_systemstatus_news'),
+    
+    # Integration News workflow actions
+    path('integration-news/<int:pk>/submit/', workflow.submit_integration_for_review, name='submit_integration_for_review'),
+    path('integration-news/<int:pk>/approve/', workflow.approve_integration_news, name='approve_integration_news'),
+    path('integration-news/<int:pk>/reject/', workflow.reject_integration_news, name='reject_integration_news'),
+    path('integration-news/<int:pk>/publish/', workflow.publish_integration_news, name='publish_integration_news'),
+    path('integration-news/<int:pk>/unpublish/', workflow.unpublish_integration_news, name='unpublish_integration_news'),
 ]

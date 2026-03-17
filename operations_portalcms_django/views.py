@@ -17,20 +17,44 @@ def unprivileged(request):
 
 def system_status_news(request):
     """System and Infrastructure Status News listing page"""
-    news_items = SystemStatusNews.objects.filter(is_active=True)
+    # Show only published news to non-authenticated users
+    # Show all news to authenticated users with permissions
+    if request.user.is_authenticated and (
+        request.user.has_perm('operations_portalcms_django.change_systemstatusnews') or
+        request.user.has_perm('operations_portalcms_django.can_review_systemstatusnews') or
+        request.user.has_perm('operations_portalcms_django.can_publish_systemstatusnews')
+    ):
+        news_items = SystemStatusNews.objects.filter(is_active=True)
+    else:
+        news_items = SystemStatusNews.objects.filter(is_active=True, status='published')
+    
     context = {
         'page': 'system_status_news',
         'system_status_news': news_items,
+        'can_review': request.user.has_perm('operations_portalcms_django.can_review_systemstatusnews') if request.user.is_authenticated else False,
+        'can_publish': request.user.has_perm('operations_portalcms_django.can_publish_systemstatusnews') if request.user.is_authenticated else False,
     }
     return render(request, 'operations_portalcms_django/infrastructure_news.html', context)
 
 
 def integration_news(request):
     """Integration News listing page"""
-    news_items = IntegrationNews.objects.filter(is_active=True)
+    # Show only published news to non-authenticated users
+    # Show all news to authenticated users with permissions
+    if request.user.is_authenticated and (
+        request.user.has_perm('operations_portalcms_django.change_integrationnews') or
+        request.user.has_perm('operations_portalcms_django.can_review_integrationnews') or
+        request.user.has_perm('operations_portalcms_django.can_publish_integrationnews')
+    ):
+        news_items = IntegrationNews.objects.filter(is_active=True)
+    else:
+        news_items = IntegrationNews.objects.filter(is_active=True, status='published')
+    
     context = {
         'page': 'integration_news',
         'integration_news': news_items,
+        'can_review': request.user.has_perm('operations_portalcms_django.can_review_integrationnews') if request.user.is_authenticated else False,
+        'can_publish': request.user.has_perm('operations_portalcms_django.can_publish_integrationnews') if request.user.is_authenticated else False,
     }
     return render(request, 'operations_portalcms_django/integration_news.html', context)
 
@@ -41,13 +65,25 @@ def integration_news(request):
 @permission_required('operations_portalcms_django.add_systemstatusnews', login_url=reverse_lazy('operations_portalcms_django:unprivileged'))
 def add_system_status_news(request):
     """Add new system and infrastructure status news item"""
+    can_publish = request.user.is_superuser or request.user.has_perm('operations_portalcms_django.can_publish_systemstatusnews')
+    
     if request.method == 'POST':
         form = SystemStatusNewsForm(request.POST)
         if form.is_valid():
             news = form.save(commit=False)
             news.author = request.user
+            
+            # Check if user wants to publish directly
+            if 'publish' in request.POST and can_publish:
+                news.status = 'published'
+                news.published_by = request.user
+                news.published_at = timezone.now()
+                messages.success(request, 'System and infrastructure status news published successfully!')
+            else:
+                news.status = 'draft'  # New news starts as draft
+                messages.success(request, 'System and infrastructure status news created as draft. Submit for review when ready.')
+            
             news.save()
-            messages.success(request, 'System and infrastructure status news added successfully!')
             return redirect('operations_portalcms_django:system_status_news')
     else:
         form = SystemStatusNewsForm()
@@ -55,6 +91,7 @@ def add_system_status_news(request):
     context = {
         'page': 'system_status_news',
         'form': form,
+        'can_publish': can_publish,
     }
     return render(request, 'operations_portalcms_django/add_system_status_news.html', context)
 
@@ -64,12 +101,24 @@ def add_system_status_news(request):
 def update_system_status_news(request, pk):
     """Update existing system and infrastructure status news item"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
+    can_publish = request.user.is_superuser or request.user.has_perm('operations_portalcms_django.can_publish_systemstatusnews')
     
     if request.method == 'POST':
         form = SystemStatusNewsForm(request.POST, instance=news)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'System and infrastructure status news updated successfully!')
+            news = form.save(commit=False)
+            
+            # Check if user wants to publish directly
+            if 'publish' in request.POST and can_publish:
+                news.status = 'published'
+                news.published_by = request.user
+                news.published_at = timezone.now()
+                news.save()
+                messages.success(request, 'System and infrastructure status news updated and published successfully!')
+            else:
+                news.save()
+                messages.success(request, 'System and infrastructure status news updated successfully!')
+            
             return redirect('operations_portalcms_django:system_status_news')
     else:
         form = SystemStatusNewsForm(instance=news)
@@ -78,6 +127,7 @@ def update_system_status_news(request, pk):
         'page': 'system_status_news',
         'news': news,
         'form': form,
+        'can_publish': can_publish,
     }
     return render(request, 'operations_portalcms_django/update_system_status_news.html', context)
 
@@ -86,6 +136,8 @@ def update_system_status_news(request, pk):
 @permission_required('operations_portalcms_django.add_integrationnews', login_url=reverse_lazy('operations_portalcms_django:unprivileged'))
 def add_integration_news(request):
     """Add new integration news item"""
+    can_publish = request.user.is_superuser or request.user.has_perm('operations_portalcms_django.can_publish_integrationnews')
+    
     if request.method == 'POST':
         form = IntegrationNewsForm(request.POST)
         if form.is_valid():
@@ -96,8 +148,18 @@ def add_integration_news(request):
             news.affected_element = form.cleaned_data.get('affected_element', '')
             news.effective_date = form.cleaned_data.get('effective_date')
             news.expiration_date = form.cleaned_data.get('expiration_date')
+            
+            # Check if user wants to publish directly
+            if 'publish' in request.POST and can_publish:
+                news.status = 'published'
+                news.published_by = request.user
+                news.published_at = timezone.now()
+                messages.success(request, 'Integration news published successfully!')
+            else:
+                news.status = 'draft'  # New news starts as draft
+                messages.success(request, 'Integration news created as draft. Submit for review when ready.')
+            
             news.save()
-            messages.success(request, 'Integration news added successfully!')
             return redirect('operations_portalcms_django:integration_news')
     else:
         form = IntegrationNewsForm()
@@ -105,6 +167,7 @@ def add_integration_news(request):
     context = {
         'page': 'integration_news',
         'form': form,
+        'can_publish': can_publish,
     }
     return render(request, 'operations_portalcms_django/add_integration_news.html', context)
 
@@ -114,6 +177,7 @@ def add_integration_news(request):
 def update_integration_news(request, pk):
     """Update existing integration news item"""
     news = get_object_or_404(IntegrationNews, pk=pk)
+    can_publish = request.user.is_superuser or request.user.has_perm('operations_portalcms_django.can_publish_integrationnews')
     
     if request.method == 'POST':
         form = IntegrationNewsForm(request.POST, instance=news)
@@ -124,8 +188,18 @@ def update_integration_news(request, pk):
             news.affected_element = form.cleaned_data.get('affected_element', '')
             news.effective_date = form.cleaned_data.get('effective_date')
             news.expiration_date = form.cleaned_data.get('expiration_date')
-            news.save()
-            messages.success(request, 'Integration news updated successfully!')
+            
+            # Check if user wants to publish directly
+            if 'publish' in request.POST and can_publish:
+                news.status = 'published'
+                news.published_by = request.user
+                news.published_at = timezone.now()
+                news.save()
+                messages.success(request, 'Integration news updated and published successfully!')
+            else:
+                news.save()
+                messages.success(request, 'Integration news updated successfully!')
+            
             return redirect('operations_portalcms_django:integration_news')
     else:
         # Pre-populate form with existing data
@@ -141,6 +215,7 @@ def update_integration_news(request, pk):
         'page': 'integration_news',
         'news': news,
         'form': form,
+        'can_publish': can_publish,
     }
     return render(request, 'operations_portalcms_django/update_integration_news.html', context)
 

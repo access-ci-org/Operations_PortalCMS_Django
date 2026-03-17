@@ -152,6 +152,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+dumps/
+
 
 # Spyder project settings
 .spyderproject
@@ -216,11 +218,13 @@ marimo/_lsp/
 __marimo__/
 
 # Database dumps and backups
-# TEMPORARILY COMMENTED OUT FOR INITIAL DEPLOYMENT WITH DEV DATA
-# Re-enable these after first production deployment
-# database/dumps/*.dump
-# database/dumps/*.sql
-# database/dumps/*.gz
-# *.dump
-# *.sql.gz
-# backup.sql
+database/dumps/*.dump
+database/dumps/*.sql
+database/dumps/*.json
+database/dumps/*.gz
+database/dumps/*.tar.gz
+*.dump
+*.sql
+*.sql.gz
+backup*.sql
+backup*.json
