@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.views.decorators.cache import cache_page
 from django.urls import reverse_lazy
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.utils import timezone
 from .models import SystemStatusNews, IntegrationNews
 from .forms import SystemStatusNewsForm, IntegrationNewsForm
 import requests
@@ -143,6 +144,7 @@ def add_integration_news(request):
         if form.is_valid():
             news = form.save(commit=False)
             news.author = request.user
+            news.is_active = True  # New news is active by default
             # Save form data for fields not in the model
             news.news_type = form.cleaned_data.get('news_type', '')
             news.affected_element = form.cleaned_data.get('affected_element', '')

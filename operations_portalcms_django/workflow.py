@@ -23,7 +23,9 @@ def can_approve_or_reject(news, user, permission_codename):
 
 def can_publish(news, user, permission_codename):
     """Check if user can publish news"""
-    return news.status == 'approved' and user.has_perm(permission_codename)
+    # Users with publish permission can publish from either 'approved' or 'pending_review'
+    # This allows publishers to bypass the approval step
+    return news.status in ('approved', 'pending_review') and user.has_perm(permission_codename)
 
 
 def can_unpublish(news, user):

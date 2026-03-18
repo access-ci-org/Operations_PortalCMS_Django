@@ -29,7 +29,7 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <h5 class="card-title">{{ news.subject }}</h5>
-                                <span class="badge bg-{% if news.status == 'published' %}success{% elif news.status == 'approved' %}info{% elif news.status == 'pending_review' %}warning{% elif news.status == 'rejected' %}danger{% else %}secondary{% endif %}">
+                                <span class="badge bg-{% if news.status == 'published' %}success{% elif news.status == 'approved' %}info{% elif news.status == 'pending_review' %}warning text-dark{% elif news.status == 'rejected' %}danger{% else %}secondary{% endif %}">
                                     {{ news.get_status_display }}
                                 </span>
                             </div>
@@ -60,8 +60,8 @@
                                         <a href="{% url 'operations_portalcms_django:update_system_status_news' news.id %}" class="btn btn-sm btn-warning">Reject</a>
                                     {% endif %}
                                     
-                                    {% if news.status == 'approved' and can_publish %}
-                                        <a href="{% url 'operations_portalcms_django:publish_systemstatus_news' news.id %}" class="btn btn-sm btn-primary">Publish</a>
+                                    {% if news.status in 'approved,pending_review' and can_publish %}
+                                        <a href="{% url 'operations_portalcms_django:publish_systemstatus_news' news.id %}" class="btn btn-sm btn-info">Publish</a>
                                     {% endif %}
                                     
                                     {% if news.status == 'rejected' and news.author == user %}

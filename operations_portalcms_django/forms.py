@@ -76,11 +76,10 @@ class IntegrationNewsForm(forms.ModelForm):
     
     class Meta:
         model = IntegrationNews
-        fields = ['title', 'content', 'is_active']
+        fields = ['title', 'content']
         labels = {
             'title': 'Subject',
             'content': 'News Content',
-            'is_active': 'Active'
         }
         widgets = {
             'title': forms.TextInput(attrs={
