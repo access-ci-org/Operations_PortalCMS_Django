@@ -228,3 +228,5 @@ database/dumps/*.tar.gz
 *.sql.gz
 backup*.sql
 backup*.json
+database/drupal_backups 
+
