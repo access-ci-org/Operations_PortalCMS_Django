@@ -25,14 +25,18 @@
         <div class="row">
             {% for news in integration_news %}
                 <div class="col-md-12 mb-4">
-                    <div class="card bg-light">
+                        <div class="card bg-light">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h5 class="card-title">{{ news.title }}</h5>
+                                <h3 class="card-title fw-bold text-dark mb-0">{{ news.title }}</h3>
                                 <span class="badge bg-{% if news.status == 'published' %}success{% elif news.status == 'approved' %}info{% elif news.status == 'pending_review' %}warning text-dark{% elif news.status == 'rejected' %}danger{% else %}secondary{% endif %}">
                                     {{ news.get_status_display }}
                                 </span>
                             </div>
+                            <p class="card-text mb-1"><strong>Integration News Type:</strong> <code>{{ news.get_news_type_label }}</code></p>
+                            <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Element:</span> {{ news.get_affected_element_label }}</p>
+                            <p class="card-text mb-1"><span class="fw-bold text-dark">Effective Date:</span> {% if news.effective_date %}{{ news.effective_date|date:"F j, Y" }}{% else %}N/A{% endif %}</p>
+                            <p class="card-text mb-3"><span class="fw-bold text-dark">Expiration Date:</span> {% if news.expiration_date %}{{ news.expiration_date|date:"F j, Y" }}{% else %}N/A{% endif %}</p>
                             <p class="card-text">{{ news.content }}</p>
                             <p class="text-muted">
                                 <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>

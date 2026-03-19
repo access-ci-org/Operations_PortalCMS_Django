@@ -134,6 +134,26 @@ class SystemStatusNews(models.Model):
 
 class IntegrationNews(models.Model):
     """News items related to integrations, resource connections, new services, etc."""
+    INTEGRATION_NEWS_TYPES = [
+        ('software_release', 'Software Release'),
+        ('new_roadmap', 'New Integration Roadmap'),
+        ('changed_roadmap', 'Changed Integration Roadmap'),
+        ('new_roadmap_task', 'New Integration Roadmap Task'),
+        ('changed_roadmap_task', 'Changed Integration Roadmap Task'),
+    ]
+
+    AFFECTED_ELEMENTS = [
+        ('cloud_roadmap', 'ACCESS Allocated Production Cloud - Integration Roadmap'),
+        ('compute_roadmap', 'ACCESS Allocated Production Compute - Integration Roadmap'),
+        ('storage_roadmap', 'ACCESS Allocated Production Storage - Integration Roadmap'),
+        ('science_gateway_roadmap', 'ACCESS Integrated Science Gateway - Integration Roadmap'),
+        ('nagios', 'ACCESS Monitoring Service - Nagios'),
+        ('online_service_roadmap', 'ACCESS Production Online Service - Integration Roadmap'),
+        ('aws_registry', 'ACCESS Public AWS Container Registry'),
+        ('cider', 'CiDeR - CyberInfrastructure Description Repository'),
+        ('ipf', 'Information Publishing Framework (IPF) tool for publishing compute resource information'),
+    ]
+
     title = models.CharField(max_length=200)
     content = models.TextField()
     news_type = models.CharField(max_length=50, blank=True)
@@ -189,6 +209,14 @@ class IntegrationNews(models.Model):
     
     def __str__(self):
         return self.title
+
+    def get_news_type_label(self):
+        """Return a human-readable label for the stored integration news type."""
+        return dict(self.INTEGRATION_NEWS_TYPES).get(self.news_type, self.news_type or 'N/A')
+
+    def get_affected_element_label(self):
+        """Return a human-readable label for the stored affected element."""
+        return dict(self.AFFECTED_ELEMENTS).get(self.affected_element, self.affected_element or 'N/A')
 
 
 # CMS Plugin Models for News Feed

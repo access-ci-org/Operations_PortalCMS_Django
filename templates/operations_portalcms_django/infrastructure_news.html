@@ -28,11 +28,15 @@
                     <div class="card bg-light">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h5 class="card-title">{{ news.subject }}</h5>
+                                <h3 class="card-title fw-bold text-dark mb-0">{{ news.subject }}</h3>
                                 <span class="badge bg-{% if news.status == 'published' %}success{% elif news.status == 'approved' %}info{% elif news.status == 'pending_review' %}warning text-dark{% elif news.status == 'rejected' %}danger{% else %}secondary{% endif %}">
                                     {{ news.get_status_display }}
                                 </span>
                             </div>
+                            <p class="card-text mb-1"><strong>Infrastructure News Type:</strong> <code>{{ news.get_infrastructure_news_type_display }}</code></p>
+                            <p class="card-text mb-1"><strong>Affected Infrastructure:</strong> {{ news.affected_infrastructure|default:"N/A" }}</p>
+                            <p class="card-text mb-1"><span class="fw-bold text-dark">Start Date:</span> {% if news.start_datetime %}{{ news.start_datetime|date:"F j, Y, g:i a" }}{% else %}N/A{% endif %}</p>
+                            <p class="card-text mb-3"><span class="fw-bold text-dark">End Date:</span> {% if news.end_datetime %}{{ news.end_datetime|date:"F j, Y, g:i a" }}{% else %}N/A{% endif %}</p>
                             <p class="card-text">{{ news.content }}</p>
                             <p class="text-muted">
                                 <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
