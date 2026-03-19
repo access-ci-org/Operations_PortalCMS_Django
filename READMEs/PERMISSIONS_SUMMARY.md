@@ -18,6 +18,19 @@ The Operations Portal CMS uses **two separate permission systems**:
 - `urn:group:access-ci.org:rp.tacc.utexas.edu:implementer`
 - etc.
 
+### 1a. News Workflow Groups
+**What:** Explicit Django groups for news workflow roles  
+**Controls:** Author, publish, and manage/review responsibilities  
+**How:** Manual assignment in Django Admin or via `setup_groups`  
+
+**Groups created by `setup_groups`:**
+- `System Status Authors`
+- `System Status Publishers`
+- `System Status Managers`
+- `Integration News Authors`
+- `Integration News Publishers`
+- `Integration News Managers`
+
 **See:** [NEWS_PERMISSIONS.md](NEWS_PERMISSIONS.md)
 
 ---
@@ -43,7 +56,7 @@ The Operations Portal CMS uses **two separate permission systems**:
 - **Pages** - Slower, structured, department-driven content
 
 **Different workflows:**
-- **News** - Automatic (CILogon sync)
+- **News** - Automatic access from RP groups, plus manual workflow roles for publishing/review
 - **Pages** - Manual (admin assigns users to groups)
 
 **Different needs:**

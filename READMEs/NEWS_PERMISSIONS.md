@@ -1,159 +1,119 @@
-# News Admin Permissions - Implementation Summary
+# News Permissions
 
-## What Was Implemented
+This project now uses explicit Django groups for each news type rather than one broad "editor" role.
 
-A simple, flexible permission system where **any RP user can add/edit news items**.
+## News Roles
 
-## The Simple Rule
+Each news type has three roles:
 
-✅ **If you're in ANY RP group** (coordinator or implementer), you can add/edit news  
-✅ **No infrastructure matching required** - encourages cross-RP collaboration  
+- `Authors` - can create and edit items
+- `Publishers` - can create, edit, and publish items
+- `Managers` - can create, edit, delete, review, and publish items
 
-## How It Works
+The groups created by `setup_groups` are:
 
-### 1. User Logs In via CILogon
-- User authenticates with CILogon
-- `sync_cilogon_groups()` adds them to RP groups automatically
-- Example: Added to `urn:group:access-ci.org:rp.psc.edu:coordinator`
-
-### 2. User Access Django Admin
-- Navigates to `/admin/`
-- Sees **System Status News** and **Integration News** sections
-- Can click "Add" button
-
-### 3. Permissions Check
-```python
-# When user clicks "Add System Status News"
-def has_add_permission(request):
-    # Is user in ANY RP group?
-    if user.groups.filter(name__startswith='urn:group:access-ci.org:rp.').exists():
-        return True  # ✓ Allow access
-    return False
-```
-
-### 4. User Creates News
-- Fills out form with infrastructure details
-- Can specify any infrastructure (not limited to their RP)
-- Submits and saves
-
-### 5. User Can Edit/Delete Own Items
-- Can always edit news they authored
-- Can delete their own items
-- Can see all news items (to stay informed)
+- `System Status Authors`
+- `System Status Publishers`
+- `System Status Managers`
+- `Integration News Authors`
+- `Integration News Publishers`
+- `Integration News Managers`
 
 ## Permission Matrix
 
-| User Type | Add News | Edit Own | Edit Others | Delete Own | Delete Others | View All |
-|-----------|----------|----------|-------------|------------|---------------|----------|
-| **RP Coordinator** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **RP Implementer** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Operations (concierge)** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Staff/Superuser** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Regular User** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Group | View | Add | Change | Delete | Review | Publish |
+|------|------|-----|--------|--------|--------|---------|
+| System Status Authors | Yes | Yes | Yes | No | No | No |
+| System Status Publishers | Yes | Yes | Yes | No | No | Yes |
+| System Status Managers | Yes | Yes | Yes | Yes | Yes | Yes |
+| Integration News Authors | Yes | Yes | Yes | No | No | No |
+| Integration News Publishers | Yes | Yes | Yes | No | No | Yes |
+| Integration News Managers | Yes | Yes | Yes | Yes | Yes | Yes |
 
-## Files Modified
+## Django Permission Mapping
 
-### 1. `operations_portalcms_django/utils.py` (NEW)
-Utility functions:
-- `is_rp_user(user)` - Check if in any RP group
-- `is_operations_user(user)` - Check if in operations groups
-- `can_manage_news(user)` - Check if can add/edit news
-- `get_user_rp_groups(user)` - Get list of RP IDs user belongs to
-- `is_rp_coordinator(user)` - Check if user is coordinator
+### System Status News
 
-### 2. `operations_portalcms_django/admin.py`
-Updated both admin classes:
+- Default Django permissions:
+  - `view_systemstatusnews`
+  - `add_systemstatusnews`
+  - `change_systemstatusnews`
+  - `delete_systemstatusnews`
+- Custom workflow permissions:
+  - `can_review_systemstatusnews`
+  - `can_publish_systemstatusnews`
 
-**SystemStatusNewsAdmin:**
-- `has_add_permission()` - RP users can add
-- `has_change_permission()` - Authors + RP users can edit
-- `has_delete_permission()` - Authors + staff can delete
-- Made `author` readonly (auto-set on save)
+### Integration News
 
-**IntegrationNewsAdmin:**
-- Same permission logic as SystemStatusNews
-- Simple, consistent approach
+- Default Django permissions:
+  - `view_integrationnews`
+  - `add_integrationnews`
+  - `change_integrationnews`
+  - `delete_integrationnews`
+- Custom workflow permissions:
+  - `can_review_integrationnews`
+  - `can_publish_integrationnews`
 
-### 3. `test_news_permissions.py` (NEW)
-Comprehensive test suite verifying:
-- Helper functions work correctly
-- Admin permissions enforce rules
-- RP users can create/edit news
-- Multiple RP memberships handled
-- Regular users blocked
+## Workflow Notes
 
-## Why This Approach?
+- Authors can create drafts and update them.
+- Publishers can publish content directly during create or update, and can publish items already in review.
+- Managers are the only non-superuser role with the explicit `can_review_*` permissions.
+- `can_publish_*` does not imply `add_*` or `change_*`; publisher groups include those permissions on purpose.
 
-**✅ Advantages:**
-1. **Simple** - Easy to understand and maintain
-2. **Collaborative** - PSC can report on TACC infrastructure if needed
-3. **Flexible** - No rigid resource ownership constraints
-4. **Automatic** - Permissions sync from CILogon
-5. **Secure** - Regular users can't access admin
+## Setup
 
-**❌ No Restrictions On:**
-- Which infrastructure IDs can be entered
-- Cross-RP news reporting
-- Viewing other RPs' news items
+Create or refresh the groups:
 
-**This is intentional** - RPs need to see all infrastructure news for coordination.
-
-## Real-World Example
-
-**Scenario:** Power outage affects multiple sites
-
-1. **PSC coordinator logs in** (via CILogon)
-2. **Automatically gets RP coordinator permissions**
-3. **Creates System Status News:**
-   - Subject: "Power Outage - Multiple Sites"
-   - Affected Infrastructure: `bridges2.psc.edu, stampede3.tacc.utexas.edu`
-   - Type: Outage - Partial
-4. **TACC implementer logs in**
-5. **Sees PSC's news item** in the list
-6. **Can add their own updates** about TACC status
-7. **Both can collaborate** on cross-site issues
-
-## Testing
-
-Run the test suite anytime:
 ```bash
-uv run python test_news_permissions.py
+uv run python manage.py setup_groups
 ```
 
-All tests pass ✅
+## Testing Strategy
 
-## Admin UI Experience
+Recommended test flow:
 
-**For RP Users:**
-1. Log into `/admin/`
-2. See sections:
-   - **OPERATIONS_PORTALCMS_DJANGO**
-     - System and Infrastructure Status News → Can Add ✅
-     - Integration News → Can Add ✅
-3. Click "Add" → Fill out form → Save
-4. See own items in list with Edit/Delete buttons
-5. See others' items in list (read-only unless staff)
+1. Assign one user to an `Authors` group.
+2. Assign one user to a `Publishers` group.
+3. Assign one user to a `Managers` group.
+4. Verify:
+   - Authors can draft and edit.
+   - Publishers can draft and publish.
+   - Managers can approve/reject and fully manage content.
 
-**For Regular Users:**
-- Don't see news sections at all
-- Blocked from accessing `/admin/operations_portalcms_django/systemstatusnews/`
+## Legacy Group Cleanup
 
-## Future Enhancements (Optional)
+Older setups may still contain:
 
-If you later want to add restrictions:
+- `System Status Editors`
+- `Integration News Editors`
+- `All News Editors`
 
-1. **Filter infrastructure dropdown** - Show only user's RP resources
-2. **Validate infrastructure field** - Check against RP ownership
-3. **Change to ManyToManyField** - More structured than CharField
-4. **Add approval workflow** - Coordinators approve implementer posts
-5. **Email notifications** - Alert RP when news added
+These are left alone by default so testing is safe.
 
-But for now, **keep it simple** - trust your RP users to report accurately.
+To copy existing users from the legacy groups into the new manager groups:
 
-## Summary
+```bash
+uv run python manage.py setup_groups --migrate-legacy-memberships
+```
 
-✅ **Implemented:** Simple RP-based news permissions  
-✅ **Tested:** All tests passing  
-✅ **Ready:** For production use  
+To delete the legacy groups after testing:
 
-**Key Feature:** Any RP member can add news about any infrastructure - encourages collaboration and information sharing across Resource Providers.
+```bash
+uv run python manage.py setup_groups --delete-legacy-groups
+```
+
+You can also do both in one run:
+
+```bash
+uv run python manage.py setup_groups --migrate-legacy-memberships --delete-legacy-groups
+```
+
+## Admin Notes
+
+Use Django Admin to assign users to the new groups:
+
+- `/admin/auth/group/`
+- `/admin/auth/user/`
+
+For a small team, this setup keeps the roles easy to reason about while still letting you test draft, publish, and review workflows separately.

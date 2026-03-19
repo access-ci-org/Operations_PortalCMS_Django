@@ -104,6 +104,39 @@ uv run python manage.py setup_rp_permissions
 uv run python test_news_permissions.py
 ```
 
+## News Workflow Groups
+
+Run this command to create the role-based news groups:
+
+```bash
+uv run python manage.py setup_groups
+```
+
+This creates:
+
+- `System Status Authors`
+- `System Status Publishers`
+- `System Status Managers`
+- `Integration News Authors`
+- `Integration News Publishers`
+- `Integration News Managers`
+
+Use these when you want to test the draft, publish, and review flows separately.
+
+### Legacy Group Migration
+
+If older editor groups already exist, you can migrate users into the new manager groups:
+
+```bash
+uv run python manage.py setup_groups --migrate-legacy-memberships
+```
+
+After testing, you can delete the old groups:
+
+```bash
+uv run python manage.py setup_groups --delete-legacy-groups
+```
+
 ## Next Steps
 
 ### In Production

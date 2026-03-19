@@ -9,6 +9,11 @@ This document explains the technical details of how Resource Provider (RP) permi
 - Adding/editing **Integration News**
 - Automatic sync from CILogon group memberships
 
+**✅ News Workflow Groups Control:**
+- Which users can publish news
+- Which users can review/manage news
+- Role-specific testing for author/publisher/manager workflows
+
 **❌ RP Groups Do NOT Control:**
 - CMS page editing (use custom groups instead - see [CMS_PAGE_PERMISSIONS.md](CMS_PAGE_PERMISSIONS.md))
 
@@ -18,6 +23,21 @@ This document explains the technical details of how Resource Provider (RP) permi
 ## Overview
 
 The permission system integrates CILogon authentication with Django's permissions to provide automatic access control for news items based on Resource Provider group memberships from COmanage.
+
+On top of that, the project also uses explicit Django groups for workflow roles:
+
+- `System Status Authors`
+- `System Status Publishers`
+- `System Status Managers`
+- `Integration News Authors`
+- `Integration News Publishers`
+- `Integration News Managers`
+
+These groups are created by:
+
+```bash
+uv run python manage.py setup_groups
+```
 
 ## How It Works
 
