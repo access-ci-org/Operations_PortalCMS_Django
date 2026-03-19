@@ -56,10 +56,17 @@ The groups created by `setup_groups` are:
 
 ## Workflow Notes
 
-- Authors can create drafts and update them.
+- Authors can create drafts and update news items.
 - Publishers can publish content directly during create or update, and can publish items already in review.
 - Managers are the only non-superuser role with the explicit `can_review_*` permissions.
+- Managers already include publish capability, so users do not need both `Publishers` and `Managers` for the same news type.
 - `can_publish_*` does not imply `add_*` or `change_*`; publisher groups include those permissions on purpose.
+
+## Current Behavior Notes
+
+- The current edit views are gated by Django's `change_*` permission.
+- That means users in `Authors`, `Publishers`, or `Managers` can edit news items of that type, not only items they personally authored.
+- Submitting an item for review is still limited to the item's author.
 
 ## Setup
 
@@ -83,13 +90,13 @@ Recommended test flow:
 
 ## Legacy Group Cleanup
 
-Older setups may still contain:
+Older setups may contain:
 
 - `System Status Editors`
 - `Integration News Editors`
 - `All News Editors`
 
-These are left alone by default so testing is safe.
+These legacy groups are left alone by default so testing is safe until you explicitly migrate and remove them.
 
 To copy existing users from the legacy groups into the new manager groups:
 
@@ -108,6 +115,8 @@ You can also do both in one run:
 ```bash
 uv run python manage.py setup_groups --migrate-legacy-memberships --delete-legacy-groups
 ```
+
+In this environment, the legacy groups have already been migrated and removed.
 
 ## Admin Notes
 
