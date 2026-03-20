@@ -35,7 +35,11 @@
                             </div>
                             <hr class="border-dark mt-2 mb-3">
                             <p class="card-text mb-1"><span class="fw-bold text-dark">Integration News Type:</span> <code>{{ news.get_news_type_label }}</code></p>
-                            <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Element:</span> <code>{{ news.get_affected_element_label }}</code></p>
+                            {% with affected_labels=news.get_affected_element_labels %}
+                                {% if affected_labels %}
+                                    <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Element{% if affected_labels|length > 1 %}s{% endif %}:</span> <code>{{ news.get_affected_elements_display }}</code></p>
+                                {% endif %}
+                            {% endwith %}
                             <p class="card-text mb-1"><span class="fw-bold text-dark">Effective Date:</span> {% if news.effective_date %}{{ news.effective_date|date:"F j, Y" }}{% else %}N/A{% endif %}</p>
                             <p class="card-text mb-3"><span class="fw-bold text-dark">Expiration Date:</span> {% if news.expiration_date %}{{ news.expiration_date|date:"F j, Y" }}{% else %}N/A{% endif %}</p>
                             <p class="card-text">{{ news.content }}</p>

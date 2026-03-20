@@ -35,7 +35,11 @@
                             </div>
                             <hr class="border-dark mt-2 mb-3">
                             <p class="card-text mb-1"><span class="fw-bold text-dark">Infrastructure News Type:</span> <code>{{ news.get_infrastructure_news_type_display }}</code></p>
-                            <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Infrastructure:</span> <code>{{ news.affected_infrastructure|default:"N/A" }}</code></p>
+                            {% with affected_values=news.get_affected_infrastructure_values %}
+                                {% if affected_values %}
+                                    <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Infrastructure:</span> <code>{{ news.get_affected_infrastructure_display }}</code></p>
+                                {% endif %}
+                            {% endwith %}
                             <p class="card-text mb-1"><span class="fw-bold text-dark">Start Date:</span> {% if news.start_datetime %}{{ news.start_datetime|date:"F j, Y, g:i a" }}{% else %}N/A{% endif %}</p>
                             <p class="card-text mb-3"><span class="fw-bold text-dark">End Date:</span> {% if news.end_datetime %}{{ news.end_datetime|date:"F j, Y, g:i a" }}{% else %}N/A{% endif %}</p>
                             <p class="card-text">{{ news.content }}</p>

@@ -25,9 +25,12 @@ def system_status_news(request):
         request.user.has_perm('operations_portalcms_django.can_review_systemstatusnews') or
         request.user.has_perm('operations_portalcms_django.can_publish_systemstatusnews')
     ):
-        news_items = SystemStatusNews.objects.filter(is_active=True)
+        news_items = SystemStatusNews.objects.filter(is_active=True).prefetch_related('affected_infrastructure_items')
     else:
-        news_items = SystemStatusNews.objects.filter(is_active=True, status='published')
+        news_items = SystemStatusNews.objects.filter(
+            is_active=True,
+            status='published',
+        ).prefetch_related('affected_infrastructure_items')
     
     context = {
         'page': 'system_status_news',
@@ -47,9 +50,12 @@ def integration_news(request):
         request.user.has_perm('operations_portalcms_django.can_review_integrationnews') or
         request.user.has_perm('operations_portalcms_django.can_publish_integrationnews')
     ):
-        news_items = IntegrationNews.objects.filter(is_active=True)
+        news_items = IntegrationNews.objects.filter(is_active=True).prefetch_related('affected_elements')
     else:
-        news_items = IntegrationNews.objects.filter(is_active=True, status='published')
+        news_items = IntegrationNews.objects.filter(
+            is_active=True,
+            status='published',
+        ).prefetch_related('affected_elements')
     
     context = {
         'page': 'integration_news',
@@ -85,6 +91,7 @@ def add_system_status_news(request):
                 messages.success(request, 'System and infrastructure status news created as draft. Submit for review when ready.')
             
             news.save()
+            form.save_related_fields(news)
             return redirect('operations_portalcms_django:system_status_news')
     else:
         form = SystemStatusNewsForm()
@@ -120,6 +127,7 @@ def update_system_status_news(request, pk):
                 news.save()
                 messages.success(request, 'System and infrastructure status news updated successfully!')
             
+            form.save_related_fields(news)
             return redirect('operations_portalcms_django:system_status_news')
     else:
         form = SystemStatusNewsForm(instance=news)
@@ -147,7 +155,6 @@ def add_integration_news(request):
             news.is_active = True  # New news is active by default
             # Save form data for fields not in the model
             news.news_type = form.cleaned_data.get('news_type', '')
-            news.affected_element = form.cleaned_data.get('affected_element', '')
             news.effective_date = form.cleaned_data.get('effective_date')
             news.expiration_date = form.cleaned_data.get('expiration_date')
             
@@ -162,6 +169,7 @@ def add_integration_news(request):
                 messages.success(request, 'Integration news created as draft. Submit for review when ready.')
             
             news.save()
+            form.save_related_fields(news)
             return redirect('operations_portalcms_django:integration_news')
     else:
         form = IntegrationNewsForm()
@@ -187,7 +195,6 @@ def update_integration_news(request, pk):
             news = form.save(commit=False)
             # Save form data for fields not in the model
             news.news_type = form.cleaned_data.get('news_type', '')
-            news.affected_element = form.cleaned_data.get('affected_element', '')
             news.effective_date = form.cleaned_data.get('effective_date')
             news.expiration_date = form.cleaned_data.get('expiration_date')
             
@@ -202,12 +209,11 @@ def update_integration_news(request, pk):
                 news.save()
                 messages.success(request, 'Integration news updated successfully!')
             
+            form.save_related_fields(news)
             return redirect('operations_portalcms_django:integration_news')
     else:
-        # Pre-populate form with existing data
         initial_data = {
             'news_type': news.news_type,
-            'affected_element': news.affected_element,
             'effective_date': news.effective_date,
             'expiration_date': news.expiration_date,
         }

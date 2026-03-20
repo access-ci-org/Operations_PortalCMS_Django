@@ -13,17 +13,18 @@ from .utils import is_rp_user, can_manage_news
 
 @admin.register(SystemStatusNews)
 class SystemStatusNewsAdmin(admin.ModelAdmin):
-    list_display = ['subject', 'infrastructure_news_type', 'start_datetime', 'affected_infrastructure', 'author', 'is_active']
+    list_display = ['subject', 'infrastructure_news_type', 'start_datetime', 'affected_infrastructure_display', 'author', 'is_active']
     list_filter = ['is_active', 'infrastructure_news_type', 'start_datetime']
     search_fields = ['subject', 'content', 'affected_infrastructure']
     readonly_fields = ['created_at', 'updated_at', 'author']
+    filter_horizontal = ['affected_infrastructure_items']
     
     fieldsets = (
         ('Basic Information', {
             'fields': ('subject', 'content', 'is_active')
         }),
         ('Infrastructure Details', {
-            'fields': ('infrastructure_news_type', 'affected_infrastructure', 'start_datetime', 'end_datetime')
+            'fields': ('infrastructure_news_type', 'affected_infrastructure_items', 'start_datetime', 'end_datetime')
         }),
         ('Distribution Options', {
             'fields': ('send_email', 'email_list', 'post_to_slack', 'slack_channel'),
@@ -39,6 +40,19 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
         if not change:  # If creating new object
             obj.author = request.user
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        obj.affected_infrastructure = ", ".join(
+            item.info_resourceid
+            for item in obj.affected_infrastructure_items.order_by('resource_descriptive_name')
+        )
+        obj.save(update_fields=['affected_infrastructure'])
+
+    @admin.display(description='Affected Infrastructure')
+    def affected_infrastructure_display(self, obj):
+        return obj.get_affected_infrastructure_display()
     
     def has_add_permission(self, request):
         """
@@ -91,16 +105,16 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs
     
-    def formfield_for_dbfield(self, db_field, request, **kwargs):
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
         """
         Add help text for RP users about infrastructure field.
         """
-        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        formfield = super().formfield_for_manytomany(db_field, request, **kwargs)
         
-        if db_field.name == 'affected_infrastructure' and is_rp_user(request.user):
+        if db_field.name == 'affected_infrastructure_items' and is_rp_user(request.user):
             if not request.user.is_staff:
                 formfield.help_text = (
-                    "Resource ID(s) from CIDER (comma-separated if multiple). "
+                    "Select one or more CIDER resources. "
                     "You can report on any infrastructure - cross-RP collaboration is encouraged."
                 )
         
@@ -109,17 +123,18 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
 
 @admin.register(IntegrationNews)
 class IntegrationNewsAdmin(admin.ModelAdmin):
-    list_display = ['title', 'author', 'created_at', 'is_active']
+    list_display = ['title', 'affected_elements_display', 'author', 'created_at', 'is_active']
     list_filter = ['is_active', 'created_at']
     search_fields = ['title', 'content']
     readonly_fields = ['created_at', 'updated_at', 'author']
+    filter_horizontal = ['affected_elements']
     
     fieldsets = (
         ('Basic Information', {
             'fields': ('title', 'content', 'is_active')
         }),
         ('Integration Details', {
-            'fields': ('news_type', 'affected_element', 'effective_date', 'expiration_date')
+            'fields': ('news_type', 'affected_elements', 'effective_date', 'expiration_date')
         }),
         ('Metadata', {
             'fields': ('author', 'created_at', 'updated_at'),
@@ -131,6 +146,17 @@ class IntegrationNewsAdmin(admin.ModelAdmin):
         if not change:
             obj.author = request.user
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        selected = list(obj.affected_elements.order_by('label'))
+        obj.affected_element = selected[0].code if len(selected) == 1 else ''
+        obj.save(update_fields=['affected_element'])
+
+    @admin.display(description='Affected Elements')
+    def affected_elements_display(self, obj):
+        return obj.get_affected_elements_display()
     
     def has_add_permission(self, request):
         """Allow adding if user can manage news (RP or operations member)"""

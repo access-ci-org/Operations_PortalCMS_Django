@@ -42,9 +42,10 @@
                     {% if form.news_type.errors %}<div class="text-danger">{{ form.news_type.errors }}</div>{% endif %}
                 </div>
                 <div class="mb-3">
-                    <label for="{{ form.affected_element.id_for_label }}" class="form-label">{{ form.affected_element.label }}</label>
-                    {{ form.affected_element }}
-                    {% if form.affected_element.errors %}<div class="text-danger">{{ form.affected_element.errors }}</div>{% endif %}
+                    <label for="{{ form.affected_elements.id_for_label }}" class="form-label">{{ form.affected_elements.label }}</label>
+                    {{ form.affected_elements }}
+                    {% if form.affected_elements.help_text %}<small class="form-text text-muted">{{ form.affected_elements.help_text }}</small>{% endif %}
+                    {% if form.affected_elements.errors %}<div class="text-danger">{{ form.affected_elements.errors }}</div>{% endif %}
                 </div>
                 <div class="mb-3">
                     <label for="{{ form.effective_date.id_for_label }}" class="form-label">{{ form.effective_date.label }}</label>

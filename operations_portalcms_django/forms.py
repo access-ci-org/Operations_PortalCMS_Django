@@ -1,5 +1,5 @@
 from django import forms
-from .models import IntegrationNews, SystemStatusNews
+from .models import CiderInfrastructure, IntegrationElement, IntegrationNews, SystemStatusNews
 
 
 class DateInput(forms.DateInput):
@@ -18,18 +18,6 @@ class IntegrationNewsForm(forms.ModelForm):
         ('changed_roadmap_task', 'Changed Integration Roadmap Task'),
     ]
     
-    AFFECTED_ELEMENTS = [
-        ('cloud_roadmap', 'ACCESS Allocated Production Cloud - Integration Roadmap'),
-        ('compute_roadmap', 'ACCESS Allocated Production Compute - Integration Roadmap'),
-        ('storage_roadmap', 'ACCESS Allocated Production Storage - Integration Roadmap'),
-        ('science_gateway_roadmap', 'ACCESS Integrated Science Gateway - Integration Roadmap'),
-        ('nagios', 'ACCESS Monitoring Service - Nagios'),
-        ('online_service_roadmap', 'ACCESS Production Online Service - Integration Roadmap'),
-        ('aws_registry', 'ACCESS Public AWS Container Registry'),
-        ('cider', 'CiDeR - CyberInfrastructure Description Repository'),
-        ('ipf', 'Information Publishing Framework (IPF) tool for publishing compute resource information'),
-    ]
-    
     news_type = forms.ChoiceField(
         choices=INTEGRATION_NEWS_TYPES,
         required=True,
@@ -37,11 +25,12 @@ class IntegrationNewsForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     
-    affected_element = forms.ChoiceField(
-        choices=AFFECTED_ELEMENTS,
-        required=True,
-        label='Affected Element',
-        widget=forms.Select(attrs={'class': 'form-select'})
+    affected_elements = forms.ModelMultipleChoiceField(
+        queryset=IntegrationElement.objects.none(),
+        required=False,
+        label='Affected Elements',
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': 8}),
+        help_text='Select one or more affected integration elements. Leave blank for broad announcements.'
     )
     
     effective_date = forms.DateField(
@@ -96,6 +85,21 @@ class IntegrationNewsForm(forms.ModelForm):
             'content': 'To update news content text please follow formatting guidance at <a href="https://operations.access-ci.org/operational-status-communications" target="_blank">Operational Status Communications</a>',
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['affected_elements'].queryset = IntegrationElement.objects.order_by('label')
+        if self.instance.pk:
+            self.fields['affected_elements'].initial = self.instance.affected_elements.all()
+
+    def save_related_fields(self, news):
+        affected_elements = list(self.cleaned_data.get('affected_elements', []))
+        news.affected_elements.set(affected_elements)
+        if len(affected_elements) == 1:
+            news.affected_element = affected_elements[0].code
+        else:
+            news.affected_element = ''
+        news.save(update_fields=['affected_element'])
+
 
 class SystemStatusNewsForm(forms.ModelForm):
     """Form for creating and updating System and Infrastructure Status News"""
@@ -119,6 +123,14 @@ class SystemStatusNewsForm(forms.ModelForm):
         }),
         help_text='When this outage or configuration change ends. May be left blank for permanent configuration changes.'
     )
+
+    affected_infrastructure_items = forms.ModelMultipleChoiceField(
+        queryset=CiderInfrastructure.objects.none(),
+        required=False,
+        label='Affected Infrastructure',
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': 10}),
+        help_text='Select one or more infrastructure resources from CIDER. Leave blank if not resource-specific.'
+    )
     
     class Meta:
         model = SystemStatusNews
@@ -126,7 +138,7 @@ class SystemStatusNewsForm(forms.ModelForm):
             'subject', 
             'content', 
             'infrastructure_news_type',
-            'affected_infrastructure',
+            'affected_infrastructure_items',
             'start_datetime',
             'end_datetime',
             'send_email',
@@ -139,7 +151,7 @@ class SystemStatusNewsForm(forms.ModelForm):
             'subject': 'Subject',
             'content': 'News Content',
             'infrastructure_news_type': 'Infrastructure News Type',
-            'affected_infrastructure': 'Affected Infrastructure',
+            'affected_infrastructure_items': 'Affected Infrastructure',
             'is_active': 'Active',
             'send_email': 'Send Email Notification',
             'email_list': 'Email Recipients',
@@ -159,10 +171,6 @@ class SystemStatusNewsForm(forms.ModelForm):
             'infrastructure_news_type': forms.Select(attrs={
                 'class': 'form-select'
             }),
-            'affected_infrastructure': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Enter resource ID(s) from CIDER (comma-separated if multiple)'
-            }),
             'email_list': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'email1@example.com, email2@example.com'
@@ -174,7 +182,23 @@ class SystemStatusNewsForm(forms.ModelForm):
         }
         help_texts = {
             'content': 'To update news content text please follow formatting guidance at <a href="https://operations.access-ci.org/operational-status-communications" target="_blank">Operational Status Communications</a>',
-            'affected_infrastructure': 'Resource ID(s) from CIDER database (comma-separated if multiple)',
             'email_list': 'Comma-separated email addresses for notifications',
             'slack_channel': 'Slack channel name (e.g., #operations-alerts)'
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['affected_infrastructure_items'].queryset = CiderInfrastructure.objects.order_by(
+            'resource_descriptive_name'
+        )
+        self.fields['affected_infrastructure_items'].label_from_instance = (
+            lambda item: f"{item.info_resourceid} - {item.resource_descriptive_name}"
+        )
+        if self.instance.pk:
+            self.fields['affected_infrastructure_items'].initial = self.instance.affected_infrastructure_items.all()
+
+    def save_related_fields(self, news):
+        affected_items = list(self.cleaned_data.get('affected_infrastructure_items', []))
+        news.affected_infrastructure_items.set(affected_items)
+        news.affected_infrastructure = ", ".join(item.info_resourceid for item in affected_items)
+        news.save(update_fields=['affected_infrastructure'])

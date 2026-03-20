@@ -33,6 +33,12 @@ class SystemStatusNews(models.Model):
         verbose_name="Affected Infrastructure",
         help_text="Resource ID(s) from CIDER (comma-separated if multiple)"
     )
+    affected_infrastructure_items = models.ManyToManyField(
+        'CiderInfrastructure',
+        blank=True,
+        related_name='system_status_news_items',
+        verbose_name="Affected Infrastructure Items",
+    )
     
     # Date/Time fields
     start_datetime = models.DateTimeField(
@@ -118,6 +124,18 @@ class SystemStatusNews(models.Model):
     
     def __str__(self):
         return self.subject
+
+    def get_affected_infrastructure_values(self):
+        related_items = list(self.affected_infrastructure_items.order_by('resource_descriptive_name'))
+        if related_items:
+            return [item.info_resourceid for item in related_items]
+        if not self.affected_infrastructure:
+            return []
+        return [value.strip() for value in self.affected_infrastructure.split(',') if value.strip()]
+
+    def get_affected_infrastructure_display(self):
+        values = self.get_affected_infrastructure_values()
+        return ", ".join(values) if values else 'N/A'
     
     def get_infrastructure_type_display_color(self):
         """Return a color class based on the infrastructure news type"""
@@ -158,6 +176,12 @@ class IntegrationNews(models.Model):
     content = models.TextField()
     news_type = models.CharField(max_length=50, blank=True)
     affected_element = models.CharField(max_length=100, blank=True)
+    affected_elements = models.ManyToManyField(
+        'IntegrationElement',
+        blank=True,
+        related_name='integration_news_items',
+        verbose_name="Affected Elements",
+    )
     effective_date = models.DateField(null=True, blank=True)
     expiration_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -217,6 +241,34 @@ class IntegrationNews(models.Model):
     def get_affected_element_label(self):
         """Return a human-readable label for the stored affected element."""
         return dict(self.AFFECTED_ELEMENTS).get(self.affected_element, self.affected_element or 'N/A')
+
+    def get_affected_element_labels(self):
+        related_items = list(self.affected_elements.order_by('label'))
+        if related_items:
+            return [item.label for item in related_items]
+        if not self.affected_element:
+            return []
+        return [self.get_affected_element_label()]
+
+    def get_affected_elements_display(self):
+        labels = self.get_affected_element_labels()
+        return ", ".join(labels) if labels else 'N/A'
+
+
+class IntegrationElement(models.Model):
+    """Normalized integration element choices for multi-select news relationships."""
+
+    code = models.CharField(max_length=100, primary_key=True)
+    label = models.CharField(max_length=200)
+
+    class Meta:
+        db_table = 'operations_portalcms_django_integrationelement'
+        verbose_name = 'Integration Element'
+        verbose_name_plural = 'Integration Elements'
+        ordering = ['label']
+
+    def __str__(self):
+        return self.label
 
 
 # CMS Plugin Models for News Feed
