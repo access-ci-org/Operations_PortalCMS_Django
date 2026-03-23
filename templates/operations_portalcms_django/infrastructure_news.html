@@ -37,7 +37,7 @@
                             <p class="card-text mb-1"><span class="fw-bold text-dark">Infrastructure News Type:</span> <code>{{ news.get_infrastructure_news_type_display }}</code></p>
                             {% with affected_values=news.get_affected_infrastructure_values %}
                                 {% if affected_values %}
-                                    <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Infrastructure:</span> <code>{{ news.get_affected_infrastructure_display }}</code></p>
+                                    <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Infrastructure:</span> <code>{{ affected_values|join:", " }}</code></p>
                                 {% endif %}
                             {% endwith %}
                             <p class="card-text mb-1"><span class="fw-bold text-dark">Start Date:</span> {% if news.start_datetime %}{{ news.start_datetime|date:"F j, Y, g:i a" }}{% else %}Not Specified{% endif %}</p>
@@ -99,6 +99,30 @@
                 </div>
             {% endfor %}
         </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav aria-label="System status news pagination" class="mt-3">
+                <ul class="pagination justify-content-center flex-wrap">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
     {% else %}
         <p>No system and infrastructure status news available.</p>
     {% endif %}

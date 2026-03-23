@@ -126,7 +126,10 @@ class SystemStatusNews(models.Model):
         return self.subject
 
     def get_affected_infrastructure_values(self):
-        related_items = list(self.affected_infrastructure_items.order_by('resource_descriptive_name'))
+        related_items = sorted(
+            self.affected_infrastructure_items.all(),
+            key=lambda item: item.resource_descriptive_name or ''
+        )
         if related_items:
             return [item.info_resourceid for item in related_items]
         if not self.affected_infrastructure:
@@ -243,7 +246,10 @@ class IntegrationNews(models.Model):
         return dict(self.AFFECTED_ELEMENTS).get(self.affected_element, self.affected_element or 'N/A')
 
     def get_affected_element_labels(self):
-        related_items = list(self.affected_elements.order_by('label'))
+        related_items = sorted(
+            self.affected_elements.all(),
+            key=lambda item: item.label or ''
+        )
         if related_items:
             return [item.label for item in related_items]
         if not self.affected_element:

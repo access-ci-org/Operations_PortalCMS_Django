@@ -1,0 +1,285 @@
+Focus Area Block-Level Permissions WIP
+======================================
+
+Current status
+--------------
+
+Page-level permissions are now configured for the four main focus-area pages.
+
+What exists now:
+- Focus_area_editors has page-level edit rights across all four focus-area pages
+- Each page-specific focus group has page-level edit rights on its matching page
+- This is documented in READMEs/FOCUS_AREA_PERMS.md
+
+What does not exist yet:
+- true block-level permissions for the editable regions inside templates/focus_area.html
+- section ownership metadata
+- section-level workflow/review/publish logic
+
+
+Current template structure
+--------------------------
+
+templates/focus_area.html currently uses plain Django CMS placeholders:
+
+- hero_image
+- section_1_heading
+- section_1_content
+- section_2_heading
+- section_2_content
+- section_3_heading
+- section_3_content
+- section_4_heading
+- section_4_content
+- section_5_heading
+- section_5_content
+- additional_links
+
+These placeholders do not currently have separate permission rules.
+If a user can edit the page, they can edit all placeholders on that page.
+
+
+Recommended direction
+---------------------
+
+Use a model-backed section system for governed blocks instead of relying on raw placeholders.
+
+Keep:
+- Django CMS page shell
+- current page-level permissions
+- hero_image as a normal placeholder for now
+
+Convert to managed block/section objects:
+- section_1
+- section_2
+- section_3
+- section_4
+- section_5
+- additional_links
+
+Important principle:
+- heading + content should be governed together as one logical section
+- do not permission section heading and section content separately
+
+
+Recommended logical editable units
+----------------------------------
+
+Treat the focus-area page as these units:
+
+- hero_image
+- section_1
+- section_2
+- section_3
+- section_4
+- section_5
+- additional_links
+
+Initial recommendation:
+- Keep hero_image as a placeholder
+- Convert section_1 through section_5 and additional_links into managed section records
+
+
+Recommended model
+-----------------
+
+Introduce a model conceptually named:
+
+- FocusAreaSection
+
+Recommended fields:
+
+- page
+  - foreign key to the CMS page this section belongs to
+
+- section_key
+  - choices:
+    - section_1
+    - section_2
+    - section_3
+    - section_4
+    - section_5
+    - additional_links
+
+- heading
+  - nullable for blocks like additional_links if needed
+
+- body
+  - rich text or text field
+
+- owner_group
+  - foreign key to Django auth Group
+
+- is_active
+
+- updated_at
+
+- updated_by
+
+Optional later fields:
+- review_status
+- review_comments
+- published_at
+- published_by
+
+Recommended uniqueness rule:
+- one row per page + section_key
+
+
+Recommended permission model
+----------------------------
+
+Page-level:
+- Focus_area_editors can edit all focus-area pages
+- page-specific focus group can edit its matching page
+
+Section-level:
+- each FocusAreaSection has one owner_group
+- members of owner_group can edit that section
+- Focus_area_editors can edit all focus-area sections as override
+- superusers can edit all focus-area sections
+
+Default ownership mapping:
+- CyberSecurity page sections -> Focus_Cybersecurity_Editors
+- Data Transfer and Networking Support page sections -> Focus_Networking_dataTransfer_Editors
+- Operational Support page sections -> Focus_operationsSupport_Editors
+- Student Training and Engagement Program page sections -> Focus_STEP_Editors
+
+
+Recommended rendering approach
+------------------------------
+
+Do not keep rendering the governed blocks directly from raw placeholders.
+
+Instead:
+- load all FocusAreaSection rows for the current page
+- key them by section_key
+- render those section objects in the template
+
+Possible rendering contract:
+- sections.section_1
+- sections.section_2
+- sections.section_3
+- sections.section_4
+- sections.section_5
+- sections.additional_links
+
+Keep hero_image as:
+- {% placeholder "hero_image" %}
+
+
+Recommended editing approach
+----------------------------
+
+Start simple:
+- use Django admin or a straightforward app edit form for FocusAreaSection
+
+Do not try to force true block-level permissions directly through raw CMS placeholder editing.
+
+Good first-version editing behavior:
+- authorized users edit section records through controlled forms/admin
+- unauthorized users can view but not edit
+
+Possible later UX improvement:
+- show an "Edit section" link/button for users allowed to edit that section
+
+
+Concrete implementation steps
+-----------------------------
+
+Step 1
+- Create FocusAreaSection model
+- Add section_key choices
+- Add page foreign key
+- Add owner_group foreign key
+- Add heading/body/is_active/updated fields
+- Enforce unique page + section_key
+
+Step 2
+- Add admin registration for FocusAreaSection
+- Limit editing based on owner_group, Focus_area_editors, or superuser
+- Keep permissions explicit and readable
+
+Step 3
+- Add permission helper functions
+- Example concept:
+  - can_edit_focus_area_section(user, section)
+  - true if user is superuser
+  - true if user is in Focus_area_editors
+  - true if user is in section.owner_group
+
+Step 4
+- Update focus_area.html to render managed sections instead of placeholders for:
+  - section_1
+  - section_2
+  - section_3
+  - section_4
+  - section_5
+  - additional_links
+- Leave hero_image as placeholder
+
+Step 5
+- Build the context loading pattern
+- Load all FocusAreaSection rows for the current page in one query
+- Build a dictionary keyed by section_key
+- Pass that into the template
+
+Step 6
+- Seed section rows for each existing focus-area page
+- Assign owner_group per page according to the current focus editor groups
+
+Step 7
+- Move existing content from placeholders into managed section rows
+- Validate output matches existing page content
+
+Step 8
+- Stop using the old placeholders for managed sections
+- Keep hero_image placeholder unless we later decide it also needs governance
+
+
+Decisions to confirm before coding
+----------------------------------
+
+1. Should every governed section require owner_group?
+- recommended answer: yes
+
+2. Should each page have exactly one record for each section_key?
+- recommended answer: yes
+
+3. Should additional_links remain rich text at first or become structured links?
+- recommended answer: rich text first, structured later if needed
+
+4. Should hero_image stay placeholder-only for now?
+- recommended answer: yes
+
+
+Why this approach
+-----------------
+
+This approach is recommended because:
+
+- Django CMS page permissions are already working for page-level ownership
+- raw placeholders are not a strong fit for true block-level governance
+- model-backed sections provide ownership, auditability, and future workflow support
+- the current group structure can be reused cleanly for both page-level and section-level permissions
+
+
+Files relevant when resuming
+----------------------------
+
+- templates/focus_area.html
+- READMEs/FOCUS_AREA_PERMS.md
+- operations_portalcms_django/management/commands/setup_focus_area_page_permissions.py
+- operations_portalcms_django/models.py
+- operations_portalcms_django/views.py
+- operations_portalcms_django/admin.py
+
+
+Suggested next session starting point
+-------------------------------------
+
+Start with:
+- create FocusAreaSection model
+- define section_key choices
+- decide the page-to-owner-group mapping strategy
+- then update focus_area.html to render managed sections for section_1 to section_5 and additional_links

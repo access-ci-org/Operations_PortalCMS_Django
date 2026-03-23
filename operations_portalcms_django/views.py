@@ -5,6 +5,7 @@ from django.views.decorators.cache import cache_page
 from django.urls import reverse_lazy
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.utils import timezone
+from django.db.models import Prefetch
 from .models import SystemStatusNews, IntegrationNews
 from .forms import SystemStatusNewsForm, IntegrationNewsForm
 import requests
@@ -18,6 +19,13 @@ def unprivileged(request):
 
 def system_status_news(request):
     """System and Infrastructure Status News listing page"""
+    infrastructure_prefetch = Prefetch(
+        'affected_infrastructure_items',
+        queryset=SystemStatusNews.affected_infrastructure_items.rel.model.objects.order_by(
+            'resource_descriptive_name'
+        ),
+    )
+
     # Show only published news to non-authenticated users
     # Show all news to authenticated users with permissions
     if request.user.is_authenticated and (
@@ -25,16 +33,25 @@ def system_status_news(request):
         request.user.has_perm('operations_portalcms_django.can_review_systemstatusnews') or
         request.user.has_perm('operations_portalcms_django.can_publish_systemstatusnews')
     ):
-        news_items = SystemStatusNews.objects.filter(is_active=True).prefetch_related('affected_infrastructure_items')
+        news_items = SystemStatusNews.objects.filter(is_active=True)
     else:
         news_items = SystemStatusNews.objects.filter(
             is_active=True,
             status='published',
-        ).prefetch_related('affected_infrastructure_items')
+        )
+
+    news_items = news_items.select_related('author', 'reviewer').prefetch_related(
+        infrastructure_prefetch
+    )
+
+    paginator = Paginator(news_items, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     
     context = {
         'page': 'system_status_news',
-        'system_status_news': news_items,
+        'system_status_news': page_obj,
+        'page_obj': page_obj,
         'can_review': request.user.has_perm('operations_portalcms_django.can_review_systemstatusnews') if request.user.is_authenticated else False,
         'can_publish': request.user.has_perm('operations_portalcms_django.can_publish_systemstatusnews') if request.user.is_authenticated else False,
     }
@@ -43,6 +60,11 @@ def system_status_news(request):
 
 def integration_news(request):
     """Integration News listing page"""
+    element_prefetch = Prefetch(
+        'affected_elements',
+        queryset=IntegrationNews.affected_elements.rel.model.objects.order_by('label'),
+    )
+
     # Show only published news to non-authenticated users
     # Show all news to authenticated users with permissions
     if request.user.is_authenticated and (
@@ -50,16 +72,25 @@ def integration_news(request):
         request.user.has_perm('operations_portalcms_django.can_review_integrationnews') or
         request.user.has_perm('operations_portalcms_django.can_publish_integrationnews')
     ):
-        news_items = IntegrationNews.objects.filter(is_active=True).prefetch_related('affected_elements')
+        news_items = IntegrationNews.objects.filter(is_active=True)
     else:
         news_items = IntegrationNews.objects.filter(
             is_active=True,
             status='published',
-        ).prefetch_related('affected_elements')
+        )
+
+    news_items = news_items.select_related('author', 'reviewer').prefetch_related(
+        element_prefetch
+    )
+
+    paginator = Paginator(news_items, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     
     context = {
         'page': 'integration_news',
-        'integration_news': news_items,
+        'integration_news': page_obj,
+        'page_obj': page_obj,
         'can_review': request.user.has_perm('operations_portalcms_django.can_review_integrationnews') if request.user.is_authenticated else False,
         'can_publish': request.user.has_perm('operations_portalcms_django.can_publish_integrationnews') if request.user.is_authenticated else False,
     }
