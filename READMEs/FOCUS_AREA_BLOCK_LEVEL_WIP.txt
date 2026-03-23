@@ -283,3 +283,57 @@ Start with:
 - define section_key choices
 - decide the page-to-owner-group mapping strategy
 - then update focus_area.html to render managed sections for section_1 to section_5 and additional_links
+
+
+Quick resume notes for next session
+-----------------------------------
+
+What is already done:
+- FocusAreaSection model was added
+- migration 0013_focusareasection was created and applied
+- focus_area.html now prefers managed FocusAreaSection content for section_1 through section_5 and additional_links
+- fallback to old placeholders still exists if a FocusAreaSection row does not exist yet
+- hero_image is still a normal CMS placeholder
+
+Important mental model:
+- page permissions and block permissions are separate layers
+- page permission = who can edit the page at all
+- block permission = who can edit a specific FocusAreaSection row
+- the true governed block identity is page + section_key
+
+Very important UI clarification:
+- CMS structure mode still shows old placeholders like section_2_content
+- block-level ownership is NOT attached to those placeholder items
+- block-level ownership lives in Django admin under Focus Area Sections
+
+Where the actual block records live:
+- /admin/ -> Operations Portal CMS -> Focus Area Sections
+
+How block access is currently assigned:
+- a user gets access by being in a Django group
+- a FocusAreaSection row gets ownership via owner_group
+- if the user's group matches the section row's owner_group, they can edit that section
+- Focus_area_editors is the broad override group
+- superusers can edit all sections
+
+Current code behavior:
+- can_edit_focus_area_section(user, section) returns true if:
+  - user is superuser
+  - user is in Focus_area_editors
+  - user is in section.owner_group
+
+Example:
+- to let cms_tester edit only CyberSecurity section_3:
+  - create/use a group like CyberSecurity_Section3_Editors
+  - add cms_tester to that group
+  - in Focus Area Sections, create/edit the row:
+    - page = CyberSecurity
+    - section_key = section_3
+    - owner_group = CyberSecurity_Section3_Editors
+
+Important limitation:
+- if multiple sections use the same owner_group, members of that group can edit all of those sections
+- so one-user/one-block separation requires different groups per section/responsibility
+
+Likely next practical step:
+- seed/create FocusAreaSection rows for all four focus-area pages so block records are easier to manage in admin
