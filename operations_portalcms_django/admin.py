@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib import messages
 from .models import (
+    FocusAreaSection,
     SystemStatusNews, 
     IntegrationNews,
     CiderInfrastructure,
@@ -8,7 +9,70 @@ from .models import (
     CiderFeatures,
     CiderGroups,
 )
-from .utils import is_rp_user, can_manage_news
+from .utils import can_edit_focus_area_section, can_manage_news, is_rp_user
+
+
+@admin.register(FocusAreaSection)
+class FocusAreaSectionAdmin(admin.ModelAdmin):
+    list_display = ['page_title', 'section_key', 'owner_group', 'is_active', 'updated_at', 'updated_by']
+    list_filter = ['section_key', 'owner_group', 'is_active']
+    search_fields = ['heading', 'body', 'page__title_set__title', 'owner_group__name']
+    readonly_fields = ['updated_at', 'updated_by']
+    autocomplete_fields = ['page', 'owner_group', 'updated_by']
+
+    fieldsets = (
+        ('Section Identity', {
+            'fields': ('page', 'section_key', 'owner_group', 'is_active')
+        }),
+        ('Content', {
+            'fields': ('heading', 'body')
+        }),
+        ('Metadata', {
+            'fields': ('updated_at', 'updated_by'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    @admin.display(description='Page')
+    def page_title(self, obj):
+        return obj.page.get_title('en', fallback=True)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related('page', 'owner_group', 'updated_by')
+        if request.user.is_superuser or request.user.groups.filter(name='Focus_area_editors').exists():
+            return qs
+        return qs.filter(owner_group__in=request.user.groups.all()).distinct()
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return request.user.groups.filter(
+            name__in=['Focus_area_editors', 'Focus_Cybersecurity_Editors', 'Focus_Networking_dataTransfer_Editors', 'Focus_STEP_Editors', 'Focus_operationsSupport_Editors']
+        ).exists()
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return self.has_module_permission(request)
+        return can_edit_focus_area_section(request.user, obj)
+
+    def has_add_permission(self, request):
+        return self.has_module_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return self.has_module_permission(request)
+        return can_edit_focus_area_section(request.user, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_change_permission(request, obj)
 
 
 @admin.register(SystemStatusNews)

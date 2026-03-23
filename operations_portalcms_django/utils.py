@@ -1,7 +1,10 @@
 """
 Utility functions for Operations Portal CMS
 """
-from django.contrib.auth.models import User
+from .models import FocusAreaSection
+
+
+GLOBAL_FOCUS_EDITORS_GROUP = 'Focus_area_editors'
 
 
 def is_rp_user(user):
@@ -130,3 +133,27 @@ def can_manage_news(user):
         bool: True if user can manage news
     """
     return is_rp_user(user) or is_operations_user(user)
+
+
+def can_edit_focus_area_section(user, section):
+    """
+    Check whether a user can edit a managed focus-area section.
+
+    Access is allowed for:
+    - superusers
+    - members of the broad Focus_area_editors override group
+    - members of the section's owner_group
+    """
+    if not user or not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    if user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists():
+        return True
+
+    if not isinstance(section, FocusAreaSection) or not section.owner_group_id:
+        return False
+
+    return user.groups.filter(pk=section.owner_group_id).exists()

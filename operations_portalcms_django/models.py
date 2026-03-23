@@ -1,7 +1,9 @@
+from cms.models import Page
+from django.contrib.auth.models import Group, User
 from django.db import models
-from django.contrib.auth.models import User
 from django.utils import timezone
 from cms.models.pluginmodel import CMSPlugin
+from djangocms_text_ckeditor.fields import HTMLField
 
 
 class SystemStatusNews(models.Model):
@@ -275,6 +277,65 @@ class IntegrationElement(models.Model):
 
     def __str__(self):
         return self.label
+
+
+class FocusAreaSection(models.Model):
+    """Managed block-level content for focus-area pages."""
+
+    SECTION_1 = 'section_1'
+    SECTION_2 = 'section_2'
+    SECTION_3 = 'section_3'
+    SECTION_4 = 'section_4'
+    SECTION_5 = 'section_5'
+    ADDITIONAL_LINKS = 'additional_links'
+
+    SECTION_KEY_CHOICES = [
+        (SECTION_1, 'Section 1'),
+        (SECTION_2, 'Section 2'),
+        (SECTION_3, 'Section 3'),
+        (SECTION_4, 'Section 4'),
+        (SECTION_5, 'Section 5'),
+        (ADDITIONAL_LINKS, 'Additional Links'),
+    ]
+
+    page = models.ForeignKey(
+        Page,
+        on_delete=models.CASCADE,
+        related_name='focus_area_sections',
+    )
+    section_key = models.CharField(max_length=32, choices=SECTION_KEY_CHOICES)
+    heading = models.CharField(max_length=255, blank=True)
+    body = HTMLField(blank=True)
+    owner_group = models.ForeignKey(
+        Group,
+        on_delete=models.PROTECT,
+        related_name='focus_area_sections',
+    )
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_focus_area_sections',
+    )
+
+    class Meta:
+        db_table = 'operations_portalcms_django_focusareasection'
+        verbose_name = 'Focus Area Section'
+        verbose_name_plural = 'Focus Area Sections'
+        ordering = ['page_id', 'section_key']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['page', 'section_key'],
+                name='focus_area_section_page_key_unique',
+            ),
+        ]
+
+    def __str__(self):
+        page_title = self.page.get_title('en', fallback=True) or f'Page {self.page_id}'
+        return f'{page_title} - {self.get_section_key_display()}'
 
 
 # CMS Plugin Models for News Feed
