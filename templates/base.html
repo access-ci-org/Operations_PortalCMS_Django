@@ -72,21 +72,22 @@
             <div id="site-menus"></div>
         </header>
         
-        {# Admin Navigation - Only visible to staff/admin users #}
-        {% if user.is_authenticated and user.is_staff %}
+        {# Secondary navigation for authenticated users; admin links are staff-only #}
+        {% if user.is_authenticated %}
         <div class="container mb-3">
             <ul class="nav nav-tabs">
-                
+                {% if user.is_staff %}
                 <li class="nav-item">
                     <a class="nav-link" href="/access_django_user_admin/" target="_blank">
                         Django User Admin
                     </a>
                 </li>
-                
+
                 <li class="nav-item">
                     <a class="nav-link" href="/admin" target="_blank">Django Admin</a>
                 </li>
-                
+                {% endif %}
+
                 <li class="nav-item">
                     <form method="post" action="/accounts/logout/" style="display: inline;">
                         {% csrf_token %}

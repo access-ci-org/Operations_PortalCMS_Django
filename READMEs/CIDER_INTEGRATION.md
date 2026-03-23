@@ -2,146 +2,80 @@
 
 ## Overview
 
-This Django CMS uses **CIDER** (Cyber Infrastructure Description Repository) data to enable Resource Provider permissions. CIDER data lives in the **Operations API Warehouse** and is synced to this app's database.
+This Django CMS keeps a local copy of CIDER catalog data in PostgreSQL and uses that data in forms, permissions, and news workflows.
 
-## Architecture
+The app should query local tables at request time; CIDER API calls should happen in background sync jobs.
 
-```
-┌─────────────────────────────────────────────┐
-│   CIDER System (Authoritative Source)       │
-│   - Resource Provider groups                │
-│   - Organizations                            │
-│   - Infrastructure resources                 │
-└────────────────┬────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────┐
-│   Operations API Warehouse                   │
-│   Database: cider.models.CiderGroups         │
-│   REST API: operations-api.access-ci.org     │
-└────────────────┬────────────────────────────┘
-                 │ HTTP/JSON
-                 ▼
-┌─────────────────────────────────────────────┐
-│   Django CMS (This App)                      │
-│   Database: operations_portalcms_django.     │
-│             models.CiderGroups               │
-│   - Syncs from API via management command    │
-│   - Creates RP groups & permissions          │
-└─────────────────────────────────────────────┘
-```
+## API Sources
 
-## Key CIDER API Endpoints
+Primary endpoints:
 
-**1. Active Groups**
-```
-GET https://operations-api.access-ci.org/wh2/cider/v2/access-active-groups/
-```
-Returns Resource Provider groups, e.g.:
-- `rp.psc.edu` (Pittsburgh Supercomputing Center)
-- `rp.tacc.utexas.edu` (Texas Advanced Computing Center)
-- `rp.sdsc.edu` (San Diego Supercomputer Center)
+1. `GET https://operations-api.access-ci.org/wh2/cider/v2/access-active/`
+- Authoritative list of active infrastructure resources
+- Used to sync `CiderInfrastructure`
 
-**2. Organizations**
-```
-GET https://operations-api.access-ci.org/wh2/cider/v1/organizations/
-```
-Returns organization metadata (names, URLs, logos)
+2. `GET https://operations-api.access-ci.org/wh2/cider/v2/access-active-groups/`
+- Active groups + rollups + organizations + feature catalogs
+- Used to sync `CiderGroups`, `CiderOrganizations`, and `CiderFeatures`
 
-**3. Infrastructure Resources**
-```
-GET https://operations-api.access-ci.org/wh2/cider/v2/access-active/
-```
-Returns compute/storage resources like Bridges-2, Delta, Stampede3
+## Local Models Synced
 
-## Data Flow
+- `CiderInfrastructure` from `v2/access-active/`
+- `CiderGroups` from `v2/access-active-groups/` `active_groups`
+- `CiderOrganizations` from `v2/access-active-groups/` `organizations`
+- `CiderFeatures` from `v2/access-active-groups/` `feature_categories` + `features`
 
-### Development Workflow
+## Command
+
 ```bash
-# Load test data for development
-uv run python manage.py load_test_cider_data
-
-# Create RP permissions and groups
-uv run python manage.py setup_rp_permissions
-```
-
-### Production Workflow
-```bash
-# Sync from live CIDER API
 uv run python manage.py sync_cider_from_api
-
-# Create RP permissions and groups
-uv run python manage.py setup_rp_permissions
 ```
 
-## What Gets Synced
+Useful options:
 
-### CiderGroups Model
-Stores **Resource Provider organizations** (not individual resources):
+```bash
+# Validate only (no DB writes)
+uv run python manage.py sync_cider_from_api --dry-run
 
-| Field | Example | Source |
-|-------|---------|--------|
-| `info_groupid` | `rp.psc.edu` | CIDER API `info_groupid` |
-| `group_descriptive_name` | `Pittsburgh Supercomputing Center` | CIDER API `group_descriptive_name` |
-| `group_description` | Full description | CIDER API `group_description` |
-| `info_resourceids` | `["bridges2-gpu.psc.access-ci.org", ...]` | CIDER API `rollup_info_resourceids` |
+# Filter groups by prefix when needed
+uv run python manage.py sync_cider_from_api --group-prefix rp.
 
-### CiderOrganizations Model
-Stores **institution metadata**:
+# Skip one side of the sync (debug/partial operation)
+uv run python manage.py sync_cider_from_api --skip-infrastructure
+uv run python manage.py sync_cider_from_api --skip-groups-bundle
+```
 
-| Field | Example | Source |
-|-------|---------|--------|
-| `organization_abbrev` | `PSC` | CIDER API `organization_abbreviation` |
-| `organization_name` | `Pittsburgh Supercomputing Center` | CIDER API `organization_name` |
-| `organization_url` | `https://www.psc.edu` | CIDER API `organization_url` |
+## News Form Impact
 
-## Relationship to CILogon Permissions
+- `SystemStatusNews` affected infrastructure options come from local `CiderInfrastructure`.
+- `IntegrationNews` affected elements remain local static choices in app models.
+- Better CIDER sync quality reduces unmatched warnings during Drupal import and improves add/edit picker accuracy.
 
-**IMPORTANT:** CIDER data is **metadata only**. The actual permission sync happens via **CILogon** authentication:
+## Scheduling Guidance
 
-1. **User logs in** → CILogon returns `isMemberOf` claim
-2. **Signal handler** → Syncs URNs to Django groups
-3. **Permission check** → Checks group membership
+Recommended cadence:
 
-CIDER provides:
-- ✅ Group existence validation
-- ✅ Display names and metadata
-- ✅ Resource associations
+- Minimum: nightly sync
+- Better freshness: every 6-12 hours
+- Also run on-demand before major imports/reconciliations
 
-CIDER does NOT:
-- ❌ Grant permissions directly
-- ❌ Replace CILogon authentication
-- ❌ Sync user group memberships
+Example crontab:
 
-## Comparison: API Warehouse vs Django CMS
+```cron
+# Nightly full sync at 02:15 UTC
+15 2 * * * cd /soft/django-cms-01/tags/Operations_PortalCMS_Django && /usr/bin/env bash -lc 'source .env && uv run python manage.py sync_cider_from_api >> /soft/django-cms-01/var/cider_sync.log 2>&1'
 
-| Aspect | API Warehouse | Django CMS |
-|--------|---------------|------------|
-| **CIDER Import** | `from cider.models import CiderGroups` | `from operations_portalcms_django.models import CiderGroups` |
-| **Database** | Authoritative CIDER DB | Copy synced from API |
-| **Data Source** | Direct CIDER system | REST API from warehouse |
-| **Purpose** | Serve CIDER data to ecosystem | Use CIDER data for RP permissions |
-| **Sync Method** | Direct database sync | HTTP API calls |
+# Optional midday refresh at 14:15 UTC
+15 14 * * * cd /soft/django-cms-01/tags/Operations_PortalCMS_Django && /usr/bin/env bash -lc 'source .env && uv run python manage.py sync_cider_from_api >> /soft/django-cms-01/var/cider_sync.log 2>&1'
+```
 
-## Sync Command Details
+Ansible direction:
 
-The `sync_cider_from_api.py` command:
-- Fetches JSON from Operations API
-- Filters for RP groups (`rp.*` prefix only)
-- Updates or creates local CiderGroups records
-- Syncs organization metadata
-- Does NOT modify user permissions (run `setup_rp_permissions` separately)
+- Use the `ansible.builtin.cron` module (or a systemd timer) to install the schedule.
+- Keep logs in a known path and monitor failures.
+- Validate in CI with `--dry-run` before deploy.
 
-## Future Enhancements
+## Permissions Note
 
-Potential improvements:
-- **Scheduled sync** - Use Django celery/cron to auto-sync daily
-- **Webhook notifications** - Get notified when CIDER data changes
-- **Shared database** - Use Django multi-db to query warehouse directly
-- **Infrastructure filtering** - Filter news by specific resources a user manages
+CIDER sync is metadata sync only. It does not grant user permissions directly. Permission mapping still relies on your authentication/group workflow.
 
-## Related Documentation
-
-- [NEWS_PERMISSIONS.md](NEWS_PERMISSIONS.md) - How RP users can add/edit news
-- [QUICKSTART_PERMISSIONS.md](QUICKSTART_PERMISSIONS.md) - Setup guide
-- [PERMISSIONS.md](PERMISSIONS.md) - Technical implementation details

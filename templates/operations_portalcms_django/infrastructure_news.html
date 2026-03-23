@@ -40,8 +40,8 @@
                                     <p class="card-text mb-1"><span class="fw-bold text-dark">Affected Infrastructure:</span> <code>{{ news.get_affected_infrastructure_display }}</code></p>
                                 {% endif %}
                             {% endwith %}
-                            <p class="card-text mb-1"><span class="fw-bold text-dark">Start Date:</span> {% if news.start_datetime %}{{ news.start_datetime|date:"F j, Y, g:i a" }}{% else %}N/A{% endif %}</p>
-                            <p class="card-text mb-3"><span class="fw-bold text-dark">End Date:</span> {% if news.end_datetime %}{{ news.end_datetime|date:"F j, Y, g:i a" }}{% else %}N/A{% endif %}</p>
+                            <p class="card-text mb-1"><span class="fw-bold text-dark">Start Date:</span> {% if news.start_datetime %}{{ news.start_datetime|date:"F j, Y, g:i a" }}{% else %}Not Specified{% endif %}</p>
+                            <p class="card-text mb-3"><span class="fw-bold text-dark">End Date:</span> {% if news.end_datetime %}{{ news.end_datetime|date:"F j, Y, g:i a" }}{% else %}Not Specified{% endif %}</p>
                             <p class="card-text">{{ news.content }}</p>
                             <p class="text-muted">
                                 <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
@@ -87,11 +87,12 @@
                                     {% endif %}
                                 </div>
                                 
-                                {% if news.review_comments %}
-                                    <div class="alert alert-warning mt-2 mb-0">
-                                        <strong>Review Comments:</strong> {{ news.review_comments }}
-                                    </div>
-                                {% endif %}
+                            {% endif %}
+
+                            {% if news.review_comments and '[drupal_nid:' not in news.review_comments %}
+                                <div class="alert alert-warning mt-2 mb-0">
+                                    <strong>Review Comments:</strong> {{ news.review_comments }}
+                                </div>
                             {% endif %}
                         </div>
                     </div>
