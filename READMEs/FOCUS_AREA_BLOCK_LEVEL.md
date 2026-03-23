@@ -162,6 +162,61 @@ Current admin behavior:
 
 This is a practical first version because it provides governed editing immediately without requiring a custom section-edit UI.
 
+## How To Assign Block-Level Access In Admin
+
+The current block-level permission model is group-based.
+
+That means:
+
+- you do not assign a standalone block permission directly to a user
+- you assign the user to a Django group
+- you assign that group to a `FocusAreaSection.owner_group`
+
+### Current Rule
+
+A user can edit a managed section if:
+
+- they are a superuser
+- they are in `Focus_area_editors`
+- they are in the section's `owner_group`
+
+### Admin Steps
+
+To give a user block-level edit access to a focus-area section:
+
+1. Open the user in Django admin under `Users`.
+2. Add the user to the appropriate Django group.
+3. Open the relevant `Focus Area Section` record in admin.
+4. Set `owner_group` on that section to the same group.
+5. Save the section.
+
+Once both pieces are true:
+
+- user belongs to the group
+- section is owned by that group
+
+the user can edit that managed section.
+
+### Example
+
+If you want a user to edit blocks on the `CyberSecurity` focus page:
+
+1. Add the user to `Focus_Cybersecurity_Editors`.
+2. Open the `FocusAreaSection` rows for the `CyberSecurity` page.
+3. Set each target section's `owner_group` to `Focus_Cybersecurity_Editors`.
+
+That user will then be able to edit those managed sections.
+
+### Important Limitation
+
+This applies only to managed `FocusAreaSection` records.
+
+It does not yet apply to:
+
+- raw page placeholders that have not been migrated into `FocusAreaSection`
+- `hero_image`, which is still a normal CMS placeholder
+- one-off direct per-user block assignments
+
 ## Rendering Model
 
 Managed sections are now loaded through a template tag in [focus_area_sections.py](../operations_portalcms_django/templatetags/focus_area_sections.py).
