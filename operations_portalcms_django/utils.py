@@ -142,7 +142,7 @@ def can_edit_focus_area_section(user, section):
     Access is allowed for:
     - superusers
     - members of the broad Focus_area_editors override group
-    - members of the section's owner_group
+    - members of any of the section's owner_groups
     """
     if not user or not user.is_authenticated:
         return False
@@ -153,7 +153,9 @@ def can_edit_focus_area_section(user, section):
     if user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists():
         return True
 
-    if not isinstance(section, FocusAreaSection) or not section.owner_group_id:
+    if not isinstance(section, FocusAreaSection):
         return False
 
-    return user.groups.filter(pk=section.owner_group_id).exists()
+    return user.groups.filter(
+        pk__in=section.owner_groups.values_list('pk', flat=True)
+    ).exists()

@@ -306,10 +306,10 @@ class FocusAreaSection(models.Model):
     section_key = models.CharField(max_length=32, choices=SECTION_KEY_CHOICES)
     heading = models.CharField(max_length=255, blank=True)
     body = HTMLField(blank=True)
-    owner_group = models.ForeignKey(
+    owner_groups = models.ManyToManyField(
         Group,
-        on_delete=models.PROTECT,
-        related_name='focus_area_sections',
+        related_name='owned_focus_area_sections',
+        blank=True,
     )
     is_active = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -336,6 +336,10 @@ class FocusAreaSection(models.Model):
     def __str__(self):
         page_title = self.page.get_title('en', fallback=True) or f'Page {self.page_id}'
         return f'{page_title} - {self.get_section_key_display()}'
+
+    @property
+    def has_content(self):
+        return bool((self.heading or '').strip() or (self.body or '').strip())
 
 
 # CMS Plugin Models for News Feed

@@ -22,15 +22,20 @@
 
                     <!-- Section 1: Light Background -->
                     <div class="row bg-light">
+                        {% if focus_sections.section_1 and request.user|can_edit_focus_section:focus_sections.section_1 %}
+                            <div class="col-lg-12 px-3 pt-3 text-end">
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:operations_portalcms_django_focusareasection_change' focus_sections.section_1.pk %}?next={{ request.path|urlencode }}">Edit Block</a>
+                            </div>
+                        {% endif %}
                         <h2 class="col-lg-12 p-3">
-                            {% if focus_sections.section_1 %}
+                            {% if focus_sections.section_1 and focus_sections.section_1.has_content %}
                                 {{ focus_sections.section_1.heading }}
                             {% else %}
                                 {% placeholder "section_1_heading" %}
                             {% endif %}
                         </h2>
                         <div class="col-lg-12 p-3 pt-0">
-                            {% if focus_sections.section_1 %}
+                            {% if focus_sections.section_1 and focus_sections.section_1.has_content %}
                                 {{ focus_sections.section_1.body|safe }}
                             {% else %}
                                 {% placeholder "section_1_content" %}
@@ -40,15 +45,20 @@
 
                     <!-- Section 2: Dark Background -->
                     <div class="row bg-dark text-light">
+                        {% if focus_sections.section_2 and request.user|can_edit_focus_section:focus_sections.section_2 %}
+                            <div class="col-lg-12 px-3 pt-3 text-end">
+                                <a class="btn btn-sm btn-outline-light" href="{% url 'admin:operations_portalcms_django_focusareasection_change' focus_sections.section_2.pk %}?next={{ request.path|urlencode }}">Edit Block</a>
+                            </div>
+                        {% endif %}
                         <h2 class="col-lg-12 p-3">
-                            {% if focus_sections.section_2 %}
+                            {% if focus_sections.section_2 and focus_sections.section_2.has_content %}
                                 {{ focus_sections.section_2.heading }}
                             {% else %}
                                 {% placeholder "section_2_heading" %}
                             {% endif %}
                         </h2>
                         <div class="col-lg-12 p-3 pt-0">
-                            {% if focus_sections.section_2 %}
+                            {% if focus_sections.section_2 and focus_sections.section_2.has_content %}
                                 {{ focus_sections.section_2.body|safe }}
                             {% else %}
                                 {% placeholder "section_2_content" %}
@@ -58,15 +68,20 @@
 
                     <!-- Section 3: Light Background (optional) -->
                     <div class="row bg-light">
+                        {% if focus_sections.section_3 and request.user|can_edit_focus_section:focus_sections.section_3 %}
+                            <div class="col-lg-12 px-3 pt-3 text-end">
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:operations_portalcms_django_focusareasection_change' focus_sections.section_3.pk %}?next={{ request.path|urlencode }}">Edit Block</a>
+                            </div>
+                        {% endif %}
                         <h2 class="col-lg-12 p-3">
-                            {% if focus_sections.section_3 %}
+                            {% if focus_sections.section_3 and focus_sections.section_3.has_content %}
                                 {{ focus_sections.section_3.heading }}
                             {% else %}
                                 {% placeholder "section_3_heading" %}
                             {% endif %}
                         </h2>
                         <div class="col-lg-12 p-3 pt-0">
-                            {% if focus_sections.section_3 %}
+                            {% if focus_sections.section_3 and focus_sections.section_3.has_content %}
                                 {{ focus_sections.section_3.body|safe }}
                             {% else %}
                                 {% placeholder "section_3_content" %}
@@ -76,15 +91,20 @@
 
                     <!-- Section 4: Dark Background (optional) -->
                     <div class="row bg-dark text-light">
+                        {% if focus_sections.section_4 and request.user|can_edit_focus_section:focus_sections.section_4 %}
+                            <div class="col-lg-12 px-3 pt-3 text-end">
+                                <a class="btn btn-sm btn-outline-light" href="{% url 'admin:operations_portalcms_django_focusareasection_change' focus_sections.section_4.pk %}?next={{ request.path|urlencode }}">Edit Block</a>
+                            </div>
+                        {% endif %}
                         <h2 class="col-lg-12 p-3">
-                            {% if focus_sections.section_4 %}
+                            {% if focus_sections.section_4 and focus_sections.section_4.has_content %}
                                 {{ focus_sections.section_4.heading }}
                             {% else %}
                                 {% placeholder "section_4_heading" %}
                             {% endif %}
                         </h2>
                         <div class="col-lg-12 p-3 pt-0">
-                            {% if focus_sections.section_4 %}
+                            {% if focus_sections.section_4 and focus_sections.section_4.has_content %}
                                 {{ focus_sections.section_4.body|safe }}
                             {% else %}
                                 {% placeholder "section_4_content" %}
@@ -94,15 +114,20 @@
 
                     <!-- Section 5: Light Background (optional) -->
                     <div class="row bg-light">
+                        {% if focus_sections.section_5 and request.user|can_edit_focus_section:focus_sections.section_5 %}
+                            <div class="col-lg-12 px-3 pt-3 text-end">
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:operations_portalcms_django_focusareasection_change' focus_sections.section_5.pk %}?next={{ request.path|urlencode }}">Edit Block</a>
+                            </div>
+                        {% endif %}
                         <h2 class="col-lg-12 p-3">
-                            {% if focus_sections.section_5 %}
+                            {% if focus_sections.section_5 and focus_sections.section_5.has_content %}
                                 {{ focus_sections.section_5.heading }}
                             {% else %}
                                 {% placeholder "section_5_heading" %}
                             {% endif %}
                         </h2>
                         <div class="col-lg-12 p-3 pt-0">
-                            {% if focus_sections.section_5 %}
+                            {% if focus_sections.section_5 and focus_sections.section_5.has_content %}
                                 {{ focus_sections.section_5.body|safe }}
                             {% else %}
                                 {% placeholder "section_5_content" %}
@@ -113,7 +138,12 @@
                     <!-- Additional Content/Links Section (optional) -->
                     <div class="row">
                         <div class="col-lg-12 p-5 text-center bg-light">
-                            {% if focus_sections.additional_links %}
+                            {% if focus_sections.additional_links and request.user|can_edit_focus_section:focus_sections.additional_links %}
+                                <div class="mb-3 text-end">
+                                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:operations_portalcms_django_focusareasection_change' focus_sections.additional_links.pk %}?next={{ request.path|urlencode }}">Edit Block</a>
+                                </div>
+                            {% endif %}
+                            {% if focus_sections.additional_links and focus_sections.additional_links.has_content %}
                                 {{ focus_sections.additional_links.body|safe }}
                             {% else %}
                                 {% placeholder "additional_links" %}

@@ -29,7 +29,7 @@ Implemented:
 
 - a managed `FocusAreaSection` model
 - stable section identifiers via `section_key`
-- section ownership via `owner_group`
+- section ownership via `owner_groups`
 - a reusable permission helper for section editing
 - a Django admin entry point for editing managed sections
 - template loading/rendering for managed sections on `focus_area.html`
@@ -116,8 +116,8 @@ Current fields:
 - `heading`
 - `body`
   - stored as rich HTML content
-- `owner_group`
-  - foreign key to Django `Group`
+- `owner_groups`
+  - many-to-many relation to Django `Group`
 - `is_active`
 - `updated_at`
 - `updated_by`
@@ -145,7 +145,7 @@ A user can edit a managed section if:
 
 - the user is a superuser
 - the user is in `Focus_area_editors`
-- the user is in that section's `owner_group`
+- the user is in one of that section's `owner_groups`
 
 This gives us block-level ownership without replacing the existing page-level structure.
 
@@ -157,7 +157,7 @@ Current admin behavior:
 
 - superusers can see and edit all `FocusAreaSection` records
 - `Focus_area_editors` can see and edit all `FocusAreaSection` records
-- page-specific focus groups can see and edit only the records owned by their group
+- page-specific focus groups can view all section records for their page and edit the ones owned by one of their groups
 - `updated_by` is set automatically on save
 
 This is a practical first version because it provides governed editing immediately without requiring a custom section-edit UI.
@@ -170,7 +170,7 @@ That means:
 
 - you do not assign a standalone block permission directly to a user
 - you assign the user to a Django group
-- you assign that group to a `FocusAreaSection.owner_group`
+- you assign that group to `FocusAreaSection.owner_groups`
 
 ### Current Rule
 
@@ -178,7 +178,7 @@ A user can edit a managed section if:
 
 - they are a superuser
 - they are in `Focus_area_editors`
-- they are in the section's `owner_group`
+- they are in one of the section's `owner_groups`
 
 ### Admin Steps
 
@@ -187,7 +187,7 @@ To give a user block-level edit access to a focus-area section:
 1. Open the user in Django admin under `Users`.
 2. Add the user to the appropriate Django group.
 3. Open the relevant `Focus Area Section` record in admin.
-4. Set `owner_group` on that section to the same group.
+4. Add that group to `owner_groups` on that section.
 5. Save the section.
 
 Once both pieces are true:
@@ -203,7 +203,7 @@ If you want a user to edit blocks on the `CyberSecurity` focus page:
 
 1. Add the user to `Focus_Cybersecurity_Editors`.
 2. Open the `FocusAreaSection` rows for the `CyberSecurity` page.
-3. Set each target section's `owner_group` to `Focus_Cybersecurity_Editors`.
+3. Add `Focus_Cybersecurity_Editors` plus any block-specific groups to `owner_groups` on each target section.
 
 That user will then be able to edit those managed sections.
 
@@ -288,7 +288,7 @@ Benefits:
 
 - preserves the existing page-level permission model
 - introduces real block identity through `page + section_key`
-- supports explicit ownership through `owner_group`
+- supports explicit ownership through `owner_groups`
 - avoids trying to force block-level governance into raw placeholders
 - gives the team an admin-editable first version quickly
 - supports future expansion into review, approval, publishing, and audit metadata
@@ -312,7 +312,7 @@ The foundation is in place, but the full block-level rollout is not finished yet
 Next steps:
 
 1. Seed `FocusAreaSection` rows for each existing focus-area page.
-2. Assign `owner_group` on each section row according to the focus page.
+2. Assign `owner_groups` on each section row according to the focus page and any block-specific editor groups.
 3. Move the existing placeholder content into the managed section records.
 4. Validate that rendered output matches the current pages.
 5. Decide whether to remove old placeholder usage after migration is complete.
@@ -326,6 +326,6 @@ The cleanest way to think about the system now is:
 - page permissions are the outer access layer
 - `FocusAreaSection` records are the inner governed block layer
 - the true block identity is `page + section_key`
-- ownership is attached to the section record through `owner_group`
+- ownership is attached to the section record through `owner_groups`
 
 That is the core of the implemented block-level permissions design.

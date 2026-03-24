@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.contrib import messages
+from django.db.models import Q
+from cms.models import Page
 from .models import (
     FocusAreaSection,
     SystemStatusNews, 
@@ -11,18 +13,27 @@ from .models import (
 )
 from .utils import can_edit_focus_area_section, can_manage_news, is_rp_user
 
+GLOBAL_FOCUS_EDITORS_GROUP = 'Focus_area_editors'
+FOCUS_PAGE_GROUP_MAP = {
+    'Focus_Cybersecurity_Editors': 'CyberSecurity',
+    'Focus_Networking_dataTransfer_Editors': 'Data Transfer and Networking Support',
+    'Focus_STEP_Editors': 'Student Training and Engagement Program',
+    'Focus_operationsSupport_Editors': 'Operational Support',
+}
+
 
 @admin.register(FocusAreaSection)
 class FocusAreaSectionAdmin(admin.ModelAdmin):
-    list_display = ['page_title', 'section_key', 'owner_group', 'is_active', 'updated_at', 'updated_by']
-    list_filter = ['section_key', 'owner_group', 'is_active']
-    search_fields = ['heading', 'body', 'page__title_set__title', 'owner_group__name']
+    list_display = ['page_title', 'section_key', 'owner_group_list', 'is_active', 'updated_at', 'updated_by']
+    list_filter = ['section_key', 'owner_groups', 'is_active']
+    search_fields = ['heading', 'body', 'page__title_set__title', 'owner_groups__name']
     readonly_fields = ['updated_at', 'updated_by']
-    autocomplete_fields = ['page', 'owner_group', 'updated_by']
+    autocomplete_fields = ['page', 'updated_by']
+    filter_horizontal = ['owner_groups']
 
     fieldsets = (
         ('Section Identity', {
-            'fields': ('page', 'section_key', 'owner_group', 'is_active')
+            'fields': ('page', 'section_key', 'owner_groups', 'is_active')
         }),
         ('Content', {
             'fields': ('heading', 'body')
@@ -37,11 +48,40 @@ class FocusAreaSectionAdmin(admin.ModelAdmin):
     def page_title(self, obj):
         return obj.page.get_title('en', fallback=True)
 
+    @admin.display(description='Owner Groups')
+    def owner_group_list(self, obj):
+        return ', '.join(obj.owner_groups.order_by('name').values_list('name', flat=True))
+
+    def _visible_page_ids_for_user(self, request):
+        if request.user.is_superuser or request.user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists():
+            return None
+
+        visible_titles = {
+            page_title
+            for group_name, page_title in FOCUS_PAGE_GROUP_MAP.items()
+            if request.user.groups.filter(name=group_name).exists()
+        }
+        if not visible_titles:
+            return set()
+
+        return {
+            page.pk
+            for page in Page.objects.all()
+            if page.get_title('en', fallback=True) in visible_titles
+        }
+
     def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related('page', 'owner_group', 'updated_by')
-        if request.user.is_superuser or request.user.groups.filter(name='Focus_area_editors').exists():
+        qs = super().get_queryset(request).select_related('page', 'updated_by').prefetch_related('owner_groups')
+        if request.user.is_superuser or request.user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists():
             return qs
-        return qs.filter(owner_group__in=request.user.groups.all()).distinct()
+
+        visible_page_ids = self._visible_page_ids_for_user(request)
+        owned_sections = Q(owner_groups__in=request.user.groups.all())
+        if visible_page_ids is None:
+            return qs
+        if visible_page_ids:
+            return qs.filter(Q(page_id__in=visible_page_ids) | owned_sections).distinct()
+        return qs.filter(owned_sections).distinct()
 
     def save_model(self, request, obj, form, change):
         obj.updated_by = request.user
@@ -50,19 +90,30 @@ class FocusAreaSectionAdmin(admin.ModelAdmin):
     def has_module_permission(self, request):
         if request.user.is_superuser:
             return True
-        return request.user.groups.filter(
-            name__in=['Focus_area_editors', 'Focus_Cybersecurity_Editors', 'Focus_Networking_dataTransfer_Editors', 'Focus_STEP_Editors', 'Focus_operationsSupport_Editors']
-        ).exists()
+        return (
+            request.user.groups.filter(
+                name__in=[GLOBAL_FOCUS_EDITORS_GROUP, *FOCUS_PAGE_GROUP_MAP.keys()]
+            ).exists()
+            or FocusAreaSection.objects.filter(owner_groups__in=request.user.groups.all()).exists()
+        )
 
     def has_view_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
         if obj is None:
             return self.has_module_permission(request)
-        return can_edit_focus_area_section(request.user, obj)
+        if can_edit_focus_area_section(request.user, obj):
+            return True
+
+        visible_page_ids = self._visible_page_ids_for_user(request)
+        if visible_page_ids is None:
+            return True
+        return obj.page_id in visible_page_ids
 
     def has_add_permission(self, request):
-        return self.has_module_permission(request)
+        if request.user.is_superuser:
+            return True
+        return request.user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists()
 
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
@@ -72,7 +123,9 @@ class FocusAreaSectionAdmin(admin.ModelAdmin):
         return can_edit_focus_area_section(request.user, obj)
 
     def has_delete_permission(self, request, obj=None):
-        return self.has_change_permission(request, obj)
+        if request.user.is_superuser:
+            return True
+        return request.user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists()
 
 
 @admin.register(SystemStatusNews)

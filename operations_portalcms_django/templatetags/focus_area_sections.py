@@ -21,7 +21,8 @@ def get_focus_area_sections(context):
 
     sections = (
         FocusAreaSection.objects.filter(page=current_page, is_active=True)
-        .select_related('owner_group', 'updated_by')
+        .select_related('updated_by')
+        .prefetch_related('owner_groups')
         .order_by('section_key')
     )
     return {section.section_key: section for section in sections}

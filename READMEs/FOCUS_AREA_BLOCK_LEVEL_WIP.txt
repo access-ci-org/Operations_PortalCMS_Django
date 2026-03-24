@@ -107,8 +107,8 @@ Recommended fields:
 - body
   - rich text or text field
 
-- owner_group
-  - foreign key to Django auth Group
+- owner_groups
+  - many-to-many relation to Django auth Group
 
 - is_active
 
@@ -134,8 +134,8 @@ Page-level:
 - page-specific focus group can edit its matching page
 
 Section-level:
-- each FocusAreaSection has one owner_group
-- members of owner_group can edit that section
+- each FocusAreaSection has one or more owner_groups
+- members of any owner_group can edit that section
 - Focus_area_editors can edit all focus-area sections as override
 - superusers can edit all focus-area sections
 
@@ -191,13 +191,13 @@ Step 1
 - Create FocusAreaSection model
 - Add section_key choices
 - Add page foreign key
-- Add owner_group foreign key
+- Add owner_groups many-to-many relation
 - Add heading/body/is_active/updated fields
 - Enforce unique page + section_key
 
 Step 2
 - Add admin registration for FocusAreaSection
-- Limit editing based on owner_group, Focus_area_editors, or superuser
+- Limit editing based on owner_groups, Focus_area_editors, or superuser
 - Keep permissions explicit and readable
 
 Step 3
@@ -206,7 +206,7 @@ Step 3
   - can_edit_focus_area_section(user, section)
   - true if user is superuser
   - true if user is in Focus_area_editors
-  - true if user is in section.owner_group
+  - true if user is in one of section.owner_groups
 
 Step 4
 - Update focus_area.html to render managed sections instead of placeholders for:
@@ -226,7 +226,7 @@ Step 5
 
 Step 6
 - Seed section rows for each existing focus-area page
-- Assign owner_group per page according to the current focus editor groups
+- Assign owner_groups per page according to the current focus editor groups plus per-block groups
 
 Step 7
 - Move existing content from placeholders into managed section rows
@@ -240,7 +240,7 @@ Step 8
 Decisions to confirm before coding
 ----------------------------------
 
-1. Should every governed section require owner_group?
+1. Should every governed section require at least one owner group?
 - recommended answer: yes
 
 2. Should each page have exactly one record for each section_key?
@@ -311,8 +311,8 @@ Where the actual block records live:
 
 How block access is currently assigned:
 - a user gets access by being in a Django group
-- a FocusAreaSection row gets ownership via owner_group
-- if the user's group matches the section row's owner_group, they can edit that section
+- a FocusAreaSection row gets ownership via owner_groups
+- if the user's group matches one of the section row's owner_groups, they can edit that section
 - Focus_area_editors is the broad override group
 - superusers can edit all sections
 
@@ -320,7 +320,7 @@ Current code behavior:
 - can_edit_focus_area_section(user, section) returns true if:
   - user is superuser
   - user is in Focus_area_editors
-  - user is in section.owner_group
+  - user is in one of section.owner_groups
 
 Example:
 - to let cms_tester edit only CyberSecurity section_3:
@@ -329,10 +329,10 @@ Example:
   - in Focus Area Sections, create/edit the row:
     - page = CyberSecurity
     - section_key = section_3
-    - owner_group = CyberSecurity_Section3_Editors
+    - owner_groups includes CyberSecurity_Section3_Editors
 
 Important limitation:
-- if multiple sections use the same owner_group, members of that group can edit all of those sections
+- if multiple sections use the same owner group, members of that group can edit all of those sections
 - so one-user/one-block separation requires different groups per section/responsibility
 
 Likely next practical step:
