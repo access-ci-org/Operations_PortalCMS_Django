@@ -52,6 +52,7 @@ Operations_PortalCMS_Django/
 
 **Getting Started:**
 - **[SETUP_GUIDE.md](READMEs/SETUP_GUIDE.md)** - Complete setup guide for all workflows
+- **[WORKFLOW_TESTING.md](READMEs/WORKFLOW_TESTING.md)** - Testing guide for all workflows (automated + manual)
 
 **Workflow Systems:**
 - **[NEWS_PERMISSIONS.md](READMEs/NEWS_PERMISSIONS.md)** - News workflow (draft/review/publish)
