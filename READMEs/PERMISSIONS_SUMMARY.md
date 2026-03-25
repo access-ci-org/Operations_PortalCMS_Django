@@ -21,21 +21,34 @@ The Operations Portal CMS uses **two separate permission systems**:
 ### 1a. News Workflow Groups
 **What:** Explicit Django groups for news workflow roles  
 **Controls:** Author, publish, and manage/review responsibilities  
-**How:** Manual assignment in Django Admin or via `setup_groups`  
+**How:** Configured via `setup_groups` command, users assigned manually  
 
-**Groups created by `setup_groups`:**
-- `System Status Authors`
-- `System Status Publishers`
-- `System Status Managers`
-- `Integration News Authors`
-- `Integration News Publishers`
-- `Integration News Managers`
+**Groups:**
+- `System Status Authors` - Can create and edit
+- `System Status Publishers` - Can create, edit, and publish
+- `System Status Managers` - Can create, edit, delete, review, and publish
+- `Integration News Authors` - Can create and edit
+- `Integration News Publishers` - Can create, edit, and publish
+- `Integration News Managers` - Can create, edit, delete, review, and publish
 
 **See:** [NEWS_PERMISSIONS.md](NEWS_PERMISSIONS.md)
 
 ---
 
-### 2. Custom Groups → CMS Pages
+### 2. Focus Area Page Workflow
+**What:** Django CMS page-level draft/publish workflow for focus areas  
+**Controls:** Who can edit vs. publish focus area pages  
+**How:** Configured via `setup_groups` and `setup_focus_area_page_permissions` commands  
+
+**Groups:**
+- Page-specific editors (e.g., `Focus_STEP_Editors`) - Can edit but NOT publish
+- `Focus_area_editors` - Can edit AND publish any focus area
+
+**See:** [FOCUS_AREA_WORKFLOW.md](FOCUS_AREA_WORKFLOW.md)
+
+---
+
+### 3. Custom Groups → CMS Pages
 **What:** Custom Django groups created by admins  
 **Controls:** Who can  edit specific CMS pages  
 **How:** Manual group creation and assignment  
@@ -67,12 +80,57 @@ The Operations Portal CMS uses **two separate permission systems**:
 
 ## Quick Reference
 
-| I want to... | Use | Create | Assign |
-|--------------|-----|--------|--------|
-| Let RPs add status updates | RP groups | Auto (from CIDER) | Auto (CILogon) |
-| Let PIs edit public pages | Custom group | Manual (`/admin/auth/group/`) | Manual (`/admin/auth/user/`) |
+| I want to... | Use | Setup Command | Assign |
+|--------------|-----|---------------|--------|
+| Configure news workflow | News workflow groups | `setup_groups` | Manual (`/admin/auth/user/`) |
+| Configure focus area workflow | Focus area groups | `setup_groups` + `setup_focus_area_page_permissions` | Manual |
+| Let RPs add status updates | RP groups | `setup_rp_permissions` + `load_test_cider_data` | Auto (CILogon) |
+| Let PIs edit public pages | Custom group | Manual (`/admin/auth/group/`) | Manual |
 | Let managers edit focus areas | Custom group | Manual | Manual |
-| Restrict internal pages | Custom group | Manual | Manual |
+
+---
+
+## Setup Commands Summary
+
+### Initial Setup (Run Once)
+
+```bash
+# 1. Configure news and focus area workflow groups
+uv run python manage.py setup_groups
+
+# 2. Configure focus area page-specific permissions
+uv run python manage.py setup_focus_area_page_permissions
+
+# 3. Configure RP permissions (optional - for news access)
+uv run python manage.py setup_rp_permissions
+
+# 4. Load test data for development (optional)
+uv run python manage.py load_test_cider_data
+```
+
+### Reconfiguration (Safe to re-run)
+
+All setup commands are idempotent and safe to re-run:
+
+```bash
+# Update all permissions
+uv run python manage.py setup_groups
+uv run python manage.py setup_focus_area_page_permissions
+```
+
+---
+
+## Testing
+
+Verify configurations:
+
+```bash
+# Test news workflow
+uv run python tests/test_news_permissions.py
+
+# Test focus area page workflow
+uv run python tests/test_focus_area_page_workflow.py
+```
 
 ---
 
@@ -92,12 +150,13 @@ Keep:
 ## Documentation
 
 **Start here:**
-- [NEWS_PERMISSIONS.md](NEWS_PERMISSIONS.md) - How news permissions work
-- [CMS_PAGE_PERMISSIONS.md](CMS_PAGE_PERMISSIONS.md) - How page permissions work
+- [NEWS_PERMISSIONS.md](NEWS_PERMISSIONS.md) - News workflow with draft/review/publish
+- [FOCUS_AREA_WORKFLOW.md](FOCUS_AREA_WORKFLOW.md) - Focus area page workflow
+- [CMS_PAGE_PERMISSIONS.md](CMS_PAGE_PERMISSIONS.md) - General CMS page permissions
 
 **Technical details:**
 - [PERMISSIONS.md](PERMISSIONS.md) - Technical implementation
-- [QUICKSTART_PERMISSIONS.md](QUICKSTART_PERMISSIONS.md) - Setup guide
+- [QUICKSTART_PERMISSIONS.md](QUICKSTART_PERMISSIONS.md) - RP permissions setup
 
 **Testing:**
 - `test_news_permissions.py` - Test news permissions

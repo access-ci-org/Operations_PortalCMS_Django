@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from operations_portalcms_django.models import SystemStatusNews, IntegrationNews
+from cms.models import Page
 
 
 class Command(BaseCommand):
@@ -121,6 +122,37 @@ class Command(BaseCommand):
                 f'✓ {group_name} configured with {len(permissions)} permissions'
             ))
             self.stdout.write(f'  {description}')
+        
+        # Configure Focus Area Editor Groups with CMS permissions
+        self.stdout.write(self.style.SUCCESS('\n=== Configuring Focus Area Editor Groups ==='))
+        page_ct = ContentType.objects.get_for_model(Page)
+        change_page = Permission.objects.get(content_type=page_ct, codename='change_page')
+        publish_page = Permission.objects.get(content_type=page_ct, codename='publish_page')
+        view_page = Permission.objects.get(content_type=page_ct, codename='view_page')
+        add_page = Permission.objects.get(content_type=page_ct, codename='add_page')
+        
+        # General focus area editors - can change and publish
+        focus_general, _ = Group.objects.get_or_create(name='Focus_area_editors')
+        focus_general.permissions.add(view_page, add_page, change_page, publish_page)
+        self.stdout.write(self.style.SUCCESS(
+            '✓ Focus_area_editors: can edit AND publish (reviewer role)'
+        ))
+        
+        # Page-specific focus area editors - can change but NOT publish
+        specific_groups = [
+            'Focus_Cybersecurity_Editors',
+            'Focus_Networking_dataTransfer_Editors',
+            'Focus_operationsSupport_Editors',
+            'Focus_STEP_Editors',
+        ]
+        for group_name in specific_groups:
+            group, _ = Group.objects.get_or_create(name=group_name)
+            group.permissions.add(view_page, add_page, change_page)
+            # Explicitly remove publish_page if it exists
+            group.permissions.remove(publish_page)
+            self.stdout.write(self.style.SUCCESS(
+                f'✓ {group_name}: can edit but NOT publish (must submit for review)'
+            ))
 
         legacy_group_targets = {
             'System Status Editors': ['System Status Managers'],
@@ -167,3 +199,12 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             '\nTo assign users to groups, use Django Admin at /admin/auth/group/'
         ))
+        self.stdout.write(self.style.WARNING(
+            '\nIMPORTANT: After configuring groups, run:'
+        ))
+        self.stdout.write(
+            '  python manage.py setup_focus_area_page_permissions'
+        )
+        self.stdout.write(
+            'This configures page-specific permissions for focus area workflow.'
+        )

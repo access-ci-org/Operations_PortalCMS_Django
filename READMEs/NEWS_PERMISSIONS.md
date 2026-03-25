@@ -70,53 +70,91 @@ The groups created by `setup_groups` are:
 
 ## Setup
 
-Create or refresh the groups:
+### Initial Configuration
+
+Run these commands to configure news workflow groups and permissions:
 
 ```bash
+# 1. Configure news workflow groups and permissions
 uv run python manage.py setup_groups
+
+# This creates:
+#   - System Status Authors/Publishers/Managers
+#   - Integration News Authors/Publishers/Managers
+#   - Assigns appropriate permissions to each group
 ```
+
+### Adding Users to Groups
+
+After running setup_groups, assign users to the appropriate groups:
+
+1. Go to Django Admin: `/admin/`
+2. Navigate to: **Authentication and Authorization → Groups**
+3. Select the appropriate group (e.g., `System Status Authors`)
+4. Add users to the group
+5. Save
+
+### Testing
+
+Verify the workflow is configured correctly:
+
+```bash
+uv run python tests/test_news_permissions.py
+```
+
+---
+
+## Legacy Migration
+
+If you have legacy editor groups from older versions:
+
+**Legacy groups:**
+- `System Status Editors`
+- `Integration News Editors`
+- `All News Editors`
+
+**Migration commands:**
+
+```bash
+# Migrate users from legacy groups to new groups
+uv run python manage.py setup_groups --migrate-legacy-memberships
+
+# Delete legacy groups (after verifying migration)
+uv run python manage.py setup_groups --delete-legacy-groups
+
+# Or do both in one run:
+uv run python manage.py setup_groups --migrate-legacy-memberships --delete-legacy-groups
+```
+
+---
 
 ## Testing Strategy
 
 Recommended test flow:
 
-1. Assign one user to an `Authors` group.
-2. Assign one user to a `Publishers` group.
-3. Assign one user to a `Managers` group.
-4. Verify:
-   - Authors can draft and edit.
-   - Publishers can draft and publish.
-   - Managers can approve/reject and fully manage content.
+1. Assign one user to an `Authors` group
+2. Assign one user to a `Publishers` group
+3. Assign one user to a `Managers` group
+4. Test the workflow:
+   - Authors can create drafts and edit
+   - Authors can submit for review
+   - Publishers can publish directly
+   - Managers can approve/reject items in review
+   - Managers can publish items
 
-## Legacy Group Cleanup
-
-Older setups may contain:
-
-- `System Status Editors`
-- `Integration News Editors`
-- `All News Editors`
-
-These legacy groups are left alone by default so testing is safe until you explicitly migrate and remove them.
-
-To copy existing users from the legacy groups into the new manager groups:
+Run automated tests:
 
 ```bash
-uv run python manage.py setup_groups --migrate-legacy-memberships
+uv run python tests/test_news_permissions.py
 ```
 
-To delete the legacy groups after testing:
+---
 
-```bash
-uv run python manage.py setup_groups --delete-legacy-groups
-```
+## Related Documentation
 
-You can also do both in one run:
-
-```bash
-uv run python manage.py setup_groups --migrate-legacy-memberships --delete-legacy-groups
-```
-
-In this environment, the legacy groups have already been migrated and removed.
+- [Focus Area Workflow](./FOCUS_AREA_WORKFLOW.md) - Page-level workflow for focus areas
+- [Permissions Summary](./PERMISSIONS_SUMMARY.md) - Overview of all permission systems
+- [Permissions Technical Details](./PERMISSIONS.md) - Implementation details
 
 ## Admin Notes
 

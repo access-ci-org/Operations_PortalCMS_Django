@@ -50,16 +50,22 @@ Operations_PortalCMS_Django/
 
 ## Documentation
 
-**Permissions System:**
-- **[PERMISSIONS_SUMMARY.md](READMEs/PERMISSIONS_SUMMARY.md)** - Start here: Overview of permission model
-- **[NEWS_PERMISSIONS.md](READMEs/NEWS_PERMISSIONS.md)** - RP permissions for news items
-- **[CMS_PAGE_PERMISSIONS.md](READMEs/CMS_PAGE_PERMISSIONS.md)** - Custom groups for page editing
-- **[QUICKSTART_PERMISSIONS.md](READMEs/QUICKSTART_PERMISSIONS.md)** - Setup guide
-- **[PERMISSIONS.md](READMEs/PERMISSIONS.md)** - Technical details
+**Getting Started:**
+- **[SETUP_GUIDE.md](READMEs/SETUP_GUIDE.md)** - Complete setup guide for all workflows
 
-**Coming Soon:**
-- DEPLOYMENT.md - Development setup and production deployment
-- QUICKREF.md - Quick reference for common operations
+**Workflow Systems:**
+- **[NEWS_PERMISSIONS.md](READMEs/NEWS_PERMISSIONS.md)** - News workflow (draft/review/publish)
+- **[FOCUS_AREA_WORKFLOW.md](READMEs/FOCUS_AREA_WORKFLOW.md)** - Focus area page workflow
+- **[PERMISSIONS_SUMMARY.md](READMEs/PERMISSIONS_SUMMARY.md)** - Overview of all permission systems
+
+**Technical Details:**
+- **[CMS_PAGE_PERMISSIONS.md](READMEs/CMS_PAGE_PERMISSIONS.md)** - Django CMS page permissions
+- **[QUICKSTART_PERMISSIONS.md](READMEs/QUICKSTART_PERMISSIONS.md)** - RP permissions setup
+- **[PERMISSIONS.md](READMEs/PERMISSIONS.md)** - Implementation details
+
+**Other:**
+- DEPLOYMENT.md - Development setup and production deployment (coming soon)
+- QUICKREF.md - Quick reference for common operations (coming soon)
 
 ## Development Guidelines
 

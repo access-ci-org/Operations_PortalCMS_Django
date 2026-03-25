@@ -218,3 +218,4 @@ def unpublish_integration_news(request, pk):
     news.save()
     messages.info(request, 'News unpublished and returned to draft.')
     return redirect('operations_portalcms_django:integration_news')
+
