@@ -62,27 +62,6 @@
             </div>
         </div>
         
-        <div class="card mb-3">
-            <div class="card-header">Distribution Options</div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    Email everyone and Post to Slack aren't implemented yet. All integration elements news is viewable on the web.
-                </div>
-                <div class="mb-3 form-check">
-                    {{ form.email_notification }}
-                    <label class="form-check-label" for="{{ form.email_notification.id_for_label }}">{{ form.email_notification.label }}</label>
-                    {% if form.email_notification.help_text %}<small class="form-text text-muted d-block">{{ form.email_notification.help_text }}</small>{% endif %}
-                    {% if form.email_notification.errors %}<div class="text-danger">{{ form.email_notification.errors }}</div>{% endif %}
-                </div>
-                <div class="mb-3 form-check">
-                    {{ form.slack_notification }}
-                    <label class="form-check-label" for="{{ form.slack_notification.id_for_label }}">{{ form.slack_notification.label }}</label>
-                    {% if form.slack_notification.help_text %}<small class="form-text text-muted d-block">{{ form.slack_notification.help_text }}</small>{% endif %}
-                    {% if form.slack_notification.errors %}<div class="text-danger">{{ form.slack_notification.errors }}</div>{% endif %}
-                </div>
-            </div>
-        </div>
-        
         <button type="submit" name="draft" class="btn btn-primary">Save as Draft</button>
         {% if can_publish %}
         <button type="submit" name="publish" class="btn btn-success">Save and Publish</button>
