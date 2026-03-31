@@ -1,10 +1,10 @@
 # Focus Area Page Workflow Implementation - March 25, 2026
 
 ## 🚀 Quick Context (Read This First)
-**Status**: Implementation COMPLETE, automated tests PASSING, ready for manual testing
+**Status**: Working demo configuration validated after follow-up fixes
 **What**: Page-level edit/publish workflow for Focus Area pages using Django CMS built-in features
-**Why**: Enable page-specific editors to edit but not publish; general editors can review and publish
-**Next**: Manual user acceptance testing (see testing plan below)
+**Why**: Enable page-specific editors to edit but not publish; general editors can review and publish while focus pages remain publicly viewable
+**Next**: Use `WORKFLOW_TESTING.md` as the source of truth for demo testing
 
 > **Note**: This implementation is documented in detail at:
 > **WORKFLOW_TESTING.md** - Comprehensive testing guide for all workflows
@@ -29,12 +29,12 @@ Implemented page-level submission/review/approval workflow for Focus Area pages 
    - Combined PagePermission + Django model permissions
    - No custom fields needed - leverages CMS native capabilities
 
-## Current State: COMPLETE ✅
-- All code changes implemented
-- Migrations applied (0015 add workflow, 0016 remove workflow - ended up using CMS native)
-- Automated tests passing
-- Documentation complete with setup commands
-- **Git status**: Documentation committed and pushed
+## Current State
+- Page-level workflow is the intended and tested model
+- STEP block editing is not the correct path for review workflow testing
+- Focus-area pages should remain publicly viewable
+- `Focus_STEP_Editors` can edit STEP but should not publish
+- `Focus_area_editors` remains the reviewer/publisher group
 
 ## Permission Model (Two-Tier)
 1. **Page-Specific Editors** (e.g., Focus_STEP_Editors):
@@ -45,6 +45,13 @@ Implemented page-level submission/review/approval workflow for Focus Area pages 
    - Can EDIT all focus area pages
    - CAN PUBLISH (can_publish=True in PagePermission)
    - Acts as reviewer/approver role
+
+## Follow-Up Fixes Applied After Initial Implementation
+- Added the CMS structure/plugin permissions needed for standard Django CMS page editing
+- Cleaned malformed mixed user/group `cms_pagepermission` rows for STEP
+- Kept focus-area `PagePermission.can_view=False` so editor groups do not gate anonymous page access
+- Enabled `CMS_PUBLIC_FOR = 'all'` so focus pages remain publicly viewable
+- Removed STEP from the active managed block editing path for workflow testing purposes
 
 ## Setup Commands (Already Documented)
 ```bash
@@ -58,25 +65,15 @@ python manage.py setup_focus_area_page_permissions
 python tests/test_focus_area_page_workflow.py
 ```
 
-## Tomorrow's Testing Plan
-### Manual Testing Checklist:
-1. **As STEP Editor** (page-specific editor):
-   - Log in as user in Focus_STEP_Editors group
-   - Navigate to STEP focus area page in CMS
-   - Make content changes (should work)
-   - Try to publish (should be BLOCKED)
-   - Submit for review
+## Final Testing Guidance
+Use `READMEs/WORKFLOW_TESTING.md` for the current manual testing checklist.
 
-2. **As General Editor** (reviewer):
-   - Log in as user in Focus_area_editors group
-   - View pending changes from STEP editor
-   - Review content
-   - Approve and publish (should work)
-
-3. **Verify Isolation**:
-   - STEP editor should NOT be able to edit Cybersecurity pages
-   - Cybersecurity editor should NOT be able to edit STEP pages
-   - General editors should be able to edit/publish ALL focus area pages
+The validated demo pattern is:
+1. Logged out: focus-area pages remain publicly viewable
+2. `Focus_STEP_Editors`: can edit STEP in standard CMS page edit mode and save draft
+3. `Focus_STEP_Editors`: cannot publish STEP
+4. Logged out/incognito: public STEP page does not change until reviewer publish
+5. `Focus_area_editors`: can review and publish
 
 ## Key Files to Reference
 - **Setup Commands**: operations_portalcms_django/management/commands/setup_groups.py, setup_focus_area_page_permissions.py
@@ -87,7 +84,8 @@ python tests/test_focus_area_page_workflow.py
 ## How It Works Technically
 - Django CMS pages have built-in draft state
 - PagePermission objects control who can edit/publish specific pages
-- Model-level permissions (change_page, publish_page) required + PagePermission objects
+- Model-level permissions plus CMS structure/plugin permissions are required for standard page editing
+- `CMS_PUBLIC_FOR = 'all'` keeps the pages publicly viewable
 - Grant type: ACCESS_PAGE_AND_DESCENDANTS (page + all children)
 - No custom workflow fields needed on models
 
@@ -95,27 +93,11 @@ python tests/test_focus_area_page_workflow.py
 - Focus_area_editors (reviewers - can publish)
 - Focus_STEP_Editors (edit only STEP pages)
 - Focus_Cybersecurity_Editors (edit only Cybersecurity pages)
-- Focus_Facilities_Editors (edit only Facilities pages)
-- Focus_DesktopSupport_Editors (edit only Desktop Support pages)
+- Focus_Networking_dataTransfer_Editors (edit only Data Transfer and Networking Support pages)
+- Focus_operationsSupport_Editors (edit only Operational Support pages)
 
-## If Issues Found Tomorrow
-1. Check Django CMS permissions: User and Group Permissions → Pages
-2. Verify group membership: Admin → Users → Group memberships
-3. Run tests again: `python tests/test_focus_area_page_workflow.py`
-4. Check logs for permission denials
-5. Review: FOCUS_AREA_WORKFLOW.md troubleshooting section
+## Source Of Truth
+For current workflow behavior, troubleshooting, and demo steps, use:
 
-## 📋 Next Steps (Action Items)
-1. **Run automated tests** to verify everything still works:
-   ```bash
-   python tests/test_focus_area_page_workflow.py
-   ```
-
-2. **Manual UAT** (see "Tomorrow's Testing Plan" above):
-   - Test as STEP editor (edit only, no publish)
-   - Test as general editor (edit + publish)
-   - Verify permission isolation
-
-3. **If issues found**: Use troubleshooting guide in WORKFLOW_TESTING.md
-
-4. **When satisfied**: Mark workflow implementation as production-ready
+- `READMEs/WORKFLOW_TESTING.md`
+- `READMEs/FOCUS_AREA_WORKFLOW.md`

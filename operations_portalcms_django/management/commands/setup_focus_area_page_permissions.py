@@ -84,7 +84,7 @@ class Command(BaseCommand):
                 'can_change_advanced_settings': False,
                 'can_change_permissions': False,
                 'can_move_page': True,
-                'can_view': True,  # Need view to access the page
+                'can_view': False,  # Keep focus-area pages publicly viewable
             }
             
             result = self._configure_permission(page, global_group, global_permission_defaults, dry_run)
@@ -104,7 +104,7 @@ class Command(BaseCommand):
                 'can_change_advanced_settings': False,
                 'can_change_permissions': False,
                 'can_move_page': True,
-                'can_view': True,  # Need view to access the page
+                'can_view': False,  # Keep focus-area pages publicly viewable
             }
             
             result = self._configure_permission(page, page_group, page_permission_defaults, dry_run)
@@ -119,13 +119,36 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.SUCCESS(summary))
 
-    
     def _configure_permission(self, page, group, permission_defaults, dry_run):
         """Helper method to configure or update a page permission"""
+        mixed_permissions = PagePermission.objects.filter(
+            page=page,
+            group=group,
+            user__isnull=False,
+        )
+        mixed_permission_count = mixed_permissions.count()
+        if mixed_permission_count:
+            self.stdout.write(
+                f"  ↻ Remove {mixed_permission_count} mixed user/group permission row(s) for {group.name}"
+            )
+            if not dry_run:
+                mixed_permissions.delete()
 
-    def _configure_permission(self, page, group, permission_defaults, dry_run):
-        """Helper method to configure or update a page permission"""
-        existing = PagePermission.objects.filter(page=page, group=group).first()
+        duplicate_group_permissions = PagePermission.objects.filter(
+            page=page,
+            group=group,
+            user__isnull=True,
+        ).order_by('pk')
+        existing = duplicate_group_permissions.first()
+        extra_duplicates = duplicate_group_permissions[1:]
+        if extra_duplicates:
+            duplicate_ids = list(extra_duplicates.values_list('pk', flat=True))
+            self.stdout.write(
+                f"  ↻ Remove duplicate group permission row(s) for {group.name}: {duplicate_ids}"
+            )
+            if not dry_run:
+                extra_duplicates.delete()
+
         if existing:
             changed_fields = []
             for field_name, expected_value in permission_defaults.items():

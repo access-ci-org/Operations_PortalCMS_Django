@@ -30,6 +30,40 @@ Focus Area pages use Django CMS's built-in draft/publish workflow with a two-tie
 - **Key Decision**: No custom workflow fields on models; leverage built-in CMS capabilities
 - **Permissions**: Combination of PagePermission objects + Django model-level permissions
 - **Grant Type**: ACCESS_PAGE_AND_DESCENDANTS (affects page and all child pages)
+- **Public Visibility**: Focus-area pages remain publicly viewable; editor groups control editing/publishing only
+
+### Known Good STEP Workflow
+
+This is the currently validated model for the STEP page:
+
+- Public users can view `/focus-areas/step/` without logging in
+- `Focus_STEP_Editors` can edit STEP through standard Django CMS page editing
+- `Focus_STEP_Editors` can save draft changes
+- `Focus_STEP_Editors` cannot publish STEP directly
+- `Focus_area_editors` can review and publish STEP
+
+For a clean STEP editor test user:
+
+- `is_staff = True`
+- `is_superuser = False`
+- member of `Focus_STEP_Editors` only
+- no direct user permissions
+- no direct `cms_pagepermission`
+- no direct `cms_globalpagepermission`
+
+### Important Constraint: Do Not Use STEP Block Editing
+
+STEP is now intended to use page-level CMS workflow only.
+
+Do not test STEP review workflow by editing `FocusAreaSection` block records or clicking `Edit Block` links. Those managed block paths bypass the draft/publish workflow model we want to demonstrate.
+
+For STEP workflow testing, always use the standard Django CMS page edit path:
+
+1. Open STEP in Django CMS page edit mode
+2. Edit normal CMS placeholder/plugin content
+3. Save draft
+4. Verify that publish is not available to `Focus_STEP_Editors`
+5. Publish only as a `Focus_area_editors` reviewer
 
 ### Automated Testing
 ```bash
@@ -55,6 +89,8 @@ python tests/test_focus_area_page_workflow.py
 7. **Expected**: "Publish" button should be disabled or missing
 8. Click "Save and close"
 9. **Expected**: Page remains in draft state, unpublished
+10. Open STEP in a logged-out/incognito browser window
+11. **Expected**: Public page should still show the old content until a reviewer publishes
 
 #### Test 2: General Editor (Edit + Publish)
 **User Role**: Focus_area_editors group member
@@ -88,7 +124,7 @@ python tests/test_focus_area_page_workflow.py
 **Simulates full workflow cycle**
 
 1. **As STEP Editor**:
-   - Make significant content changes to STEP page
+   - Make significant content changes to STEP page using standard CMS page edit mode
    - Add note: "Ready for review - updated contact information"
    - Save (do not publish)
 
@@ -108,6 +144,18 @@ python tests/test_focus_area_page_workflow.py
    - Contact STEP editor
    - STEP editor makes revisions
    - Repeat cycle
+
+#### Test 5: Public Visibility
+**Confirms that page permissions do not hide the public page**
+
+1. Open `/focus-areas/step/` in a logged-out browser
+2. **Expected**: STEP page loads successfully
+3. Open `/focus-areas/cybersecurity/` in a logged-out browser
+4. **Expected**: Cybersecurity page loads successfully
+5. Log in as `jlambertson`
+6. Open STEP in CMS edit mode and save a draft-only change
+7. Recheck `/focus-areas/step/` in a logged-out/incognito browser
+8. **Expected**: Public page still shows the previously published content
 
 ---
 
@@ -175,6 +223,36 @@ python manage.py shell
 >>> Session.objects.all().delete()
 ```
 
+### Focus Pages 404 For Logged-Out Users
+**Problem**: Focus-area pages work when logged in, but return 404 when logged out
+
+**Cause**:
+- Django CMS page permissions are enabled
+- editor groups have page permissions
+- public viewing was accidentally being treated as permission-restricted
+
+**Fix**:
+1. Ensure `CMS_PUBLIC_FOR = 'all'` in settings
+2. Re-run `python manage.py setup_focus_area_page_permissions`
+3. Confirm focus-area `PagePermission` rows use `can_view=False`
+4. Restart the CMS service
+
+**Expected Result**:
+- anonymous users can view focus-area pages
+- editor groups can still edit
+- only `Focus_area_editors` can publish
+
+### STEP Editor Can Edit Blocks But Changes Go Live Immediately
+**Problem**: STEP content changed immediately without review
+
+**Cause**:
+- edit was made through managed block content, not standard CMS page draft workflow
+
+**Fix**:
+1. Do not use `Edit Block` for STEP workflow testing
+2. Use standard Django CMS page edit mode only
+3. Save as draft and verify from a logged-out browser before reviewer publish
+
 ### Test Failures
 **Problem**: Automated tests fail
 
@@ -205,7 +283,7 @@ python manage.py setup_groups
 
 **What it does**:
 - Creates Focus_area_editors, Focus_STEP_Editors, etc.
-- Grants model-level permissions: view_page, add_page, change_page
+- Grants CMS page edit permissions needed for standard page editing, including structure/plugin editing
 - Grants publish_page ONLY to Focus_area_editors (reviewers)
 - Configures news workflow groups (System_Status_editors, etc.)
 
@@ -218,9 +296,10 @@ python manage.py setup_focus_area_page_permissions
 **What it does**:
 - Finds all focus area pages (STEP, Cybersecurity, etc.)
 - Creates two PagePermission sets per page:
-  - General editors: can_change=True, can_publish=True
-  - Page-specific editors: can_change=True, can_publish=False
+  - General editors: can_change=True, can_publish=True, can_view=False
+  - Page-specific editors: can_change=True, can_publish=False, can_view=False
 - Sets grant_on=ACCESS_PAGE_AND_DESCENDANTS
+- Removes malformed mixed user/group page-permission rows if found
 
 ### Verify Setup
 ```bash
@@ -258,6 +337,7 @@ python manage.py shell
 
 ### Documentation
 - `READMEs/FOCUS_AREA_WORKFLOW.md` - Detailed focus area workflow guide
+- `READMEs/WORKFLOW_TESTING.md` - Current known-good testing and troubleshooting notes
 - `READMEs/NEWS_PERMISSIONS.md` - News workflow documentation
 - `READMEs/SETUP_GUIDE.md` - Comprehensive setup instructions
 - `READMEs/PERMISSIONS_SUMMARY.md` - Overview of all permissions

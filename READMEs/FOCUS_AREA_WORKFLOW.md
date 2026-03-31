@@ -8,7 +8,7 @@ Focus area pages (STEP, Cybersecurity, Operational Support, Data Transfer and Ne
 
 ### Page-Specific Editors
 - **Groups**: Focus_STEP_Editors, Focus_Cybersecurity_Editors, Focus_operationsSupport_Editors, Focus_Networking_dataTransfer_Editors
-- **Can**: Edit their assigned focus area page and sections
+- **Can**: Edit their assigned focus area page through standard Django CMS page editing
 - **Cannot**: Publish changes directly (must submit for review)
 
 ### General Focus Area Editors (Reviewers/Publishers)
@@ -26,6 +26,8 @@ Focus area pages (STEP, Cybersecurity, Operational Support, Data Transfer and Ne
 3. Click "Edit" to enter edit mode
 4. Make changes to page content or sections
 5. Click "Save" - changes are saved as draft (not published)
+
+> **Important**: For STEP, use standard Django CMS page editing only. Do not use managed block editing or `Edit Block` links when testing review workflow.
 
 ### 2. Request Review
 
@@ -55,12 +57,16 @@ The page is now published and visible to all users.
 ### Permissions
 
 **Django Model Permissions** (applied to groups):
-- Page-specific editors: `view_page`, `add_page`, `change_page`
+- Page-specific editors: `view_page`, `add_page`, `change_page`, plus required CMS structure/plugin edit permissions
 - General editors: `view_page`, `add_page`, `change_page`, `publish_page`
 
 **Django CMS PagePermissions** (page-specific):
-- Page-specific editors: `can_change=True`, `can_publish=False`
-- General editors: `can_change=True`, `can_publish=True`
+- Page-specific editors: `can_change=True`, `can_publish=False`, `can_view=False`
+- General editors: `can_change=True`, `can_publish=True`, `can_view=False`
+
+**Public Visibility**:
+- Focus-area pages are intended to remain publicly viewable
+- `CMS_PUBLIC_FOR = 'all'` is used so page permissions govern editing/publishing, not anonymous page visibility
 
 ### Setup Commands
 
@@ -145,7 +151,7 @@ This is safe to run multiple times - it will update existing permissions without
 1. Ensure user has `is_staff = True` (required for CMS access)
 2. Verify user is in the correct group
 3. Re-run `setup_groups` and `setup_focus_area_page_permissions`
-4. Check that Django CMS page permissions are enabled on the page
+4. Confirm the user is editing through standard CMS page edit mode, not STEP block editing
 
 ### Can't Publish
 
@@ -157,6 +163,29 @@ This is safe to run multiple times - it will update existing permissions without
 1. Verify they're in the Focus_area_editors group
 2. Run `setup_groups` to ensure they have `publish_page` permission
 3. Run `setup_focus_area_page_permissions` to ensure PagePermissions are correct
+
+### Logged-Out Users Get 404 On Focus Pages
+
+**Problem**: Focus pages load for logged-in staff but 404 for anonymous users
+
+**Expected**: Focus-area pages should remain publicly viewable
+
+**Fixes**:
+1. Ensure `CMS_PUBLIC_FOR = 'all'` in settings
+2. Re-run `setup_focus_area_page_permissions`
+3. Confirm focus-area `PagePermission` rows use `can_view=False`
+4. Restart the CMS service
+
+### STEP Changes Went Live Without Review
+
+**Problem**: STEP content changed immediately after editing
+
+**Cause**: The edit was made through managed block content rather than standard Django CMS page draft workflow
+
+**Fix**:
+1. Test STEP workflow only through standard CMS page edit mode
+2. Save draft as `Focus_STEP_Editors`
+3. Verify the public page from a logged-out/incognito browser before reviewer publish
 
 ## Related Documentation
 

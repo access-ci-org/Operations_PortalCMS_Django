@@ -11,7 +11,12 @@ from .models import (
     CiderFeatures,
     CiderGroups,
 )
-from .utils import can_edit_focus_area_section, can_manage_news, is_rp_user
+from .utils import (
+    STEP_FOCUS_PAGE_TITLE,
+    can_edit_focus_area_section,
+    can_manage_news,
+    is_rp_user,
+)
 
 GLOBAL_FOCUS_EDITORS_GROUP = 'Focus_area_editors'
 FOCUS_PAGE_GROUP_MAP = {
@@ -51,6 +56,23 @@ class FocusAreaSectionAdmin(admin.ModelAdmin):
     @admin.display(description='Owner Groups')
     def owner_group_list(self, obj):
         return ', '.join(obj.owner_groups.order_by('name').values_list('name', flat=True))
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj and obj.page.get_title('en', fallback=True) == STEP_FOCUS_PAGE_TITLE:
+            return (
+                ('Section Identity', {
+                    'fields': ('page', 'section_key', 'is_active')
+                }),
+                ('Content', {
+                    'fields': ('heading', 'body')
+                }),
+                ('Metadata', {
+                    'fields': ('updated_at', 'updated_by'),
+                    'classes': ('collapse',)
+                }),
+            )
+        return fieldsets
 
     def _visible_page_ids_for_user(self, request):
         if request.user.is_superuser or request.user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists():

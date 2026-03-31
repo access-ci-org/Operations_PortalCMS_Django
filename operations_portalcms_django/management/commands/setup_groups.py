@@ -130,10 +130,30 @@ class Command(BaseCommand):
         publish_page = Permission.objects.get(content_type=page_ct, codename='publish_page')
         view_page = Permission.objects.get(content_type=page_ct, codename='view_page')
         add_page = Permission.objects.get(content_type=page_ct, codename='add_page')
-        
+        use_structure = Permission.objects.get(content_type=ContentType.objects.get(app_label='cms', model='placeholder'), codename='use_structure')
+        add_cmsplugin = Permission.objects.get(content_type=ContentType.objects.get(app_label='cms', model='cmsplugin'), codename='add_cmsplugin')
+        change_cmsplugin = Permission.objects.get(content_type=ContentType.objects.get(app_label='cms', model='cmsplugin'), codename='change_cmsplugin')
+        add_text = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_text_ckeditor', model='text'), codename='add_text')
+        change_text = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_text_ckeditor', model='text'), codename='change_text')
+        add_picture = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_picture', model='picture'), codename='add_picture')
+        change_picture = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_picture', model='picture'), codename='change_picture')
+
+        focus_editor_permissions = [
+            view_page,
+            add_page,
+            change_page,
+            use_structure,
+            add_cmsplugin,
+            change_cmsplugin,
+            add_text,
+            change_text,
+            add_picture,
+            change_picture,
+        ]
+
         # General focus area editors - can change and publish
         focus_general, _ = Group.objects.get_or_create(name='Focus_area_editors')
-        focus_general.permissions.add(view_page, add_page, change_page, publish_page)
+        focus_general.permissions.add(*focus_editor_permissions, publish_page)
         self.stdout.write(self.style.SUCCESS(
             '✓ Focus_area_editors: can edit AND publish (reviewer role)'
         ))
@@ -147,7 +167,7 @@ class Command(BaseCommand):
         ]
         for group_name in specific_groups:
             group, _ = Group.objects.get_or_create(name=group_name)
-            group.permissions.add(view_page, add_page, change_page)
+            group.permissions.add(*focus_editor_permissions)
             # Explicitly remove publish_page if it exists
             group.permissions.remove(publish_page)
             self.stdout.write(self.style.SUCCESS(

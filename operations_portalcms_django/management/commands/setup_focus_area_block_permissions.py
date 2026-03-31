@@ -13,6 +13,8 @@ FOCUS_PAGE_GROUP_MAP = {
     'Student Training and Engagement Program': 'Focus_STEP_Editors',
 }
 
+STEP_FOCUS_PAGE_TITLE = 'Student Training and Engagement Program'
+
 BLOCK_GROUP_NAME_MAP = {
     'CyberSecurity': {
         FocusAreaSection.SECTION_1: 'Focus_Cybersecurity_Section_1_Editors',
@@ -84,11 +86,6 @@ class Command(BaseCommand):
             self.stdout.write(f'\nPage: {page_title} (id={page.pk})')
 
             for section_key, block_group_name in BLOCK_GROUP_NAME_MAP[page_title].items():
-                block_group, group_created = Group.objects.get_or_create(name=block_group_name)
-                if group_created:
-                    total_groups_created += 1
-                    self.stdout.write(f'  + Created block group {block_group_name}')
-
                 section, section_created = FocusAreaSection.objects.get_or_create(
                     page=page,
                     section_key=section_key,
@@ -98,7 +95,17 @@ class Command(BaseCommand):
                     total_sections_created += 1
                     self.stdout.write(f'  + Created section row for {section_key}')
 
-                target_group_ids = {page_group.pk, block_group.pk}
+                target_group_ids = {page_group.pk}
+                if page_title != STEP_FOCUS_PAGE_TITLE:
+                    block_group, group_created = Group.objects.get_or_create(name=block_group_name)
+                    if group_created:
+                        total_groups_created += 1
+                        self.stdout.write(f'  + Created block group {block_group_name}')
+                    target_group_ids.add(block_group.pk)
+                else:
+                    self.stdout.write(
+                        f'  - {section_key}: STEP now uses page-level workflow only; skipping block group {block_group_name}'
+                    )
                 current_group_ids = set(section.owner_groups.values_list('pk', flat=True))
 
                 if replace_owner_groups:

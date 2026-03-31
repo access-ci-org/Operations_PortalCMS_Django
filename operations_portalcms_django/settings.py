@@ -229,6 +229,7 @@ CMS_TEMPLATES = [
     ('focus_area.html', 'Focus Area Page'),
 ]
 CMS_PERMISSION = True
+CMS_PUBLIC_FOR = 'all'
 CMS_PLACEHOLDER_CONF = {}
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
