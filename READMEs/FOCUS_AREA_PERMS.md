@@ -15,7 +15,8 @@ It covers:
 
 This document covers **page-level permissions only**.
 
-It does **not** yet define a block-level permission system for the placeholders in [focus_area.html](../templates/focus_area.html). Block-level permissions will require managed section/plugin objects rather than plain placeholders.
+That is now intentional final direction for focus-area permissions. The earlier block-level
+permissions idea has been retired.
 
 ## Current Focus Editor Groups
 
@@ -141,9 +142,9 @@ That means:
 - if a user has page edit rights on a focus-area page, they can edit the page’s content through Django CMS
 - the current `focus_area.html` template placeholders are **not** individually permissioned
 
-The current page-level system is the foundation for later block-level work.
+This is the active architecture, not a temporary stepping stone.
 
-## Future Direction: Block-Level Permissions
+## No Separate Block-Level Permission Layer
 
 The current template [focus_area.html](../templates/focus_area.html) contains multiple placeholders such as:
 
@@ -162,12 +163,11 @@ The current template [focus_area.html](../templates/focus_area.html) contains mu
 
 These placeholders do not currently have a separate permission model.
 
-If block-level permissions are needed in the future, the recommended approach is:
+The project no longer plans to introduce a second focus-area section model or block-level
+permission layer for these placeholders.
 
-1. Keep the current page-level groups and page-level permissions.
-2. Convert selected sections into managed content objects or custom plugins.
-3. Reuse the same focus editor groups as block owners.
-4. Let `Focus_area_editors` remain the broad override/editor group across all focus-area content.
+If more granular workflow is ever needed in the future, it should be solved inside the CMS
+page-content/versioning model rather than by reintroducing a parallel section system.
 
 ## Maintenance Notes
 

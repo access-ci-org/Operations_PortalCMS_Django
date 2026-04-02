@@ -51,11 +51,66 @@ Dumps are saved to `database/dumps/` directory with timestamp.
 
 ### pg_dump_cms.sh
 
-Legacy dump script (from previous CMS version).
+Safe dump script for the current Portal CMS PostgreSQL database.
+
+Supports:
+- config discovery from `APP_CONFIG`, `portalcms.conf.dev.json`, or `portalcms.conf.json`
+- explicit source database override
+- custom or SQL dump output
+- dry-run preview mode for local or production planning
+
+This script is suitable for:
+- local clone/test workflows
+- future RDS backup workflows, as long as the environment variables or `APP_CONFIG` point at the intended RDS instance
+
+**Usage:**
+```bash
+./database/pg_dump_cms.sh
+./database/pg_dump_cms.sh --source-db portalcms1 --format sql
+./database/pg_dump_cms.sh --output database/dumps/portalcms1_clone_seed.dump
+./database/pg_dump_cms.sh --dry-run
+```
 
 ### pg_restore_cms.sh
 
-Legacy restore script (from previous CMS version).
+Safe restore script for the current Portal CMS PostgreSQL database.
+
+Supports:
+- explicit input dump
+- explicit target database
+- optional drop/recreate of the target database
+- refusal to restore into the configured live/source database unless explicitly overridden
+- post-restore verification using `verify_db.sh`
+- dry-run preview mode for local or production planning
+
+This script is suitable for:
+- local clone/restore workflows right now
+- future RDS restores, provided the target host/database/user are set deliberately and `--allow-live-target` is only used when intended
+
+**Usage:**
+```bash
+./database/pg_restore_cms.sh \
+  --input backups/portalcms1_pre_versioning_20260331T174604Z.dump \
+  --target-db portalcms1_clone \
+  --recreate-db
+
+./database/pg_restore_cms.sh \
+  --input backups/portalcms1_pre_versioning_20260331T174604Z.dump \
+  --target-db portalcms1_clone \
+  --recreate-db \
+  --dry-run
+```
+
+### clone_db.sh
+
+Convenience wrapper for the clone-first workflow used for safe testing.
+
+**Usage:**
+```bash
+./database/clone_db.sh
+./database/clone_db.sh portalcms1_clone backups/portalcms1_pre_versioning_20260331T174604Z.dump
+./database/clone_db.sh portalcms1_clone backups/portalcms1_pre_versioning_20260331T174604Z.dump --dry-run
+```
 
 ## Quick Examples
 
@@ -96,12 +151,32 @@ scp database/dumps/portalcms1_*.sql.gz software@your-server:/tmp/
 ssh software@your-server
 
 # For custom format dump
-pg_restore -U portalcms_django -d portalcms1 -v \
-  --no-owner --no-acl /tmp/portalcms1_*.dump
+./database/pg_restore_cms.sh \
+  --input /tmp/portalcms1_*.dump \
+  --target-db portalcms1 \
+  --allow-live-target
 
 # For SQL format dump
 gunzip /tmp/portalcms1_*.sql.gz
-psql -U portalcms_django -d portalcms1 -f /tmp/portalcms1_*.sql
+./database/pg_restore_cms.sh \
+  --input /tmp/portalcms1_*.sql \
+  --target-db portalcms1 \
+  --allow-live-target
+```
+
+### Safe Clone Workflow
+```bash
+# Preview the exact clone steps first
+./database/clone_db.sh portalcms1_clone backups/portalcms1_pre_versioning_20260331T174604Z.dump --dry-run
+
+# Create a disposable clone from the current safety backup
+./database/clone_db.sh
+
+# Or be explicit
+./database/pg_restore_cms.sh \
+  --input backups/portalcms1_pre_versioning_20260331T174604Z.dump \
+  --target-db portalcms1_clone \
+  --recreate-db
 ```
 
 ## Database Migration Workflow

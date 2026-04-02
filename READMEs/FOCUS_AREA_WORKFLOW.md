@@ -27,7 +27,7 @@ Focus area pages (STEP, Cybersecurity, Operational Support, Data Transfer and Ne
 4. Make changes to page content or sections
 5. Click "Save" - changes are saved as draft (not published)
 
-> **Important**: For STEP, use standard Django CMS page editing only. Do not use managed block editing or `Edit Block` links when testing review workflow.
+> **Important**: Page-specific focus editors should use standard Django CMS page editing only. Legacy `FocusAreaSection` editing has been retired from the project.
 
 ### 2. Request Review
 
@@ -176,16 +176,17 @@ This is safe to run multiple times - it will update existing permissions without
 3. Confirm focus-area `PagePermission` rows use `can_view=False`
 4. Restart the CMS service
 
-### STEP Changes Went Live Without Review
+### Legacy Section Changes Went Live Without Review
 
-**Problem**: STEP content changed immediately after editing
+**Problem**: Legacy section content changed immediately after editing
 
-**Cause**: The edit was made through managed block content rather than standard Django CMS page draft workflow
+**Cause**: The edit was made outside the normal Django CMS page draft workflow
 
 **Fix**:
-1. Test STEP workflow only through standard CMS page edit mode
-2. Save draft as `Focus_STEP_Editors`
+1. Use standard CMS page edit mode for page-specific editor workflow
+2. Save draft as the page-specific editor
 3. Verify the public page from a logged-out/incognito browser before reviewer publish
+4. Do not reintroduce model-backed section editing as part of the focus-area workflow
 
 ## Related Documentation
 

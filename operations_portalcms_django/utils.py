@@ -1,13 +1,6 @@
 """
 Utility functions for Operations Portal CMS
 """
-from .models import FocusAreaSection
-
-
-GLOBAL_FOCUS_EDITORS_GROUP = 'Focus_area_editors'
-STEP_FOCUS_EDITORS_GROUP = 'Focus_STEP_Editors'
-STEP_FOCUS_PAGE_TITLE = 'Student Training and Engagement Program'
-
 
 def is_rp_user(user):
     """
@@ -135,34 +128,3 @@ def can_manage_news(user):
         bool: True if user can manage news
     """
     return is_rp_user(user) or is_operations_user(user)
-
-
-def can_edit_focus_area_section(user, section):
-    """
-    Check whether a user can edit a managed focus-area section.
-
-    Access is allowed for:
-    - superusers
-    - members of the broad Focus_area_editors override group
-    - STEP sections are excluded from block-level editing for page-workflow consistency
-    - for non-STEP sections, members of any of the section's owner_groups
-    """
-    if not user or not user.is_authenticated:
-        return False
-
-    if user.is_superuser:
-        return True
-
-    if user.groups.filter(name=GLOBAL_FOCUS_EDITORS_GROUP).exists():
-        return True
-
-    if not isinstance(section, FocusAreaSection):
-        return False
-
-    page_title = section.page.get_title('en', fallback=True)
-    if page_title == STEP_FOCUS_PAGE_TITLE:
-        return False
-
-    return user.groups.filter(
-        pk__in=section.owner_groups.values_list('pk', flat=True)
-    ).exists()

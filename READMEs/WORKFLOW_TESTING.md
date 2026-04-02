@@ -51,13 +51,13 @@ For a clean STEP editor test user:
 - no direct `cms_pagepermission`
 - no direct `cms_globalpagepermission`
 
-### Important Constraint: Do Not Use STEP Block Editing
+### Important Constraint: Use CMS Page Editing Only
 
-STEP is now intended to use page-level CMS workflow only.
+Focus-area workflow is now intended to use page-level CMS workflow only.
 
-Do not test STEP review workflow by editing `FocusAreaSection` block records or clicking `Edit Block` links. Those managed block paths bypass the draft/publish workflow model we want to demonstrate.
+Do not test focus-area review workflow through any legacy section-editing path. Focus-area pages now rely on CMS placeholders/plugins only.
 
-For STEP workflow testing, always use the standard Django CMS page edit path:
+For focus-area workflow testing, always use the standard Django CMS page edit path:
 
 1. Open STEP in Django CMS page edit mode
 2. Edit normal CMS placeholder/plugin content
@@ -242,15 +242,15 @@ python manage.py shell
 - editor groups can still edit
 - only `Focus_area_editors` can publish
 
-### STEP Editor Can Edit Blocks But Changes Go Live Immediately
-**Problem**: STEP content changed immediately without review
+### Focus Editor Change Went Live Immediately
+**Problem**: A focus-area content change appeared live immediately without review
 
 **Cause**:
-- edit was made through managed block content, not standard CMS page draft workflow
+- edit was made outside the intended CMS draft/publish path
 
 **Fix**:
-1. Do not use `Edit Block` for STEP workflow testing
-2. Use standard Django CMS page edit mode only
+1. Use standard Django CMS page edit mode only for page-specific editor testing
+2. Treat CMS placeholders/plugins as the only supported focus-area content path
 3. Save as draft and verify from a logged-out browser before reviewer publish
 
 ### Test Failures
@@ -332,8 +332,8 @@ python manage.py shell
 - `tests/test_permissions.py` - General permissions
 
 ### Models
-- `operations_portalcms_django/models.py` - FocusAreaSection, news models
-- Note: FocusAreaSection has NO workflow fields (uses CMS native)
+- `operations_portalcms_django/models.py` - news models and plugin models
+- Note: focus-area content is now CMS-placeholder-only
 
 ### Documentation
 - `READMEs/FOCUS_AREA_WORKFLOW.md` - Detailed focus area workflow guide
