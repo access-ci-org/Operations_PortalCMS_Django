@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',
     'cms',
+    'djangocms_versioning',
     'menus',
     'treebeard',
     'sekizai',
@@ -231,6 +232,8 @@ CMS_TEMPLATES = [
 CMS_PERMISSION = True
 CMS_PUBLIC_FOR = 'all'
 CMS_PLACEHOLDER_CONF = {}
+DJANGOCMS_VERSIONING_LOCK_VERSIONS = True
+DJANGOCMS_VERSIONING_ON_PUBLISH_REDIRECT = 'published'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # Thumbnail Settings

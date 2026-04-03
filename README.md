@@ -57,6 +57,7 @@ Operations_PortalCMS_Django/
 **Workflow Systems:**
 - **[NEWS_PERMISSIONS.md](READMEs/NEWS_PERMISSIONS.md)** - News workflow (draft/review/publish)
 - **[FOCUS_AREA_WORKFLOW.md](READMEs/FOCUS_AREA_WORKFLOW.md)** - Focus area page workflow
+- **[CMS_VERSIONING_CLONE_CHECKLIST.md](READMEs/CMS_VERSIONING_CLONE_CHECKLIST.md)** - Command-by-command clone-first versioning rollout
 - **[FOCUS_AREA_WORKFLOW_IMPLEMENTATION_NOTES.md](READMEs/FOCUS_AREA_WORKFLOW_IMPLEMENTATION_NOTES.md)** - Implementation context and decisions
 - **[PERMISSIONS_SUMMARY.md](READMEs/PERMISSIONS_SUMMARY.md)** - Overview of all permission systems
 

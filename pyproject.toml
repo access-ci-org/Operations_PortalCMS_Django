@@ -23,4 +23,5 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "access-django-user-admin==1.5.3",
     "python-dotenv>=1.0.0",
+    "djangocms-versioning>=2.5.1,<3",
 ]
