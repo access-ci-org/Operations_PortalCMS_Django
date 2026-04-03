@@ -38,11 +38,17 @@ The Operations Portal CMS uses **two separate permission systems**:
 ### 2. Focus Area Page Workflow
 **What:** Django CMS page-level draft/publish workflow for focus areas  
 **Controls:** Who can edit vs. publish focus area pages  
-**How:** Configured via `setup_groups` and `setup_focus_area_page_permissions` commands  
+**How:** Configured via `setup_groups`, `setup_focus_area_page_permissions`, and `djangocms_versioning` in the active environment  
 
 **Groups:**
 - Page-specific editors (e.g., `Focus_STEP_Editors`) - Can edit but NOT publish
 - `Focus_area_editors` - Can edit AND publish any focus area
+
+**Verified clone result (2026-04-03):**
+- a page-specific editor can create a draft for STEP
+- the published page remains separate until publish
+- reviewer/superuser can publish successfully
+- the old live version becomes `unpublished` after publish
 
 **See:** [FOCUS_AREA_WORKFLOW.md](FOCUS_AREA_WORKFLOW.md)
 
@@ -169,6 +175,10 @@ Keep:
 **✅ Clear separation of concerns**
 - RP groups = News
 - Custom groups = Pages
+
+**✅ Focus-area versioning now proven in clone**
+- `djangocms_versioning` is sufficient for the tested STEP draft/publish workflow
+- `djangocms_moderation` is still optional and not yet enabled
 
 **✅ Simple and flexible**
 - No complex matching rules

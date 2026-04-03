@@ -5,6 +5,7 @@ ACCESS Operations Portal Django CMS application for managing & publishing infras
 ## Features
 
 - Django CMS 5 with Bootstrap 5
+- django CMS page versioning for focus-area draft/publish workflow
 - CILogon OAuth2 authentication with automatic group sync
 - **Resource Provider Permissions** - Fine-grained access control based on COmanage groups
 - Integration News & System Status News management
@@ -58,6 +59,7 @@ Operations_PortalCMS_Django/
 - **[NEWS_PERMISSIONS.md](READMEs/NEWS_PERMISSIONS.md)** - News workflow (draft/review/publish)
 - **[FOCUS_AREA_WORKFLOW.md](READMEs/FOCUS_AREA_WORKFLOW.md)** - Focus area page workflow
 - **[CMS_VERSIONING_CLONE_CHECKLIST.md](READMEs/CMS_VERSIONING_CLONE_CHECKLIST.md)** - Command-by-command clone-first versioning rollout
+- **[CMS_VERSIONING_ROLLOUT_PLAN.md](READMEs/CMS_VERSIONING_ROLLOUT_PLAN.md)** - Current rollout status, clone findings, and next steps
 - **[FOCUS_AREA_WORKFLOW_IMPLEMENTATION_NOTES.md](READMEs/FOCUS_AREA_WORKFLOW_IMPLEMENTATION_NOTES.md)** - Implementation context and decisions
 - **[PERMISSIONS_SUMMARY.md](READMEs/PERMISSIONS_SUMMARY.md)** - Overview of all permission systems
 

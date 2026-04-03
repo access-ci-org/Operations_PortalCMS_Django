@@ -21,10 +21,52 @@ This checklist is for the focus-area page workflow:
 
 - Clone config:
   `/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json`
+- Deployed clone config used for server-side browser testing:
+  `/soft/django-cms-01/conf/portalcms-clone.conf.json`
 - Fresh backup:
   `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_post_migrate_20260401T185011Z.dump`
 - Target clone database:
   `portalcms1_clone`
+- Clone systemd unit:
+  `/etc/systemd/system/portalcms-clone.service`
+- Clone socket:
+  `/soft/django-cms-01/run/portalcms-clone.socket`
+- Clone nginx site:
+  `/etc/nginx/sites-available/nginx.portalcms-clone`
+
+## Verified Result
+
+As of 2026-04-03, the clone-first versioning test has already been proven for the STEP page:
+
+- `djangocms_versioning` installed and migrated in clone
+- initial version bootstrap completed successfully
+- page-specific editor created a new draft
+- reviewer/superuser published the new version
+- clone DB reflected the publish as a new `cms_pagecontent` row and new current version
+
+Current verified clone DB state after that test:
+
+- `cms_pagecontent = 19`
+- `djangocms_versioning_version = 19`
+- version states: `published:18, unpublished:1`
+
+This means versioning-only workflow is working in the clone environment. Moderation is still deferred.
+
+## Public Browser Test Path
+
+For real browser testing on the server, a temporary clone-backed public path was created:
+
+- public hostname: `https://cms2.operations.access-ci.org/`
+- active public nginx vhost temporarily repointed from:
+  - `/soft/django-cms-01/run/portalcms.socket`
+  to:
+  - `/soft/django-cms-01/run/portalcms-clone.socket`
+
+Backup of the original public nginx vhost created during the switch:
+
+- `/etc/nginx/sites-available/nginx.portalcms.bak_20260403T194558Z`
+
+This repoint should be considered temporary and should be reverted when clone testing is complete.
 
 ## Phase 0: Preflight
 
@@ -182,7 +224,7 @@ uv run python manage.py shell -c "from django.db import connection; cur=connecti
 
 ## Phase 4: Add Packages In Code
 
-The repo does not currently include these packages in `pyproject.toml`.
+The repo now includes `djangocms-versioning` in `pyproject.toml`.
 
 Add versioning first:
 
@@ -190,7 +232,7 @@ Add versioning first:
 uv add djangocms-versioning
 ```
 
-If you are explicitly testing the moderation package in the same pass, add it too:
+If you are explicitly testing the moderation package in a later pass, add it too:
 
 ```bash
 uv add djangocms-moderation
@@ -202,7 +244,6 @@ Add these apps to `INSTALLED_APPS`:
 
 ```python
 'djangocms_versioning',
-'djangocms_moderation',
 ```
 
 Recommended initial settings:
@@ -239,6 +280,11 @@ APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.c
 uv run python manage.py migrate
 ```
 
+Observed clone-specific note:
+
+- `djangocms_versioning.0009_cms_pagecontent_remove_unique_constraint` had to be fake-applied in clone because this DB no longer had the old `cms_pagecontent(language, page_id)` uniqueness constraint that the migration expects to remove.
+- Remaining versioning migrations then completed successfully.
+
 Re-check the CMS counts after migration:
 
 ```bash
@@ -272,14 +318,14 @@ Dry-run the bootstrap first. Replace `1` with the chosen user id if needed:
 
 ```bash
 APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
-uv run python manage.py create_versions --userid 1 --state published --dry-run
+uv run python manage.py create_versions --userid 4 --state published --dry-run
 ```
 
 Run the bootstrap for real:
 
 ```bash
 APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
-uv run python manage.py create_versions --userid 1 --state published
+uv run python manage.py create_versions --userid 4 --state published
 ```
 
 Verify that every relevant `cms_pagecontent` row now has a version:
@@ -300,6 +346,12 @@ Expected result after cleanup-first bootstrap:
 
 - one published version for each current page-content grouper
 - no missing `cms_pagecontent` rows
+
+Observed result after clone browser test and reviewer publish:
+
+- one page (`STEP`) now has a newer published version and an older `unpublished` version
+- total `cms_pagecontent` rows increased from 18 to 19
+- total version rows increased from 18 to 19
 
 ## Phase 7: Validate Workflow In Clone
 

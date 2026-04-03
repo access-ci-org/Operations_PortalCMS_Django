@@ -18,6 +18,11 @@ The portal uses three separate workflows:
 
 ## Complete Setup Process
 
+For clone-first focus-area versioning rollout notes, also see:
+
+- [CMS_VERSIONING_CLONE_CHECKLIST.md](./CMS_VERSIONING_CLONE_CHECKLIST.md)
+- [CMS_VERSIONING_ROLLOUT_PLAN.md](./CMS_VERSIONING_ROLLOUT_PLAN.md)
+
 ### Step 1: Configure News Workflow
 
 This creates groups and permissions for news item workflow (draft → review → publish).
@@ -52,6 +57,8 @@ uv run python manage.py setup_focus_area_page_permissions
 **What this creates:**
 - Permissions for `Focus_area_editors` to publish any focus area page
 - Permissions for page-specific groups (Focus_STEP_Editors, etc.) to edit but not publish
+
+**Additional requirement:** The environment must also have `djangocms_versioning` installed and migrated for true draft/publish separation.
 
 **Next:** Assign users to focus area editor groups via Django Admin
 
@@ -114,6 +121,23 @@ Expected output:
 ✓ All tests passed
 ```
 
+### Test Clone-Backed Versioning Workflow
+
+The currently validated browser test path uses:
+
+- clone DB: `portalcms1_clone`
+- clone app config: `/soft/django-cms-01/conf/portalcms-clone.conf.json`
+- clone gunicorn service: `portalcms-clone.service`
+- clone socket: `/soft/django-cms-01/run/portalcms-clone.socket`
+
+During the 2026-04-03 validation session, the public dev nginx vhost for `cms2.operations.access-ci.org` was temporarily repointed from the normal socket to the clone socket for real browser testing.
+
+That allowed a normal browser session to verify:
+
+- STEP editor creates draft
+- reviewer/superuser publishes draft
+- clone DB records a new published version and a new `cms_pagecontent` row
+
 ---
 
 ## User Management
@@ -175,6 +199,12 @@ Users must be staff to access Django CMS:
 2. Navigate to page with draft changes
 3. Click "Preview" to review changes
 4. Click "Publish" to make live
+
+Validated clone result:
+
+- old published version remains intact until reviewer publish
+- new `cms_pagecontent` row is created for the edited version
+- prior live version becomes `unpublished` after the newer version is published
 
 ---
 

@@ -4,6 +4,15 @@
 
 Focus area pages (STEP, Cybersecurity, Operational Support, Data Transfer and Networking) now use Django CMS's built-in draft/publish workflow with role-based permissions.
 
+As of 2026-04-03, this workflow has been verified end-to-end on the clone-backed environment using `djangocms_versioning`:
+
+- a page-specific editor created a new draft for STEP
+- the UI showed a separate draft version and compare-to-published controls
+- a reviewer/superuser published the draft successfully
+- the clone database recorded a new `cms_pagecontent` row and a new published version
+
+At this point, page versioning is proven in the clone environment. `djangocms_moderation` has not been enabled.
+
 ## User Roles
 
 ### Page-Specific Editors
@@ -26,6 +35,7 @@ Focus area pages (STEP, Cybersecurity, Operational Support, Data Transfer and Ne
 3. Click "Edit" to enter edit mode
 4. Make changes to page content or sections
 5. Click "Save" - changes are saved as draft (not published)
+6. Confirm the version menu shows a draft version separate from the current published version
 
 > **Important**: Page-specific focus editors should use standard Django CMS page editing only. Legacy `FocusAreaSection` editing has been retired from the project.
 
@@ -80,6 +90,19 @@ uv run python manage.py setup_groups
 uv run python manage.py setup_focus_area_page_permissions
 ```
 
+### Versioning Requirement
+
+This workflow now depends on `djangocms_versioning` being installed and migrated for the environment you are testing.
+
+Without CMS versioning, page edit vs publish permissions alone are not enough to hold changes back from the public page.
+
+For the clone-backed browser test path, the app was run with:
+
+- clone app config file: `/soft/django-cms-01/conf/portalcms-clone.conf.json`
+- clone database: `portalcms1_clone`
+- clone gunicorn socket: `/soft/django-cms-01/run/portalcms-clone.socket`
+- temporary public nginx repoint from `cms2.operations.access-ci.org` to the clone socket
+
 ### Testing
 
 Run the workflow test to verify permissions:
@@ -87,6 +110,8 @@ Run the workflow test to verify permissions:
 ```bash
 uv run python tests/test_focus_area_page_workflow.py
 ```
+
+For current operational browser testing details, see [CMS_VERSIONING_CLONE_CHECKLIST.md](./CMS_VERSIONING_CLONE_CHECKLIST.md).
 
 ## Benefits of Page-Level Workflow
 
@@ -175,6 +200,16 @@ This is safe to run multiple times - it will update existing permissions without
 2. Re-run `setup_focus_area_page_permissions`
 3. Confirm focus-area `PagePermission` rows use `can_view=False`
 4. Restart the CMS service
+
+### Draft / Publish UI Is Missing
+
+**Problem**: Editors can still edit pages, but version controls such as "New Draft" or compare-to-published are missing
+
+**Checks**:
+1. Verify `djangocms_versioning` is installed in the environment
+2. Verify migrations have been applied
+3. Confirm the environment is actually pointed at the intended database
+4. If testing the clone path, verify nginx is pointing at the clone socket rather than the normal socket
 
 ### Legacy Section Changes Went Live Without Review
 

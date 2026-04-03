@@ -41,6 +41,8 @@ This is the currently validated model for the STEP page:
 - `Focus_STEP_Editors` can save draft changes
 - `Focus_STEP_Editors` cannot publish STEP directly
 - `Focus_area_editors` can review and publish STEP
+- django CMS versioning creates a separate draft version before publish
+- publishing creates a new current `cms_pagecontent` row rather than editing the old live row in place
 
 For a clean STEP editor test user:
 
@@ -91,6 +93,7 @@ python tests/test_focus_area_page_workflow.py
 9. **Expected**: Page remains in draft state, unpublished
 10. Open STEP in a logged-out/incognito browser window
 11. **Expected**: Public page should still show the old content until a reviewer publishes
+12. **Expected**: The version UI should show a new draft version, not overwrite the published version directly
 
 #### Test 2: General Editor (Edit + Publish)
 **User Role**: Focus_area_editors group member
@@ -138,6 +141,7 @@ python tests/test_focus_area_page_workflow.py
    - Click "Publish"
    - Verify live site shows updated content
    - Check publish date/history
+   - Confirm the old live version is no longer current
 
 4. **If Changes Needed**:
    - Add review comments
@@ -156,6 +160,22 @@ python tests/test_focus_area_page_workflow.py
 6. Open STEP in CMS edit mode and save a draft-only change
 7. Recheck `/focus-areas/step/` in a logged-out/incognito browser
 8. **Expected**: Public page still shows the previously published content
+
+#### Test 6: Clone-Backed Public Browser Path
+
+This is the current browser-based test path used on the server:
+
+- public URL: `https://cms2.operations.access-ci.org/`
+- clone DB: `portalcms1_clone`
+- clone config file: `/soft/django-cms-01/conf/portalcms-clone.conf.json`
+- clone service: `portalcms-clone.service`
+- clone socket: `/soft/django-cms-01/run/portalcms-clone.socket`
+
+Important:
+
+- the normal public dev hostname was temporarily repointed to the clone socket for browser testing
+- this is suitable for short-lived testing when the server is mostly being used by one person
+- switch the vhost back when clone testing is complete
 
 ---
 
@@ -252,6 +272,16 @@ python manage.py shell
 1. Use standard Django CMS page edit mode only for page-specific editor testing
 2. Treat CMS placeholders/plugins as the only supported focus-area content path
 3. Save as draft and verify from a logged-out browser before reviewer publish
+
+### Browser Test Is Still Hitting Live DB
+
+**Problem**: Clone testing changes do not appear to match the clone DB state
+
+**Checks**:
+1. Verify the public nginx vhost upstream is pointing at `/soft/django-cms-01/run/portalcms-clone.socket`
+2. Verify `portalcms-clone.service` is running
+3. Verify clone config file points at `portalcms1_clone`
+4. If needed, run a direct DB check before and after page edits to confirm which DB is changing
 
 ### Test Failures
 **Problem**: Automated tests fail

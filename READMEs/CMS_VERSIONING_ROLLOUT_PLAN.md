@@ -10,7 +10,7 @@ to be the working runbook for the next phase of project work.
 
 ## Current State Summary
 
-As of 2026-04-01:
+As of 2026-04-03:
 
 - focus-area pages now use Django CMS placeholders/plugins only
 - legacy `FocusAreaSection` code, permissions, and database rows have been retired
@@ -20,15 +20,29 @@ As of 2026-04-01:
   - `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_post_migrate_20260401T185011Z.dump`
 - a legacy content archive exists at:
   - `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/focus_area_sections_archive_20260401.json`
-- the codebase does **not** currently install or configure:
+- the codebase now installs and configures:
   - `djangocms_versioning`
+- the codebase still does **not** enable:
   - `djangocms_moderation`
 
 Important complication:
 
-- the database already contains stranded old `djangocms_versioning_*` and
-  `djangocms_moderation_*` tables plus partial historical data
-- this is therefore a reconciliation and repair rollout, not a clean first install
+- the live database still contains stranded old `djangocms_versioning_*` and
+  `djangocms_moderation_*` history
+- the clone database was refreshed, cleaned, re-migrated for versioning, and re-bootstrapped
+- this remained a reconciliation and repair rollout, not a clean first install
+
+Validated clone result:
+
+- `portalcms1_clone` now has working django CMS page versioning
+- STEP was tested through the browser with:
+  - a page-specific editor creating a new draft
+  - a reviewer/superuser publishing the new version
+- the clone DB ended with:
+  - 19 `cms_pagecontent` rows
+  - 19 `djangocms_versioning_version` rows
+  - states `published:18, unpublished:1`
+- the normal public dev hostname `cms2.operations.access-ci.org` was temporarily repointed to the clone socket for browser testing
 
 ## Goal
 
@@ -104,6 +118,12 @@ Recommended order:
 7. bootstrap current CMS page content as initial published baseline
 8. validate browser and permission behavior in clone
 9. only then prepare a production runbook
+
+Current status:
+
+- phases 1 through 7 have been proven in clone for the STEP workflow using versioning only
+- moderation has not been enabled
+- the next major decision is whether broader testing is enough to stop at versioning, or whether a stricter moderation layer is still required
 
 ## Phase Plan
 
