@@ -9,3 +9,4 @@ class OperationsPortalcmsDjangoConfig(AppConfig):
     def ready(self):
         """Register signal handlers when app is ready."""
         import operations_portalcms_django.signals  # noqa
+        import operations_portalcms_django.cms_toolbars  # noqa

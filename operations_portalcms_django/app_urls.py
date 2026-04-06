@@ -12,6 +12,11 @@ urlpatterns = [
     # Main navigation pages
     # path('', views.index, name='index'),  # Homepage now handled by CMS
     path('unprivileged/', views.unprivileged, name='unprivileged'),  # Permission error page
+    path(
+        'cms-versioning/version/<int:version_id>/submit-for-review/',
+        views.submit_page_draft_for_review,
+        name='submit_page_draft_for_review',
+    ),
     path('infrastructure-news/', views.system_status_news, name='system_status_news'),
     path('integration-news/', views.integration_news, name='integration_news'),
     path('resources/access-allocated/', views.access_allocated_resources, name='access_allocated'),

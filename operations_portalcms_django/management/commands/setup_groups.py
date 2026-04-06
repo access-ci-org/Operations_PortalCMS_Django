@@ -28,6 +28,11 @@ class Command(BaseCommand):
         # Get content types
         system_status_ct = ContentType.objects.get_for_model(SystemStatusNews)
         integration_ct = ContentType.objects.get_for_model(IntegrationNews)
+        version_ct = ContentType.objects.get(app_label='djangocms_versioning', model='version')
+        unlock_version = Permission.objects.get(
+            content_type=version_ct,
+            codename='delete_versionlock',
+        )
 
         def get_permissions(content_type, codenames):
             permissions = []
@@ -56,7 +61,7 @@ class Command(BaseCommand):
                         'change_systemstatusnews',
                         'can_publish_systemstatusnews',
                     ],
-                ),
+                ) + [unlock_version],
                 'Can create, edit, and publish System Status news',
             ),
             (
@@ -71,7 +76,7 @@ class Command(BaseCommand):
                         'can_review_systemstatusnews',
                         'can_publish_systemstatusnews',
                     ],
-                ),
+                ) + [unlock_version],
                 'Can fully manage and review System Status news',
             ),
             (
@@ -92,7 +97,7 @@ class Command(BaseCommand):
                         'change_integrationnews',
                         'can_publish_integrationnews',
                     ],
-                ),
+                ) + [unlock_version],
                 'Can create, edit, and publish Integration News',
             ),
             (
@@ -107,7 +112,7 @@ class Command(BaseCommand):
                         'can_review_integrationnews',
                         'can_publish_integrationnews',
                     ],
-                ),
+                ) + [unlock_version],
                 'Can fully manage and review Integration News',
             ),
         ]
@@ -153,9 +158,9 @@ class Command(BaseCommand):
 
         # General focus area editors - can change and publish
         focus_general, _ = Group.objects.get_or_create(name='Focus_area_editors')
-        focus_general.permissions.add(*focus_editor_permissions, publish_page)
+        focus_general.permissions.add(*focus_editor_permissions, publish_page, unlock_version)
         self.stdout.write(self.style.SUCCESS(
-            '✓ Focus_area_editors: can edit AND publish (reviewer role)'
+            '✓ Focus_area_editors: can edit, publish, AND unlock draft locks (reviewer role)'
         ))
         
         # Page-specific focus area editors - can change but NOT publish
