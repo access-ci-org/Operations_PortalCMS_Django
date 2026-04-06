@@ -2,6 +2,18 @@
 
 This directory contains database management scripts for the Operations Portal CMS.
 
+Current environment note:
+
+- As of 2026-04-06, the canonical application database is `portalcms1`.
+- The prior pre-cutover database was retained as `portalcms1_old`.
+- Historical references below to `portalcms1_clone` describe the earlier clone-first rollout workflow.
+
+RDS transition note:
+
+- The current backup and restore scripts are validated against the local PostgreSQL environment on this host.
+- When the application moves to Amazon RDS, these scripts should be re-validated against the real RDS hostname, auth model, SSL requirements, and privilege limits before assuming full compatibility.
+- In particular, restore flows may need adjustment because RDS often restricts database creation, drop, and other admin-level operations compared with local PostgreSQL.
+
 ## Scripts
 
 ### verify_db.sh

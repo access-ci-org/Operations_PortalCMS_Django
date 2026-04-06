@@ -23,6 +23,19 @@ For clone-first focus-area versioning rollout notes, also see:
 - [CMS_VERSIONING_CLONE_CHECKLIST.md](./CMS_VERSIONING_CLONE_CHECKLIST.md)
 - [CMS_VERSIONING_ROLLOUT_PLAN.md](./CMS_VERSIONING_ROLLOUT_PLAN.md)
 
+## Current Operational State
+
+As of 2026-04-06:
+
+- Canonical application database: `portalcms1`
+- Archived pre-cutover database: `portalcms1_old`
+- Active app service: `portalcms.service`
+- Active app socket: `/soft/django-cms-01/run/portalcms.socket`
+- Public nginx vhost: `/etc/nginx/sites-available/nginx.portalcms`
+- Current deployed runtime config: `/soft/django-cms-01/conf/portalcms.conf.dev.json`
+- Future intended secret/config source: Ansible-managed `portalcms.conf` rendered from vaulted deployment variables
+- Latest post-cutover backup: `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_backup_20260406T134344Z.dump`
+
 ### Step 1: Configure News Workflow
 
 This creates groups and permissions for news item workflow (draft → review → publish).
@@ -122,6 +135,11 @@ Expected output:
 ```
 
 ### Test Clone-Backed Versioning Workflow
+
+Historical note:
+
+- The clone-backed test path below was the rollout validation path.
+- As of 2026-04-06, that validated database has been promoted to the canonical `portalcms1` name.
 
 The currently validated browser test path uses:
 

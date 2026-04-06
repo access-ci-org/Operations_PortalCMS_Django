@@ -1,5 +1,10 @@
 # Focus Area Page Workflow
 
+Current environment note:
+
+- The workflow below was validated through the former clone path and then promoted on 2026-04-06.
+- The active standard database is now `portalcms1`; the prior pre-cutover database was archived as `portalcms1_old`.
+
 ## Overview
 
 Focus area pages (STEP, Cybersecurity, Operational Support, Data Transfer and Networking) now use Django CMS's built-in draft/publish workflow with role-based permissions.

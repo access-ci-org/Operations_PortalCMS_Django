@@ -1,5 +1,11 @@
 # CMS Versioning Clone Checklist
 
+Historical note:
+
+- This checklist documents the clone-first validation path that was completed before promotion.
+- On 2026-04-06, `portalcms1_clone` was promoted to the canonical `portalcms1` name and the former `portalcms1` was archived as `portalcms1_old`.
+- The temporary clone-specific runtime files referenced below were retired after that cutover.
+
 This is the hands-on checklist for rolling out django CMS page versioning safely in the clone database first.
 
 Important:

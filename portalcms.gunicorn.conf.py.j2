@@ -13,5 +13,5 @@ access_log_format = '%({x-forwarded-for}i)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)
 errorlog = '{{ app_home }}/var/{{ app_name }}.error.log'
 chdir = '{{ app_home }}/PROD/{{ app_source_name }}'
 raw_env = [
-        "APP_CONFIG={{ app_home }}/conf/{{ app_name }}.conf"
+        "APP_CONFIG={{ app_home }}/conf/{{ app_name }}.conf.dev.json"
 ]

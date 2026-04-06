@@ -67,6 +67,7 @@ db.sqlite3-journal
 # Project Configuration
 portalcms.conf.dev.json
 portalcms.conf.clone.json
+passwords-template.yml
 DEPLOYMENT.md
 QUICKREF.md
 portalcms_django_config

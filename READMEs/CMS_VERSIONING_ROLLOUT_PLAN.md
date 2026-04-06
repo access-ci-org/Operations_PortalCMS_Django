@@ -1,5 +1,12 @@
 # CMS Versioning And Moderation Rollout Plan
 
+Historical note:
+
+- On 2026-04-06, the validated clone database was promoted into the canonical `portalcms1` name.
+- The former `portalcms1` database was renamed to `portalcms1_old`.
+- References to `portalcms1_clone`, `portalcms-clone.service`, and `portalcms-clone.socket` below describe the validation and rollout path that led to the current standard environment.
+- The temporary clone-specific runtime files used during validation were retired after the cutover.
+
 ## Purpose
 
 This document is the current operational plan for introducing real Django CMS

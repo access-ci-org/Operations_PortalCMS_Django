@@ -8,7 +8,7 @@ set -e  # Exit on any error
 APP_HOME="/soft/django-cms-01"
 APP_NAME="portalcms"
 APP_DIR="$APP_HOME/PROD/Operations_PortalCMS_Django"
-CONF_FILE="$APP_HOME/conf/$APP_NAME.conf"
+CONF_FILE="$APP_HOME/conf/$APP_NAME.conf.dev.json"
 
 # Colors for output
 RED='\033[0;31m'

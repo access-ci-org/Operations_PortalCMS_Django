@@ -165,6 +165,11 @@ python tests/test_focus_area_page_workflow.py
 
 This is the current browser-based test path used on the server:
 
+Historical note:
+
+- This section describes the short-lived clone-backed validation path.
+- As of 2026-04-06, that validated database has been promoted into the standard `portalcms1` name and the canonical public runtime is back on `portalcms.service` and `portalcms.socket`.
+
 - public URL: `https://cms2.operations.access-ci.org/`
 - clone DB: `portalcms1_clone`
 - clone config file: `/soft/django-cms-01/conf/portalcms-clone.conf.json`
