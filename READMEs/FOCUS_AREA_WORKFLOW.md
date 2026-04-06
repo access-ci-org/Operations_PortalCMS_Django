@@ -46,13 +46,15 @@ At this point, page versioning is proven in the clone environment. `djangocms_mo
 
 ### 2. Request Review
 
-The editor notifies a general focus area editor that changes are ready for review. This can be done via:
-- Email
-- Slack message
-- Team communication channel
-- Or any agreed-upon process
+The editor uses **Submit for Review** from the page versioning controls after saving the draft.
 
-> **Note**: Django CMS doesn't have a built-in "Submit for Review" button, but editors can add comments or notes in the page's "Notes" field to indicate review status.
+Current behavior:
+
+- `Submit for Review` releases the draft lock without publishing the page
+- the public page stays on the last published version
+- a reviewer in `Focus_area_editors` can then open the same draft, edit further if needed, and publish it
+
+Editors can still notify reviewers through normal team channels if desired, but the draft lock handoff is now handled in the CMS UI.
 
 ### 3. Review and Publish
 
@@ -73,11 +75,17 @@ The page is now published and visible to all users.
 
 **Django Model Permissions** (applied to groups):
 - Page-specific editors: `view_page`, `add_page`, `change_page`, plus required CMS structure/plugin edit permissions
-- General editors: `view_page`, `add_page`, `change_page`, `publish_page`
+- General editors: `view_page`, `add_page`, `change_page`, `publish_page`, `djangocms_versioning.delete_versionlock`
 
 **Django CMS PagePermissions** (page-specific):
 - Page-specific editors: `can_change=True`, `can_publish=False`, `can_view=False`
 - General editors: `can_change=True`, `can_publish=True`, `can_view=False`
+
+**Draft Lock Handoff**:
+- New drafts are locked to the editor who created them while they are actively editing
+- `Submit for Review` releases that lock so a reviewer can take over the draft
+- `Focus_area_editors` can also use **Unlock** directly when manual recovery is needed
+- News publisher/manager groups were also granted `djangocms_versioning.delete_versionlock` so reviewer-style roles can recover stuck draft locks consistently
 
 **Public Visibility**:
 - Focus-area pages are intended to remain publicly viewable
@@ -193,6 +201,16 @@ This is safe to run multiple times - it will update existing permissions without
 1. Verify they're in the Focus_area_editors group
 2. Run `setup_groups` to ensure they have `publish_page` permission
 3. Run `setup_focus_area_page_permissions` to ensure PagePermissions are correct
+
+### Reviewer Cannot Take Over Draft
+
+**Problem**: Reviewer can see that a draft exists but cannot edit it
+
+**Checks**:
+1. Ask whether the editor already clicked **Submit for Review**
+2. Verify the reviewer is in `Focus_area_editors`
+3. Run `setup_groups` to ensure `djangocms_versioning.delete_versionlock` is present
+4. If needed, use **Unlock** in the CMS versioning controls and reopen the draft
 
 ### Logged-Out Users Get 404 On Focus Pages
 

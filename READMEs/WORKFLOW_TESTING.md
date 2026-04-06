@@ -39,8 +39,10 @@ This is the currently validated model for the STEP page:
 - Public users can view `/focus-areas/step/` without logging in
 - `Focus_STEP_Editors` can edit STEP through standard Django CMS page editing
 - `Focus_STEP_Editors` can save draft changes
+- `Focus_STEP_Editors` can use `Submit for Review` to release their draft lock
 - `Focus_STEP_Editors` cannot publish STEP directly
 - `Focus_area_editors` can review and publish STEP
+- `Focus_area_editors` can unlock a draft if handoff needs manual recovery
 - django CMS versioning creates a separate draft version before publish
 - publishing creates a new current `cms_pagecontent` row rather than editing the old live row in place
 
@@ -64,8 +66,9 @@ For focus-area workflow testing, always use the standard Django CMS page edit pa
 1. Open STEP in Django CMS page edit mode
 2. Edit normal CMS placeholder/plugin content
 3. Save draft
-4. Verify that publish is not available to `Focus_STEP_Editors`
-5. Publish only as a `Focus_area_editors` reviewer
+4. Use `Submit for Review` to release the draft lock
+5. Verify that publish is not available to `Focus_STEP_Editors`
+6. Publish only as a `Focus_area_editors` reviewer
 
 ### Automated Testing
 ```bash
@@ -94,6 +97,8 @@ python tests/test_focus_area_page_workflow.py
 10. Open STEP in a logged-out/incognito browser window
 11. **Expected**: Public page should still show the old content until a reviewer publishes
 12. **Expected**: The version UI should show a new draft version, not overwrite the published version directly
+13. Click **Submit for Review**
+14. **Expected**: Draft remains unpublished but becomes available for a reviewer to take over
 
 #### Test 2: General Editor (Edit + Publish)
 **User Role**: Focus_area_editors group member
@@ -107,6 +112,8 @@ python tests/test_focus_area_page_workflow.py
 7. **Expected**: All changes save successfully
 8. Click "Publish"
 9. **Expected**: Page publishes successfully and is now live
+
+If the draft was not submitted cleanly, use **Unlock** first and then continue review.
 
 #### Test 3: Permission Isolation
 **User Roles**: Focus_STEP_Editors, Focus_Cybersecurity_Editors
@@ -129,7 +136,7 @@ python tests/test_focus_area_page_workflow.py
 1. **As STEP Editor**:
    - Make significant content changes to STEP page using standard CMS page edit mode
    - Add note: "Ready for review - updated contact information"
-   - Save (do not publish)
+   - Save and click `Submit for Review` (do not publish)
 
 2. **As General Editor (Reviewer)**:
    - View draft changes in CMS
