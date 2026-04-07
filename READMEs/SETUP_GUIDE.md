@@ -25,16 +25,21 @@ For clone-first focus-area versioning rollout notes, also see:
 
 ## Current Operational State
 
-As of 2026-04-06:
+As of 2026-04-07:
 
-- Canonical application database: `portalcms1`
-- Archived pre-cutover database: `portalcms1_old`
+- Canonical application database: `portal1`
+- Canonical database host: `opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com`
+- Canonical database owner: `portal_owner`
+- Canonical application role/schema: `portal_django` / `portal_django`
+- Canonical SSL mode: `require`
+- Local pre-cutover source database retained for rollback: `portalcms1`
 - Active app service: `portal.service`
 - Active app socket: `/soft/django-cms-01/run/portal.socket`
 - Public nginx vhost: `/etc/nginx/sites-available/nginx.portal`
 - Current deployed runtime config: `/soft/django-cms-01/conf/portal.conf.dev.json`
 - Future intended secret/config source: Ansible-managed `portal.conf` rendered from vaulted deployment variables
-- Latest post-cutover backup: `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_backup_20260406T134344Z.dump`
+- Latest local pre-cutover backup: `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_pre_rds_cutover_20260407T192613Z.dump`
+- Live config rollback copy: `/soft/django-cms-01/conf/portal.conf.dev.pre_rds_cutover_20260407T192826Z.json`
 
 ### Step 1: Configure News Workflow
 
@@ -134,14 +139,15 @@ Expected output:
 ✓ All tests passed
 ```
 
-### Test Clone-Backed Versioning Workflow
+### Historical Clone-Backed Versioning Workflow
 
 Historical note:
 
 - The clone-backed test path below was the rollout validation path.
-- As of 2026-04-06, that validated database has been promoted to the canonical `portalcms1` name.
+- As of 2026-04-06, that validated database had already been promoted into the canonical local `portalcms1` name.
+- As of 2026-04-07, the standard runtime has moved again and now points at RDS `portal1`.
 
-The currently validated browser test path uses:
+The retired browser test path used:
 
 - clone DB: `portalcms1_clone`
 - clone app config: `/soft/django-cms-01/conf/portal-clone.conf.json`
@@ -155,6 +161,8 @@ That allowed a normal browser session to verify:
 - STEP editor creates draft
 - reviewer/superuser publishes draft
 - clone DB records a new published version and a new `cms_pagecontent` row
+
+That path is now historical reference material only. Current runtime verification should use the active `portal.service` and the deployed RDS-backed config.
 
 ---
 

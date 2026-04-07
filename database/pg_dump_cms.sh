@@ -48,6 +48,10 @@ DB_HOST="${DB_HOSTNAME_READ:-$(load_config_value DB_HOSTNAME_READ)}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-$(load_config_value DB_PORT)}"
 DB_PORT="${DB_PORT:-5432}"
+DB_SSLMODE="${DB_SSLMODE:-$(load_config_value DB_SSLMODE)}"
+DB_SSLROOTCERT="${DB_SSLROOTCERT:-$(load_config_value DB_SSLROOTCERT)}"
+DB_SSLCERT="${DB_SSLCERT:-$(load_config_value DB_SSLCERT)}"
+DB_SSLKEY="${DB_SSLKEY:-$(load_config_value DB_SSLKEY)}"
 FORMAT="custom"
 OUTPUT=""
 DRY_RUN=0
@@ -126,6 +130,18 @@ echo "  format:   ${FORMAT}"
 echo "  output:   ${OUTPUT}"
 
 export PGPASSWORD="${DB_PASS}"
+if [[ -n "${DB_SSLMODE}" ]]; then
+    export PGSSLMODE="${DB_SSLMODE}"
+fi
+if [[ -n "${DB_SSLROOTCERT}" ]]; then
+    export PGSSLROOTCERT="${DB_SSLROOTCERT}"
+fi
+if [[ -n "${DB_SSLCERT}" ]]; then
+    export PGSSLCERT="${DB_SSLCERT}"
+fi
+if [[ -n "${DB_SSLKEY}" ]]; then
+    export PGSSLKEY="${DB_SSLKEY}"
+fi
 
 if [[ "$FORMAT" == "custom" ]]; then
     CMD=(

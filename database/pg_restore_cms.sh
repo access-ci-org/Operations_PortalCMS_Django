@@ -42,17 +42,32 @@ SOURCE_DB="${SOURCE_DB:-portalcms1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
 DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
+DB_OWNER="${DB_OWNER:-$(load_config_value DB_OWNER)}"
 DB_SCHEMA="${DB_SCHEMA:-$(load_config_value DB_SCHEMA)}"
 DB_HOST="${DB_HOSTNAME_WRITE:-${DB_HOSTNAME_READ:-$(load_config_value DB_HOSTNAME_WRITE)}}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-$(load_config_value DB_PORT)}"
 DB_PORT="${DB_PORT:-5432}"
+DB_SSLMODE="${DB_SSLMODE:-$(load_config_value DB_SSLMODE)}"
+DB_SSLROOTCERT="${DB_SSLROOTCERT:-$(load_config_value DB_SSLROOTCERT)}"
+DB_SSLCERT="${DB_SSLCERT:-$(load_config_value DB_SSLCERT)}"
+DB_SSLKEY="${DB_SSLKEY:-$(load_config_value DB_SSLKEY)}"
 INPUT=""
 TARGET_DB=""
 RECREATE_DB=0
 VERIFY_AFTER=1
 ALLOW_LIVE_TARGET=0
+SKIP_SCHEMA_CREATE=0
 DRY_RUN=0
+TEMP_LIST_FILE=""
+
+cleanup() {
+    if [[ -n "$TEMP_LIST_FILE" && -f "$TEMP_LIST_FILE" ]]; then
+        rm -f "$TEMP_LIST_FILE"
+    fi
+}
+
+trap cleanup EXIT
 
 usage() {
     cat <<EOF
@@ -65,6 +80,7 @@ Options:
   --target-db NAME     Target database name
   --recreate-db        Drop and recreate target database before restore
   --allow-live-target  Allow target database to match source/live database
+  --skip-schema-create Exclude CREATE SCHEMA for the app schema from custom-format restores
   --no-verify          Skip post-restore verification
   --dry-run            Print the resolved restore steps without executing them
   --help               Show this help
@@ -97,6 +113,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --allow-live-target)
             ALLOW_LIVE_TARGET=1
+            shift
+            ;;
+        --skip-schema-create)
+            SKIP_SCHEMA_CREATE=1
             shift
             ;;
         --no-verify)
@@ -135,13 +155,29 @@ if [[ "$TARGET_DB" == "$SOURCE_DB" && "$ALLOW_LIVE_TARGET" -ne 1 ]]; then
 fi
 
 export PGPASSWORD="${DB_PASS}"
+if [[ -n "${DB_SSLMODE}" ]]; then
+    export PGSSLMODE="${DB_SSLMODE}"
+fi
+if [[ -n "${DB_SSLROOTCERT}" ]]; then
+    export PGSSLROOTCERT="${DB_SSLROOTCERT}"
+fi
+if [[ -n "${DB_SSLCERT}" ]]; then
+    export PGSSLCERT="${DB_SSLCERT}"
+fi
+if [[ -n "${DB_SSLKEY}" ]]; then
+    export PGSSLKEY="${DB_SSLKEY}"
+fi
 
 echo "Preparing restore"
 echo "  input:     ${INPUT}"
 echo "  source db: ${SOURCE_DB}"
 echo "  target db: ${TARGET_DB}"
 echo "  host:      ${DB_HOST}:${DB_PORT}"
+if [[ -n "${DB_SSLMODE}" ]]; then
+    echo "  sslmode:   ${DB_SSLMODE}"
+fi
 echo "  recreate:  ${RECREATE_DB}"
+echo "  skip schema create: ${SKIP_SCHEMA_CREATE}"
 echo "  verify:    ${VERIFY_AFTER}"
 
 DROP_CMD=(
@@ -150,10 +186,18 @@ DROP_CMD=(
 )
 CREATE_CMD=(
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1
-    -c "CREATE DATABASE ${TARGET_DB} OWNER ${DB_USER};"
+    -c "CREATE DATABASE ${TARGET_DB} OWNER ${DB_OWNER:-$DB_USER};"
 )
 
+RESTORE_SCHEMA="${DB_SCHEMA:-$DB_USER}"
 if [[ "$INPUT" == *.dump ]]; then
+    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 ]]; then
+        TEMP_LIST_FILE="$(mktemp)"
+        pg_restore -l "$INPUT" | awk -v schema="$RESTORE_SCHEMA" '
+            index($0, " SCHEMA - " schema " ") == 0 { print }
+        ' > "$TEMP_LIST_FILE"
+    fi
+
     RESTORE_CMD=(
         pg_restore
         -h "$DB_HOST"
@@ -163,9 +207,20 @@ if [[ "$INPUT" == *.dump ]]; then
         --no-owner
         --no-acl
         -v
+    )
+    if [[ -n "$TEMP_LIST_FILE" ]]; then
+        RESTORE_CMD+=(
+            --use-list="$TEMP_LIST_FILE"
+        )
+    fi
+    RESTORE_CMD+=(
         "$INPUT"
     )
 else
+    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 ]]; then
+        echo "--skip-schema-create is only supported for custom-format .dump inputs" >&2
+        exit 1
+    fi
     RESTORE_CMD=(
         psql
         -h "$DB_HOST"
@@ -189,10 +244,15 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
         printf '  %q' "${CREATE_CMD[@]}"
         printf '\n'
     fi
-    printf '  %q' "${RESTORE_CMD[@]}"
-    printf '\n'
+    if [[ -n "$TEMP_LIST_FILE" ]]; then
+        printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --no-owner --no-acl -v --use-list="<generated temp list>" "$INPUT"
+        printf '\n'
+    else
+        printf '  %q' "${RESTORE_CMD[@]}"
+        printf '\n'
+    fi
     if [[ "$VERIFY_AFTER" -eq 1 ]]; then
-        echo "  DB_DATABASE=${TARGET_DB} DB_HOSTNAME_READ=${DB_HOST} DB_PORT=${DB_PORT} DJANGO_USER=${DB_USER} DB_SCHEMA=${DB_SCHEMA} ${VERIFY_CMD[0]}"
+        echo "  DB_DATABASE=${TARGET_DB} DB_HOSTNAME_READ=${DB_HOST} DB_PORT=${DB_PORT} DJANGO_USER=${DB_USER} DB_SCHEMA=${DB_SCHEMA} DB_SSLMODE=${DB_SSLMODE} ${VERIFY_CMD[0]}"
     fi
     exit 0
 fi
@@ -209,6 +269,6 @@ echo "Restore complete into ${TARGET_DB}"
 
 if [[ "$VERIFY_AFTER" -eq 1 ]]; then
     echo "Running verification against ${TARGET_DB}"
-    DB_DATABASE="$TARGET_DB" DB_HOSTNAME_READ="$DB_HOST" DB_PORT="$DB_PORT" DJANGO_USER="$DB_USER" DB_SCHEMA="$DB_SCHEMA" \
+    DB_DATABASE="$TARGET_DB" DB_HOSTNAME_READ="$DB_HOST" DB_PORT="$DB_PORT" DJANGO_USER="$DB_USER" DB_SCHEMA="$DB_SCHEMA" DB_SSLMODE="$DB_SSLMODE" \
         "${ROOT_DIR}/database/verify_db.sh"
 fi

@@ -19,55 +19,49 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load configuration from JSON file if APP_CONFIG is set (production-like)
-# Otherwise fall back to .env file (simple local development)
-config_file = None
+##### ACCESS-CI CUSTOMIZATIONS #####
+if 'APP_CONFIG' not in os.environ:
+    print('Missing APP_CONFIG environment variable')
+    sys.exit(1)
 
-if os.environ.get('APP_CONFIG'):
-    # Production: explicit config file path from environment
-    config_file = Path(os.environ['APP_CONFIG'])
-elif (BASE_DIR / 'portal.conf.dev.json').exists():
-    # Development: use the renamed portal config first
-    config_file = BASE_DIR / 'portal.conf.dev.json'
-elif (BASE_DIR / 'portal.conf.json').exists():
-    # Fallback: use the renamed production config template
-    config_file = BASE_DIR / 'portal.conf.json'
-elif (BASE_DIR / 'portalcms.conf.dev.json').exists():
-    # Backward-compatible fallback for older local deployments
-    config_file = BASE_DIR / 'portalcms.conf.dev.json'
-elif (BASE_DIR / 'portalcms.conf.json').exists():
-    # Backward-compatible fallback for older local deployments
-    config_file = BASE_DIR / 'portalcms.conf.json'
+config_file = Path(os.environ['APP_CONFIG'])
 
-if config_file and config_file.exists():
-    with open(config_file, 'r') as f:
-        config = json.load(f)
-        # Inject config values into environment
-        for key, value in config.items():
-            if key not in os.environ:  # Don't override existing env vars
-                # Convert JSON types to strings for os.environ
-                if isinstance(value, list):
-                    os.environ[key] = ','.join(str(v) for v in value)
-                elif isinstance(value, bool):
-                    os.environ[key] = 'True' if value else 'False'
-                else:
-                    os.environ[key] = str(value)
-else:
-    # Fall back to .env file for simple local development
-    env_file = BASE_DIR / '.env'
-    if env_file.exists():
-        from dotenv import load_dotenv
-        load_dotenv(env_file)
+try:
+    with open(config_file, 'r', encoding='utf-8') as f:
+        CONF = json.load(f)
+except (ValueError, OSError):
+    print(f'Failed to load APP_CONFIG={config_file}')
+    raise
+
+required_config_keys = [
+    'DJANGO_SECRET_KEY',
+]
+missing_required_keys = [key for key in required_config_keys if key not in CONF or CONF[key] in ('', None)]
+if missing_required_keys:
+    print(f'Missing required APP_CONFIG keys: {", ".join(missing_required_keys)}')
+    sys.exit(1)
+
+# Inject config values into the environment for settings that still use os.environ.
+for key, value in CONF.items():
+    if key not in os.environ:
+        if isinstance(value, list):
+            os.environ[key] = ','.join(str(v) for v in value)
+        elif isinstance(value, bool):
+            os.environ[key] = 'True' if value else 'False'
+        elif value is None:
+            os.environ[key] = ''
+        else:
+            os.environ[key] = str(value)
+
+if CONF.get('API_KEY'):
+    os.environ['API_KEY'] = str(CONF['API_KEY'])
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-_ynz3i!)8i_0=(ul2q$-^bfedijur*n!icr+reqbdvf(t*0j3b'
-)
+SECRET_KEY = CONF['DJANGO_SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
@@ -157,6 +151,24 @@ WSGI_APPLICATION = 'operations_portalcms_django.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DB_SEARCH_PATH = os.environ.get('DB_SEARCH_PATH', '"$user",public')
+DB_SSLMODE = os.environ.get('DB_SSLMODE', '')
+DB_SSLROOTCERT = os.environ.get('DB_SSLROOTCERT', '')
+DB_SSLCERT = os.environ.get('DB_SSLCERT', '')
+DB_SSLKEY = os.environ.get('DB_SSLKEY', '')
+
+DB_OPTIONS = {
+    # Keep schema resolution explicit during the role/schema cutover.
+    'options': f'-c search_path={DB_SEARCH_PATH}',
+}
+
+if DB_SSLMODE:
+    DB_OPTIONS['sslmode'] = DB_SSLMODE
+if DB_SSLROOTCERT:
+    DB_OPTIONS['sslrootcert'] = DB_SSLROOTCERT
+if DB_SSLCERT:
+    DB_OPTIONS['sslcert'] = DB_SSLCERT
+if DB_SSLKEY:
+    DB_OPTIONS['sslkey'] = DB_SSLKEY
 
 DATABASES = {
     'default': {
@@ -166,10 +178,7 @@ DATABASES = {
         'PASSWORD': os.environ.get('DJANGO_PASS', ''),
         'HOST': os.environ.get('DB_HOSTNAME_WRITE', os.environ.get('DB_HOSTNAME_READ', 'localhost')),
         'PORT': os.environ.get('DB_PORT', '5432'),
-        'OPTIONS': {
-            # Keep schema resolution explicit during the role/schema cutover.
-            'options': f'-c search_path={DB_SEARCH_PATH}',
-        },
+        'OPTIONS': DB_OPTIONS,
     }
 }
 

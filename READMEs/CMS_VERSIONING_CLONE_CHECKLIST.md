@@ -4,7 +4,10 @@ Historical note:
 
 - This checklist documents the clone-first validation path that was completed before promotion.
 - On 2026-04-06, `portalcms1_clone` was promoted to the canonical `portalcms1` name and the former `portalcms1` was archived as `portalcms1_old`.
+- On 2026-04-07, the live runtime was cut over again from local PostgreSQL to Amazon RDS database `portal1`.
 - The temporary clone-specific runtime files referenced below were retired after that cutover.
+
+This file is now historical runbook material, not the current operational procedure for the live environment.
 
 This is the hands-on checklist for rolling out django CMS page versioning safely in the clone database first.
 

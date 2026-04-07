@@ -1,127 +1,73 @@
-# Database Migration Plan
+# Database Migration Status
 
-This note captures the current database migration strategy after the local role/schema/service/config cleanup completed on 2026-04-07.
+This note records the Amazon RDS cutover that was completed on 2026-04-07 and the rollback assets that were kept afterward.
 
-## Current Local State
+## Current Operational State
 
 - Live service: `portal.service`
 - Live runtime config: `/soft/django-cms-01/conf/portal.conf.dev.json`
 - Live socket: `/soft/django-cms-01/run/portal.socket`
-- Live local database name: `portalcms1`
-- Live database role: `portal_django`
+- Live database host: `opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com`
+- Live database name: `portal1`
+- Live database owner: `portal_owner`
+- Live application role: `portal_django`
 - Live application schema: `portal_django`
 - Live search path: `"$user",public`
+- Live SSL mode: `require`
 
-Important decision:
+## Completed On 2026-04-07
 
-- Do **not** rename the local database from `portalcms1` to `portal1` yet.
-- The next likely major step is seeding Amazon RDS from the current local database.
-- Leaving the local database names alone avoids confusion during source-to-target migration and rollback planning.
+1. Verified the RDS target database and schema were reachable and empty.
+2. Restored the current `portalcms1` dump into RDS `portal1`.
+3. Validated Django connectivity, migration state, row counts, and app startup against a temporary RDS `APP_CONFIG`.
+4. Took a final local pre-cutover dump from the original local PostgreSQL source.
+5. Backed up the deployed runtime config.
+6. Updated the live runtime config to point `portal.service` at RDS `portal1`.
+7. Restarted `portal.service` and verified the live app through Gunicorn, Django, and the Unix socket.
 
-## Migration Model
+## Rollback Assets
 
-When moving to Amazon RDS, treat the work as two separate phases:
+- Deployed config backup:
+  `/soft/django-cms-01/conf/portal.conf.dev.pre_rds_cutover_20260407T192826Z.json`
+- Final local pre-cutover dump:
+  `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_pre_rds_cutover_20260407T192613Z.dump`
+- Earlier RDS seed dump used during validation:
+  `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_post_portal_cutover_20260407T132914Z.dump`
 
-1. **Data seeding into RDS**
-2. **Application cutover to RDS**
+## Local Source Database
 
-Do not combine them into a single rename-and-migrate event.
+The original local PostgreSQL database was intentionally left in place for rollback and comparison work.
 
-## Phase 1: Seed RDS
+- Local source database name: `portalcms1`
+- Local role/schema model retained there: `portal_django` / `portal_django`
 
-Goal:
+Do not treat the local database as the active runtime target anymore. The active runtime target is RDS `portal1`.
 
-- Keep the current application running against local PostgreSQL
-- Build and validate the target RDS database separately
+## Current Cutover Logic
 
-Recommended approach:
+The runtime switch is still a config-target change, not a service rename.
 
-1. Keep the current local app pointed at local `portalcms1`
-2. Create the target RDS database with the intended final name, likely `portal1`
-3. Restore/import data from the local `portalcms1` source into the RDS `portal1` target
-4. Apply any RDS-specific setup needed there
-
-Expected RDS-side checks:
-
-- database role exists as `portal_django`
-- schema exists as `portal_django`
-- role/search path resolves to `"$user",public`
-- table ownership is correct
-- row counts on key tables look right
-- Django can connect read-only without error
-
-At the end of Phase 1:
-
-- the production app should still be using the local DB
-- the RDS database should be validated but not yet live
-
-## Phase 2: Cut App Over To RDS
-
-Goal:
-
-- Switch the existing app runtime from local PostgreSQL to the validated RDS database
-
-This is primarily a connection-target change, not a service rename.
-
-Things that should change at cutover time:
+The active deployed config now sets:
 
 - `DB_HOSTNAME_READ`
 - `DB_HOSTNAME_WRITE`
 - `DB_DATABASE`
-- possibly `DB_PORT`
-- possibly additional SSL/connection options if required by RDS
+- `DB_SSLMODE`
 
-Things that should **not** need to change at cutover time:
+Things that did not need to change for cutover:
 
 - `portal.service`
-- `portal.conf.dev.json` as a filename
+- `portal.conf.dev.json` as the deployed filename
 - Django app/module names
-- database role/schema names, assuming RDS is prepared as `portal_django` / `portal_django`
+- the application role/schema names
 
-## Recommended Future Cutover Sequence
+## If Rollback Is Needed
 
-1. Take a fresh local pre-RDS dump
-2. Restore that dump into RDS `portal1`
-3. Verify the RDS database independently
-4. Create a temporary RDS app config for testing
-5. Run Django read-only checks against the RDS config
-6. Schedule the application cutover window
-7. Take one final local backup immediately before the switch
-8. Update the live app config to point to the RDS host and database
-9. Restart `portal.service`
-10. Verify Django, Gunicorn, and nginx behavior
-11. Keep the local database untouched for rollback until confidence is high
-
-## Recommended Testing Pattern
-
-Before editing the live runtime config, use a temporary RDS config file for validation.
-
-That lets us test:
-
-- DB connectivity
-- migrations state
-- row counts
-- schema resolution
-- app startup
-
-without prematurely flipping the production service.
-
-## Why This Is The Preferred Path
-
-- It avoids mixing local cleanup with RDS migration
-- It keeps rollback simple
-- It reduces confusion around source vs target database names
-- It lets RDS use the final desired DB name (`portal1`) even while local stays on `portalcms1`
+1. Restore the backed-up deployed config file over `/soft/django-cms-01/conf/portal.conf.dev.json`.
+2. Restart `portal.service`.
+3. Verify the service is again pointing at the intended database target.
+4. Keep the RDS database intact for investigation unless a separate recovery decision is made.
 
 ## Summary
 
-For the local machine:
-
-- keep using `portalcms1`
-- keep `portal_django` role/schema
-- keep `portal.service`
-
-For the future RDS target:
-
-- create and validate `portal1`
-- cut the app over only after validation is complete
+The RDS migration is no longer a future plan item. The live app is now running against Amazon RDS `portal1`, with the pre-cutover local database and config backup preserved for fallback.

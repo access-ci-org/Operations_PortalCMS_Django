@@ -2,6 +2,11 @@
 
 This guide covers testing procedures for all workflow implementations in the Portal CMS, including both automated and manual testing scenarios.
 
+Current environment note:
+
+- As of 2026-04-07, the standard runtime uses Amazon RDS database `portal1`.
+- The historical clone-backed browser path below is retained only as rollout history.
+
 ## Quick Start Testing
 
 ### Run All Automated Tests
@@ -168,7 +173,7 @@ If the draft was not submitted cleanly, use **Unlock** first and then continue r
 7. Recheck `/focus-areas/step/` in a logged-out/incognito browser
 8. **Expected**: Public page still shows the previously published content
 
-#### Test 6: Clone-Backed Public Browser Path
+#### Test 6: Historical Clone-Backed Public Browser Path
 
 This is the current browser-based test path used on the server:
 
@@ -176,6 +181,7 @@ Historical note:
 
 - This section describes the short-lived clone-backed validation path.
 - As of 2026-04-06, that validated database has been promoted into the standard `portalcms1` name and the canonical public runtime is back on `portal.service` and `portal.socket`.
+- As of 2026-04-07, the active runtime has moved again and now points at RDS `portal1` through `/soft/django-cms-01/conf/portal.conf.dev.json`.
 
 - public URL: `https://cms2.operations.access-ci.org/`
 - clone DB: `portalcms1_clone`
@@ -188,6 +194,7 @@ Important:
 - the normal public dev hostname was temporarily repointed to the clone socket for browser testing
 - this is suitable for short-lived testing when the server is mostly being used by one person
 - switch the vhost back when clone testing is complete
+- this path is no longer the standard validation path
 
 ---
 

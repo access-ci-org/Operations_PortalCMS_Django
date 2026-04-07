@@ -2,8 +2,9 @@
 
 Current environment note:
 
-- The workflow below was validated through the former clone path and then promoted on 2026-04-06.
-- The active standard database is now `portalcms1`; the prior pre-cutover database was archived as `portalcms1_old`.
+- The workflow below was first validated through the former clone path and then promoted on 2026-04-06.
+- As of 2026-04-07, the active standard runtime points at Amazon RDS database `portal1`.
+- The application role/schema model remains `portal_django` / `portal_django`.
 
 ## Overview
 
@@ -16,7 +17,7 @@ As of 2026-04-03, this workflow has been verified end-to-end on the clone-backed
 - a reviewer/superuser published the draft successfully
 - the clone database recorded a new `cms_pagecontent` row and a new published version
 
-At this point, page versioning is proven in the clone environment. `djangocms_moderation` has not been enabled.
+At this point, page versioning has been proven in the historical clone environment and is part of the current standard runtime. `djangocms_moderation` has not been enabled.
 
 ## User Roles
 
@@ -109,12 +110,14 @@ This workflow now depends on `djangocms_versioning` being installed and migrated
 
 Without CMS versioning, page edit vs publish permissions alone are not enough to hold changes back from the public page.
 
-For the clone-backed browser test path, the app was run with:
+For the historical clone-backed browser test path, the app was run with:
 
 - clone app config file: `/soft/django-cms-01/conf/portal-clone.conf.json`
 - clone database: `portalcms1_clone`
 - clone gunicorn socket: `/soft/django-cms-01/run/portal-clone.socket`
 - temporary public nginx repoint from `cms2.operations.access-ci.org` to the clone socket
+
+That path is preserved here as rollout history only. The current operational runtime uses `portal.service` with the deployed RDS-backed `portal.conf.dev.json`.
 
 ### Testing
 
@@ -124,7 +127,7 @@ Run the workflow test to verify permissions:
 uv run python tests/test_focus_area_page_workflow.py
 ```
 
-For current operational browser testing details, see [CMS_VERSIONING_CLONE_CHECKLIST.md](./CMS_VERSIONING_CLONE_CHECKLIST.md).
+For historical rollout browser testing details, see [CMS_VERSIONING_CLONE_CHECKLIST.md](./CMS_VERSIONING_CLONE_CHECKLIST.md).
 
 ## Benefits of Page-Level Workflow
 

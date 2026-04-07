@@ -4,16 +4,17 @@ Historical note:
 
 - On 2026-04-06, the validated clone database was promoted into the canonical `portalcms1` name.
 - The former `portalcms1` database was renamed to `portalcms1_old`.
+- On 2026-04-07, the live runtime was cut over again from local PostgreSQL to Amazon RDS database `portal1`.
 - References to `portalcms1_clone`, `portal-clone.service`, and `portal-clone.socket` below describe the validation and rollout path that led to the current standard environment.
 - The temporary clone-specific runtime files used during validation were retired after the cutover.
 
 ## Purpose
 
-This document is the current operational plan for introducing real Django CMS
+This document is the historical rollout plan that was used for introducing real Django CMS
 draft/review/publish behavior for focus-area pages.
 
-It is intentionally more detailed than `CMS_VERSIONING_SKETCH.md` and is meant
-to be the working runbook for the next phase of project work.
+It is intentionally more detailed than `CMS_VERSIONING_SKETCH.md` and remains
+useful as a historical runbook for understanding how the clone-first validation was completed.
 
 ## Current State Summary
 

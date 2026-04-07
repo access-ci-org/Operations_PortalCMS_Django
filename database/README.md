@@ -41,6 +41,7 @@ Verifies database schema, ownership, and structure.
 - `DB_PORT` - Database port (default: 5432)
 - `DB_SCHEMA` - Optional schema override for tooling; auto-detected from `django_migrations` when unset
 - `DB_SEARCH_PATH` - Runtime PostgreSQL search path (recommended: `"$user",public`)
+- `DB_SSLMODE` - Optional PostgreSQL SSL mode for remote databases such as Amazon RDS (recommended: `require`)
 
 ### backup_db.sh
 
