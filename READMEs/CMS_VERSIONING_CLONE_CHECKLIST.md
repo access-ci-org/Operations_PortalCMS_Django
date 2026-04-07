@@ -26,19 +26,19 @@ This checklist is for the focus-area page workflow:
 ## Current Known Inputs
 
 - Clone config:
-  `/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json`
+  `/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json`
 - Deployed clone config used for server-side browser testing:
-  `/soft/django-cms-01/conf/portalcms-clone.conf.json`
+  `/soft/django-cms-01/conf/portal-clone.conf.json`
 - Fresh backup:
   `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_post_migrate_20260401T185011Z.dump`
 - Target clone database:
   `portalcms1_clone`
 - Clone systemd unit:
-  `/etc/systemd/system/portalcms-clone.service`
+  `/etc/systemd/system/portal-clone.service`
 - Clone socket:
-  `/soft/django-cms-01/run/portalcms-clone.socket`
+  `/soft/django-cms-01/run/portal-clone.socket`
 - Clone nginx site:
-  `/etc/nginx/sites-available/nginx.portalcms-clone`
+  `/etc/nginx/sites-available/nginx.portal-clone`
 
 ## Verified Result
 
@@ -64,9 +64,9 @@ For real browser testing on the server, a temporary clone-backed public path was
 
 - public hostname: `https://cms2.operations.access-ci.org/`
 - active public nginx vhost temporarily repointed from:
-  - `/soft/django-cms-01/run/portalcms.socket`
+  - `/soft/django-cms-01/run/portal.socket`
   to:
-  - `/soft/django-cms-01/run/portalcms-clone.socket`
+  - `/soft/django-cms-01/run/portal-clone.socket`
 
 Backup of the original public nginx vhost created during the switch:
 
@@ -87,14 +87,14 @@ ls -1 backups
 Confirm the app can resolve the clone config before doing anything else:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py check
 ```
 
 Confirm Django resolves the clone DB, not live:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])"
 ```
 
@@ -130,7 +130,7 @@ DB_DATABASE=portalcms1_clone ./database/verify_db.sh
 Verify the app still points to the clone DB after restore:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.conf import settings; from cms.models import Page; print({'db': settings.DATABASES['default']['NAME'], 'page_count': Page.objects.count()})"
 ```
 
@@ -144,28 +144,28 @@ Expected result:
 List existing versioning/moderation tables in the clone:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select tablename from pg_tables where schemaname='public' and (tablename like 'djangocms_versioning_%' or tablename like 'djangocms_moderation_%') order by tablename\"); print([row[0] for row in cur.fetchall()])"
 ```
 
 Count rows in the key versioning tables:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select count(*) from cms_pagecontent\"); pagecontent=cur.fetchone()[0]; cur.execute(\"select count(*) from djangocms_versioning_version\"); versions=cur.fetchone()[0]; cur.execute(\"select count(*) from djangocms_versioning_statetracking\"); tracking=cur.fetchone()[0]; print({'cms_pagecontent': pagecontent, 'djangocms_versioning_version': versions, 'djangocms_versioning_statetracking': tracking})"
 ```
 
 Check migration history rows related to versioning/moderation:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select app, name from django_migrations where app in ('djangocms_versioning', 'djangocms_moderation') order by app, name\"); print(cur.fetchall())"
 ```
 
 Find `cms_pagecontent` rows that do not currently have a version row:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select pc.id, pc.title, p.path from cms_pagecontent pc join cms_page p on p.id = pc.page_id left join djangocms_versioning_version v on v.object_id = pc.id where v.object_id is null order by p.path, pc.language, pc.id\"); print(cur.fetchall())"
 ```
 
@@ -182,7 +182,7 @@ Run the cleanup script below only after you have confirmed:
 - you are not connected to `portalcms1`
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python - <<'PY'
 import os
 import django
@@ -224,7 +224,7 @@ PY
 Re-check that the old tables and migration rows are gone:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select tablename from pg_tables where schemaname='public' and (tablename like 'djangocms_versioning_%' or tablename like 'djangocms_moderation_%') order by tablename\"); print([row[0] for row in cur.fetchall()]); cur.execute(\"select app, name from django_migrations where app in ('djangocms_versioning', 'djangocms_moderation') order by app, name\"); print(cur.fetchall())"
 ```
 
@@ -275,14 +275,14 @@ Note:
 Check that Django now sees the package migrations:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py showmigrations | rg 'djangocms_(versioning|moderation)'
 ```
 
 Run migrations against the clone DB only:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py migrate
 ```
 
@@ -294,7 +294,7 @@ Observed clone-specific note:
 Re-check the CMS counts after migration:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select count(*) from cms_page\"); page_count=cur.fetchone()[0]; cur.execute(\"select count(*) from cms_pagecontent\"); pagecontent_count=cur.fetchone()[0]; cur.execute(\"select count(*) from cms_placeholder\"); placeholder_count=cur.fetchone()[0]; cur.execute(\"select count(*) from cms_cmsplugin\"); plugin_count=cur.fetchone()[0]; print({'cms_page': page_count, 'cms_pagecontent': pagecontent_count, 'cms_placeholder': placeholder_count, 'cms_cmsplugin': plugin_count})"
 ```
 
@@ -309,42 +309,42 @@ First, create or identify the user that should own the initial bootstrap version
 List superusers and staff users:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.contrib.auth import get_user_model; User=get_user_model(); print(list(User.objects.filter(is_staff=True).values_list('id','username','is_superuser')))"
 ```
 
 If needed, create a dedicated migration user:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.contrib.auth import get_user_model; User=get_user_model(); u, created = User.objects.get_or_create(username='migration', defaults={'email':'migration@example.com','is_staff':True,'is_superuser':True}); print({'id': u.pk, 'created': created})"
 ```
 
 Dry-run the bootstrap first. Replace `1` with the chosen user id if needed:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py create_versions --userid 4 --state published --dry-run
 ```
 
 Run the bootstrap for real:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py create_versions --userid 4 --state published
 ```
 
 Verify that every relevant `cms_pagecontent` row now has a version:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select count(*) from cms_pagecontent\"); pagecontent=cur.fetchone()[0]; cur.execute(\"select count(*) from djangocms_versioning_version\"); versions=cur.fetchone()[0]; cur.execute(\"select pc.id, pc.title from cms_pagecontent pc left join djangocms_versioning_version v on v.object_id = pc.id where v.object_id is null order by pc.id\"); missing=cur.fetchall(); print({'cms_pagecontent': pagecontent, 'versions': versions, 'missing': missing[:20]})"
 ```
 
 Check the state distribution:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute(\"select state, count(*) from djangocms_versioning_version group by state order by state\"); print(cur.fetchall())"
 ```
 
@@ -364,19 +364,19 @@ Observed result after clone browser test and reviewer publish:
 Re-run permission setup to make sure the page groups are still aligned:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py setup_groups
 ```
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py setup_focus_area_page_permissions
 ```
 
 Run the existing focus-area workflow test:
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json \
+APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python tests/test_focus_area_page_workflow.py
 ```
 

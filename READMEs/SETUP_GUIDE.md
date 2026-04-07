@@ -29,11 +29,11 @@ As of 2026-04-06:
 
 - Canonical application database: `portalcms1`
 - Archived pre-cutover database: `portalcms1_old`
-- Active app service: `portalcms.service`
-- Active app socket: `/soft/django-cms-01/run/portalcms.socket`
-- Public nginx vhost: `/etc/nginx/sites-available/nginx.portalcms`
-- Current deployed runtime config: `/soft/django-cms-01/conf/portalcms.conf.dev.json`
-- Future intended secret/config source: Ansible-managed `portalcms.conf` rendered from vaulted deployment variables
+- Active app service: `portal.service`
+- Active app socket: `/soft/django-cms-01/run/portal.socket`
+- Public nginx vhost: `/etc/nginx/sites-available/nginx.portal`
+- Current deployed runtime config: `/soft/django-cms-01/conf/portal.conf.dev.json`
+- Future intended secret/config source: Ansible-managed `portal.conf` rendered from vaulted deployment variables
 - Latest post-cutover backup: `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_backup_20260406T134344Z.dump`
 
 ### Step 1: Configure News Workflow
@@ -144,9 +144,9 @@ Historical note:
 The currently validated browser test path uses:
 
 - clone DB: `portalcms1_clone`
-- clone app config: `/soft/django-cms-01/conf/portalcms-clone.conf.json`
-- clone gunicorn service: `portalcms-clone.service`
-- clone socket: `/soft/django-cms-01/run/portalcms-clone.socket`
+- clone app config: `/soft/django-cms-01/conf/portal-clone.conf.json`
+- clone gunicorn service: `portal-clone.service`
+- clone socket: `/soft/django-cms-01/run/portal-clone.socket`
 
 During the 2026-04-03 validation session, the public dev nginx vhost for `cms2.operations.access-ci.org` was temporarily repointed from the normal socket to the clone socket for real browser testing.
 

@@ -133,8 +133,8 @@ I do not see any committed code in this repo that intentionally resets the datab
 5. A separate local development config was used accidentally
    - this repo supports multiple config sources:
      - `APP_CONFIG`
-     - `portalcms.conf.dev.json`
-     - `portalcms.conf.json`
+     - `portal.conf.dev.json`
+     - `portal.conf.json`
      - `.env`
 
 Most likely inference:

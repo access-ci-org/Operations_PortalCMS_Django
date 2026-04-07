@@ -8,7 +8,11 @@ load_config_value() {
     local config_file="${APP_CONFIG:-}"
 
     if [[ -z "$config_file" ]]; then
-        if [[ -f "${ROOT_DIR}/portalcms.conf.dev.json" ]]; then
+        if [[ -f "${ROOT_DIR}/portal.conf.dev.json" ]]; then
+            config_file="${ROOT_DIR}/portal.conf.dev.json"
+        elif [[ -f "${ROOT_DIR}/portal.conf.json" ]]; then
+            config_file="${ROOT_DIR}/portal.conf.json"
+        elif [[ -f "${ROOT_DIR}/portalcms.conf.dev.json" ]]; then
             config_file="${ROOT_DIR}/portalcms.conf.dev.json"
         elif [[ -f "${ROOT_DIR}/portalcms.conf.json" ]]; then
             config_file="${ROOT_DIR}/portalcms.conf.json"
@@ -36,8 +40,9 @@ PY
 SOURCE_DB="${DB_DATABASE:-$(load_config_value DB_DATABASE)}"
 SOURCE_DB="${SOURCE_DB:-portalcms1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
-DB_USER="${DB_USER:-portalcms_django}"
+DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
+DB_SCHEMA="${DB_SCHEMA:-$(load_config_value DB_SCHEMA)}"
 DB_HOST="${DB_HOSTNAME_WRITE:-${DB_HOSTNAME_READ:-$(load_config_value DB_HOSTNAME_WRITE)}}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-$(load_config_value DB_PORT)}"
@@ -187,7 +192,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     printf '  %q' "${RESTORE_CMD[@]}"
     printf '\n'
     if [[ "$VERIFY_AFTER" -eq 1 ]]; then
-        echo "  DB_DATABASE=${TARGET_DB} DB_HOSTNAME_READ=${DB_HOST} DB_PORT=${DB_PORT} DJANGO_USER=${DB_USER} ${VERIFY_CMD[0]}"
+        echo "  DB_DATABASE=${TARGET_DB} DB_HOSTNAME_READ=${DB_HOST} DB_PORT=${DB_PORT} DJANGO_USER=${DB_USER} DB_SCHEMA=${DB_SCHEMA} ${VERIFY_CMD[0]}"
     fi
     exit 0
 fi
@@ -204,6 +209,6 @@ echo "Restore complete into ${TARGET_DB}"
 
 if [[ "$VERIFY_AFTER" -eq 1 ]]; then
     echo "Running verification against ${TARGET_DB}"
-    DB_DATABASE="$TARGET_DB" DB_HOSTNAME_READ="$DB_HOST" DB_PORT="$DB_PORT" DJANGO_USER="$DB_USER" \
+    DB_DATABASE="$TARGET_DB" DB_HOSTNAME_READ="$DB_HOST" DB_PORT="$DB_PORT" DJANGO_USER="$DB_USER" DB_SCHEMA="$DB_SCHEMA" \
         "${ROOT_DIR}/database/verify_db.sh"
 fi

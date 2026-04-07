@@ -4,9 +4,10 @@
 
 # Configuration
 DB_NAME="${DB_DATABASE:-portalcms1}"
-DB_USER="${DJANGO_USER:-portalcms_django}"
+DB_USER="${DJANGO_USER:-portal_django}"
 DB_HOST="${DB_HOSTNAME_READ:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
+DB_SCHEMA="${DB_SCHEMA:-}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -19,6 +20,34 @@ echo -e "${BLUE}Operations Portal CMS - Database Verification${NC}"
 echo "=============================================="
 echo ""
 
+detect_schema() {
+    if [[ -n "$DB_SCHEMA" ]]; then
+        printf '%s\n' "$DB_SCHEMA"
+        return
+    fi
+
+    local detected_schema
+    detected_schema=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c "
+SELECT schemaname
+FROM pg_tables
+WHERE tablename = 'django_migrations'
+ORDER BY
+    CASE
+        WHEN schemaname = current_user THEN 0
+        WHEN schemaname = 'public' THEN 1
+        ELSE 2
+    END,
+    schemaname
+LIMIT 1;
+" 2>/dev/null | xargs || true)
+
+    if [[ -n "$detected_schema" ]]; then
+        printf '%s\n' "$detected_schema"
+    else
+        printf 'public\n'
+    fi
+}
+
 # Check if database exists
 if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
     echo -e "${RED}✗ Database '$DB_NAME' not found${NC}"
@@ -26,6 +55,10 @@ if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt | cut -d \| -f 1 | grep
 fi
 
 echo -e "${GREEN}✓ Database exists: $DB_NAME${NC}"
+echo ""
+
+TARGET_SCHEMA="$(detect_schema)"
+echo -e "${GREEN}✓ Application schema target: $TARGET_SCHEMA${NC}"
 echo ""
 
 # Check database owner
@@ -77,7 +110,7 @@ SELECT
     tablename as table,
     tableowner as owner
 FROM pg_tables
-WHERE schemaname = 'public'
+WHERE schemaname = '$TARGET_SCHEMA'
 ORDER BY tablename;
 "
 
@@ -87,8 +120,9 @@ echo -e "${YELLOW}Key Django CMS Tables:${NC}"
 echo "-----------------------------------"
 TABLES=("auth_user" "cms_page" "django_migrations" "operations_portalcms_django_integrationnews" "operations_portalcms_django_systemstatusnews")
 for table in "${TABLES[@]}"; do
-    if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "\dt $table" | grep -q "$table"; then
-        COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM $table;" | xargs)
+    REGCLASS=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c "SELECT to_regclass('\"${TARGET_SCHEMA}\".\"${table}\"');" | xargs)
+    if [[ -n "$REGCLASS" ]]; then
+        COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c "SELECT COUNT(*) FROM \"${TARGET_SCHEMA}\".\"${table}\";" | xargs)
         echo -e "${GREEN}✓ $table${NC} (rows: $COUNT)"
     else
         echo -e "${RED}✗ $table (not found)${NC}"
@@ -100,9 +134,11 @@ echo ""
 echo -e "${YELLOW}Sequences:${NC}"
 echo "-----------------------------------"
 SEQ_COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "
-SELECT COUNT(*) 
-FROM information_schema.sequences 
-WHERE sequence_schema = 'public';
+SELECT COUNT(*)
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'S'
+AND n.nspname = '$TARGET_SCHEMA';
 " | xargs)
 echo -e "Total sequences: ${GREEN}$SEQ_COUNT${NC}"
 
@@ -113,7 +149,7 @@ echo "-----------------------------------"
 WRONG_OWNER=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "
 SELECT COUNT(*) 
 FROM pg_tables 
-WHERE schemaname = 'public' 
+WHERE schemaname = '$TARGET_SCHEMA' 
 AND tableowner != '$DB_USER';
 " | xargs)
 
@@ -126,7 +162,7 @@ else
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "
     SELECT tablename, tableowner 
     FROM pg_tables 
-    WHERE schemaname = 'public' 
+    WHERE schemaname = '$TARGET_SCHEMA' 
     AND tableowner != '$DB_USER';
     "
 fi
@@ -141,7 +177,7 @@ SELECT
     tablename,
     pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
 FROM pg_tables
-WHERE schemaname = 'public'
+WHERE schemaname = '$TARGET_SCHEMA'
 ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
 LIMIT 10;
 "

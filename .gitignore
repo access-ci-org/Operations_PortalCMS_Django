@@ -65,6 +65,8 @@ db.sqlite3
 db.sqlite3-journal
 
 # Project Configuration
+portal.conf.dev.json
+portal.conf.clone.json
 portalcms.conf.dev.json
 portalcms.conf.clone.json
 passwords-template.yml
@@ -233,3 +235,4 @@ database/dumps/*.tar.gz
 backup*.sql
 backup*.json
 database/drupal_backups 
+portal_django_cutover.psql

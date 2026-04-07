@@ -111,9 +111,9 @@ Without CMS versioning, page edit vs publish permissions alone are not enough to
 
 For the clone-backed browser test path, the app was run with:
 
-- clone app config file: `/soft/django-cms-01/conf/portalcms-clone.conf.json`
+- clone app config file: `/soft/django-cms-01/conf/portal-clone.conf.json`
 - clone database: `portalcms1_clone`
-- clone gunicorn socket: `/soft/django-cms-01/run/portalcms-clone.socket`
+- clone gunicorn socket: `/soft/django-cms-01/run/portal-clone.socket`
 - temporary public nginx repoint from `cms2.operations.access-ci.org` to the clone socket
 
 ### Testing

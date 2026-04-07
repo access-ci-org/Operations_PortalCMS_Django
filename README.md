@@ -35,7 +35,7 @@ Operations_PortalCMS_Django/
 ├── pyproject.toml                # Python dependencies
 ├── DEPLOYMENT.md                 # Production deployment guide
 ├── QUICKREF.md                   # Quick reference for operations
-└── nginx-portalcms.conf         # Nginx configuration example
+└── nginx-portal.conf            # Nginx configuration example
 ```
 
 ## Technology Stack

@@ -26,11 +26,17 @@ config_file = None
 if os.environ.get('APP_CONFIG'):
     # Production: explicit config file path from environment
     config_file = Path(os.environ['APP_CONFIG'])
+elif (BASE_DIR / 'portal.conf.dev.json').exists():
+    # Development: use the renamed portal config first
+    config_file = BASE_DIR / 'portal.conf.dev.json'
+elif (BASE_DIR / 'portal.conf.json').exists():
+    # Fallback: use the renamed production config template
+    config_file = BASE_DIR / 'portal.conf.json'
 elif (BASE_DIR / 'portalcms.conf.dev.json').exists():
-    # Development: use dev-specific config (gitignored)
+    # Backward-compatible fallback for older local deployments
     config_file = BASE_DIR / 'portalcms.conf.dev.json'
 elif (BASE_DIR / 'portalcms.conf.json').exists():
-    # Fallback: use production config template (with placeholders)
+    # Backward-compatible fallback for older local deployments
     config_file = BASE_DIR / 'portalcms.conf.json'
 
 if config_file and config_file.exists():
@@ -150,14 +156,20 @@ WSGI_APPLICATION = 'operations_portalcms_django.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+DB_SEARCH_PATH = os.environ.get('DB_SEARCH_PATH', '"$user",public')
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_DATABASE', 'portalcms1'),
-        'USER': os.environ.get('DJANGO_USER', 'portalcms_django'),
+        'USER': os.environ.get('DJANGO_USER', 'portal_django'),
         'PASSWORD': os.environ.get('DJANGO_PASS', ''),
         'HOST': os.environ.get('DB_HOSTNAME_WRITE', os.environ.get('DB_HOSTNAME_READ', 'localhost')),
         'PORT': os.environ.get('DB_PORT', '5432'),
+        'OPTIONS': {
+            # Keep schema resolution explicit during the role/schema cutover.
+            'options': f'-c search_path={DB_SEARCH_PATH}',
+        },
     }
 }
 

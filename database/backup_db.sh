@@ -4,9 +4,10 @@
 
 # Configuration
 DB_NAME="${DB_DATABASE:-portalcms1}"
-DB_USER="${DJANGO_USER:-portalcms_django}"
+DB_USER="${DJANGO_USER:-portal_django}"
 DB_HOST="${DB_HOSTNAME_READ:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
+DB_SCHEMA="${DB_SCHEMA:-}"
 DUMP_DIR="database/dumps"
 DATE=$(date +%Y%m%d_%H%M%S)
 
@@ -20,6 +21,34 @@ echo -e "${YELLOW}Operations Portal CMS - Database Backup${NC}"
 echo "========================================"
 echo ""
 
+detect_schema() {
+    if [[ -n "$DB_SCHEMA" ]]; then
+        printf '%s\n' "$DB_SCHEMA"
+        return
+    fi
+
+    local detected_schema
+    detected_schema=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c "
+SELECT schemaname
+FROM pg_tables
+WHERE tablename = 'django_migrations'
+ORDER BY
+    CASE
+        WHEN schemaname = current_user THEN 0
+        WHEN schemaname = 'public' THEN 1
+        ELSE 2
+    END,
+    schemaname
+LIMIT 1;
+" 2>/dev/null | xargs || true)
+
+    if [[ -n "$detected_schema" ]]; then
+        printf '%s\n' "$detected_schema"
+    else
+        printf 'public\n'
+    fi
+}
+
 # Create dump directory
 mkdir -p "$DUMP_DIR"
 
@@ -32,6 +61,8 @@ fi
 echo -e "${YELLOW}Database: $DB_NAME${NC}"
 echo -e "${YELLOW}User: $DB_USER${NC}"
 echo -e "${YELLOW}Host: $DB_HOST:$DB_PORT${NC}"
+TARGET_SCHEMA="$(detect_schema)"
+echo -e "${YELLOW}Schema: $TARGET_SCHEMA${NC}"
 echo ""
 
 # Verify schema ownership
@@ -46,7 +77,7 @@ echo -e "Database owner: ${GREEN}$OWNER${NC}"
 
 # Count tables
 TABLE_COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "
-SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';
+SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$TARGET_SCHEMA';
 " | xargs)
 
 echo -e "Tables: ${GREEN}$TABLE_COUNT${NC}"

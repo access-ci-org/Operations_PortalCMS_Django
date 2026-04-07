@@ -175,13 +175,13 @@ This is the current browser-based test path used on the server:
 Historical note:
 
 - This section describes the short-lived clone-backed validation path.
-- As of 2026-04-06, that validated database has been promoted into the standard `portalcms1` name and the canonical public runtime is back on `portalcms.service` and `portalcms.socket`.
+- As of 2026-04-06, that validated database has been promoted into the standard `portalcms1` name and the canonical public runtime is back on `portal.service` and `portal.socket`.
 
 - public URL: `https://cms2.operations.access-ci.org/`
 - clone DB: `portalcms1_clone`
-- clone config file: `/soft/django-cms-01/conf/portalcms-clone.conf.json`
-- clone service: `portalcms-clone.service`
-- clone socket: `/soft/django-cms-01/run/portalcms-clone.socket`
+- clone config file: `/soft/django-cms-01/conf/portal-clone.conf.json`
+- clone service: `portal-clone.service`
+- clone socket: `/soft/django-cms-01/run/portal-clone.socket`
 
 Important:
 
@@ -290,8 +290,8 @@ python manage.py shell
 **Problem**: Clone testing changes do not appear to match the clone DB state
 
 **Checks**:
-1. Verify the public nginx vhost upstream is pointing at `/soft/django-cms-01/run/portalcms-clone.socket`
-2. Verify `portalcms-clone.service` is running
+1. Verify the public nginx vhost upstream is pointing at `/soft/django-cms-01/run/portal-clone.socket`
+2. Verify `portal-clone.service` is running
 3. Verify clone config file points at `portalcms1_clone`
 4. If needed, run a direct DB check before and after page edits to confirm which DB is changing
 

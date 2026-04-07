@@ -36,9 +36,11 @@ Verifies database schema, ownership, and structure.
 
 **Environment Variables:**
 - `DB_DATABASE` - Database name (default: portalcms1)
-- `DJANGO_USER` - Database user (default: portalcms_django)
+- `DJANGO_USER` - Database user (default: portal_django)
 - `DB_HOSTNAME_READ` - Database host (default: localhost)
 - `DB_PORT` - Database port (default: 5432)
+- `DB_SCHEMA` - Optional schema override for tooling; auto-detected from `django_migrations` when unset
+- `DB_SEARCH_PATH` - Runtime PostgreSQL search path (recommended: `"$user",public`)
 
 ### backup_db.sh
 
@@ -66,7 +68,7 @@ Dumps are saved to `database/dumps/` directory with timestamp.
 Safe dump script for the current Portal CMS PostgreSQL database.
 
 Supports:
-- config discovery from `APP_CONFIG`, `portalcms.conf.dev.json`, or `portalcms.conf.json`
+- config discovery from `APP_CONFIG`, `portal.conf.dev.json`, or `portal.conf.json`
 - explicit source database override
 - custom or SQL dump output
 - dry-run preview mode for local or production planning
@@ -139,11 +141,11 @@ Convenience wrapper for the clone-first workflow used for safe testing.
 # Choose option 2 for SQL format
 
 # Manual backup (custom format)
-pg_dump -U portalcms_django -d portalcms1 -F c -b \
+pg_dump -U portal_django -d portalcms1 -F c -b \
   -f database/dumps/backup_$(date +%Y%m%d).dump
 
 # Manual backup (SQL format)
-pg_dump -U portalcms_django -d portalcms1 --clean --if-exists \
+pg_dump -U portal_django -d portalcms1 --clean --if-exists \
   -f database/dumps/backup_$(date +%Y%m%d).sql
 ```
 
@@ -220,10 +222,10 @@ gunzip /tmp/portalcms1_*.sql.gz
    gunzip /tmp/portalcms1_*.sql.gz
    
    # Create database if needed
-   sudo -u postgres psql -c "CREATE DATABASE portalcms1 OWNER portalcms_django;"
+   sudo -u postgres psql -c "CREATE DATABASE portalcms1 OWNER portal_django;"
    
    # Restore
-   psql -U portalcms_django -d portalcms1 -f /tmp/portalcms1_*.sql
+   psql -U portal_django -d portalcms1 -f /tmp/portalcms1_*.sql
    ```
 
 5. **Verify restoration:**
@@ -233,7 +235,7 @@ gunzip /tmp/portalcms1_*.sql.gz
 
 6. **Restart application:**
    ```bash
-   sudo systemctl restart portalcms
+   sudo systemctl restart portal
    ```
 
 ## Troubleshooting
@@ -245,7 +247,8 @@ echo $DB_DATABASE $DJANGO_USER
 
 # Or set them explicitly
 export DB_DATABASE=portalcms1
-export DJANGO_USER=portalcms_django
+export DJANGO_USER=portal_django
+export DB_SCHEMA=portal_django
 ./database/verify_db.sh
 ```
 
@@ -253,7 +256,7 @@ export DJANGO_USER=portalcms_django
 ```bash
 # Fix ownership (run as postgres user)
 sudo -u postgres psql -d portalcms1 -c \
-  "REASSIGN OWNED BY old_owner TO portalcms_django;"
+  "REASSIGN OWNED BY old_owner TO portal_django;"
 ```
 
 ### Database Connection Failed
@@ -262,8 +265,21 @@ sudo -u postgres psql -d portalcms1 -c \
 sudo systemctl status postgresql
 
 # Check connection
-psql -U portalcms_django -d portalcms1 -c "SELECT version();"
+psql -U portal_django -d portalcms1 -c "SELECT version();"
 ```
+
+### Role + Schema Cutover
+Use the dedicated cutover script in:
+
+- `database/portal_django_cutover.psql`
+
+That script handles:
+
+- renaming the PostgreSQL role from `portalcms_django` to `portal_django`
+- creating the `portal_django` schema
+- moving app-owned objects from `public` into `portal_django`
+- setting the role search path to `"$user", public`
+- hardening `public` by revoking broad create access
 
 ## See Also
 

@@ -10,7 +10,11 @@ load_config_value() {
     local config_file="${APP_CONFIG:-}"
 
     if [[ -z "$config_file" ]]; then
-        if [[ -f "${ROOT_DIR}/portalcms.conf.dev.json" ]]; then
+        if [[ -f "${ROOT_DIR}/portal.conf.dev.json" ]]; then
+            config_file="${ROOT_DIR}/portal.conf.dev.json"
+        elif [[ -f "${ROOT_DIR}/portal.conf.json" ]]; then
+            config_file="${ROOT_DIR}/portal.conf.json"
+        elif [[ -f "${ROOT_DIR}/portalcms.conf.dev.json" ]]; then
             config_file="${ROOT_DIR}/portalcms.conf.dev.json"
         elif [[ -f "${ROOT_DIR}/portalcms.conf.json" ]]; then
             config_file="${ROOT_DIR}/portalcms.conf.json"
@@ -38,7 +42,7 @@ PY
 DB_NAME="${DB_DATABASE:-$(load_config_value DB_DATABASE)}"
 DB_NAME="${DB_NAME:-portalcms1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
-DB_USER="${DB_USER:-portalcms_django}"
+DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
 DB_HOST="${DB_HOSTNAME_READ:-$(load_config_value DB_HOSTNAME_READ)}"
 DB_HOST="${DB_HOST:-localhost}"

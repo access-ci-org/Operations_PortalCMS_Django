@@ -6,7 +6,7 @@ set -e  # Exit on any error
 
 # Configuration
 APP_HOME="/soft/django-cms-01"
-APP_NAME="portalcms"
+APP_NAME="portal"
 APP_DIR="$APP_HOME/PROD/Operations_PortalCMS_Django"
 CONF_FILE="$APP_HOME/conf/$APP_NAME.conf.dev.json"
 

@@ -4,7 +4,7 @@ Historical note:
 
 - On 2026-04-06, the validated clone database was promoted into the canonical `portalcms1` name.
 - The former `portalcms1` database was renamed to `portalcms1_old`.
-- References to `portalcms1_clone`, `portalcms-clone.service`, and `portalcms-clone.socket` below describe the validation and rollout path that led to the current standard environment.
+- References to `portalcms1_clone`, `portal-clone.service`, and `portal-clone.socket` below describe the validation and rollout path that led to the current standard environment.
 - The temporary clone-specific runtime files used during validation were retired after the cutover.
 
 ## Purpose
@@ -101,7 +101,7 @@ The following are out of scope for the first rollout:
 
 ### Current Clone Config
 
-- `/soft/django-cms-01/tags/Operations_PortalCMS_Django/portalcms.conf.clone.json`
+- `/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json`
 
 ### Current Database Scripts
 
