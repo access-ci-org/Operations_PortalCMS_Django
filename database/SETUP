@@ -1,30 +1,30 @@
 ### ONLY ONCE for a new PostgreSQL server
-### first databse will be portal1; next would be portal_beta; portal_dev; etc
-$ psql -p 5432 postgres
+### first database will be portal1; next would be portal_beta; portal_dev; etc
+$ psql -h <server> -U opsdba postgres
 UPDATE pg_database SET datcollate='en_US.UTF-8', datctype='en_US.UTF-8';
 
-### NEW DATABASE
+### CREATE ROLES and DATABASE
+
+$ psql -h <server> -U opsdba postgres
 CREATE ROLE portal_owner WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION ENCRYPTED PASSWORD ‘...’;
-### IN AWS PRODUCTION, NEXT NEEDED
+CREATE ROLE portal_django WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION ENCRYPTED PASSWORD ‘...’;
+
+### IN AWS PRODUCTION
 GRANT portal_owner to opsdba;
+GRANT portal_django to opsdba;
 
 # 1
 CREATE DATABASE portal1 WITH OWNER portal_owner encoding "UTF8" LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
-
 # beta
 CREATE DATABASE portal_beta WITH OWNER portal_owner encoding "UTF8" LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
-
 # dev 
 CREATE DATABASE portal_dev WITH OWNER portal_owner encoding "UTF8" LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
 
-### NEW ROLE
-$ psql -p 5432 portal1
-# make sure to connect as opsdba
-CREATE ROLE portal_django WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION ENCRYPTED PASSWORD ‘...’;
-### IN AWS PRODUCTION, NEXT NEEDED
-GRANT portal_django to opsdba;
+### NEW SCHEMA
+# make sure to connect as opsdba to each database
+$ psql -p 5432 -U opsdba portal1
 
-## RERUN after DROP OWNED
-# make sure to connect as user opsdba
 CREATE SCHEMA portal_django AUTHORIZATION portal_django;
+
+
 
