@@ -1,8 +1,12 @@
 #!/bin/bash
 APP_HOME="/soft/django-cms-01"
 APP_NAME="portal"
-APP_DJANGO="/soft/django-cms-01/PROD/Operations_PortalCMS_Django"
+APP_DJANGO="/soft/django-cms-01/PROD"
 
-export APP_CONFIG=$APP_HOME/conf/$APP_NAME.conf.dev.json
-cd $APP_DJANGO
-exec /home/software/.local/bin/uv run python manage.py "$@"
+# Mirror the current portal.service runtime contract for manual manage.py commands.
+export APP_CONFIG="$APP_HOME/conf/$APP_NAME.conf.dev.json"
+export DJANGO_SETTINGS_MODULE="operations_portalcms_django.settings"
+export PATH="/home/jlambertson/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+
+cd "$APP_DJANGO"
+exec /home/jlambertson/.local/bin/uv run python manage.py "$@"

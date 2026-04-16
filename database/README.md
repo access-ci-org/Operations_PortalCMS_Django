@@ -69,7 +69,7 @@ Dumps are saved to `database/dumps/` directory with timestamp.
 Safe dump script for the current Portal CMS PostgreSQL database.
 
 Supports:
-- config discovery from `APP_CONFIG`, `portal.conf.dev.json`, or `portal.conf.json`
+- config discovery from `APP_CONFIG` first, with repo-root `portal.conf.dev.json` as the canonical local fallback and older repo-root names treated as legacy fallbacks
 - explicit source database override
 - custom or SQL dump output
 - dry-run preview mode for local or production planning

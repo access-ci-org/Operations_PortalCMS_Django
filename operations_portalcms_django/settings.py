@@ -20,6 +20,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 ##### ACCESS-CI CUSTOMIZATIONS #####
+# `APP_CONFIG` is the single supported runtime config entry point for this app.
+# For local repo workflows, `portal.conf.dev.json` is the canonical sample file.
 if 'APP_CONFIG' not in os.environ:
     print('Missing APP_CONFIG environment variable')
     sys.exit(1)
@@ -33,6 +35,8 @@ except (ValueError, OSError):
     print(f'Failed to load APP_CONFIG={config_file}')
     raise
 
+# Keep the required-key contract explicit so sample configs and deployment
+# automation can stay aligned as the runtime moves toward infra management.
 required_config_keys = [
     'DJANGO_SECRET_KEY',
 ]
