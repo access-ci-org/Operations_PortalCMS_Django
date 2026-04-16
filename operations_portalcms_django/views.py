@@ -293,6 +293,34 @@ def submit_page_draft_for_review(request, version_id):
     return redirect(next_url)
 
 
+@login_required
+@require_POST
+def unlock_cms_page_draft(request, version_id):
+    """Unlock a version lock and redirect back to the CMS page (not the admin version list).
+
+    Accepts a ``?next=`` query parameter for the redirect destination so the toolbar
+    can send the user straight back to the page they were editing instead of the
+    admin version-list URL that djangocms_versioning normally uses.
+    """
+    version = get_object_or_404(Version, pk=version_id)
+    next_url = request.GET.get('next') or request.META.get('HTTP_REFERER') or '/'
+
+    if not request.user.has_perm('djangocms_versioning.delete_versionlock'):
+        return HttpResponseForbidden('You do not have permission to unlock this version.')
+
+    if version.state != 'draft':
+        messages.error(request, 'Only draft versions can be unlocked.')
+        return redirect(next_url)
+
+    if version.locked_by_id is None:
+        messages.info(request, 'This version is already unlocked.')
+        return redirect(next_url)
+
+    remove_version_lock(version)
+    messages.success(request, 'Version unlocked. You can now edit or publish it.')
+    return redirect(next_url)
+
+
 @cache_page(60 * 15)  # Cache for 15 minutes
 def access_allocated_resources(request):
     """Display ACCESS allocated resources from API"""

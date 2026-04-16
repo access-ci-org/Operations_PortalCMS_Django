@@ -17,6 +17,11 @@ urlpatterns = [
         views.submit_page_draft_for_review,
         name='submit_page_draft_for_review',
     ),
+    path(
+        'cms-versioning/version/<int:version_id>/unlock/',
+        views.unlock_cms_page_draft,
+        name='unlock_cms_page_draft',
+    ),
     path('infrastructure-news/', views.system_status_news, name='system_status_news'),
     path('integration-news/', views.integration_news, name='integration_news'),
     path('resources/access-allocated/', views.access_allocated_resources, name='access_allocated'),

@@ -43,10 +43,13 @@ class ReviewWorkflowVersioningToolbar(VersioningToolbar):
             return
 
         item = ButtonList(side=self.toolbar.RIGHT)
-        proxy_model = self._get_proxy_model()
-        unlock_url = reverse(
-            f"admin:{proxy_model._meta.app_label}_{proxy_model.__name__.lower()}_unlock",
-            args=(version.pk,),
+        current_path = self.request.get_full_path()
+        unlock_url = (
+            reverse(
+                "operations_portalcms_django:unlock_cms_page_draft",
+                args=(version.pk,),
+            )
+            + f"?next={current_path}"
         )
         item.add_button(
             _("Unlock"),
