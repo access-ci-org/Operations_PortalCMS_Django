@@ -6,6 +6,7 @@ Historical note:
 - On 2026-04-06, `portalcms1_clone` was promoted to the canonical `portalcms1` name and the former `portalcms1` was archived as `portalcms1_old`.
 - On 2026-04-07, the live runtime was cut over again from local PostgreSQL to Amazon RDS database `portal1`.
 - The temporary clone-specific runtime files referenced below were retired after that cutover.
+- Some of the clone-specific files referenced below no longer exist in this repo or on the active runtime host; keep them as rollout history only.
 
 This file is now historical runbook material, not the current operational procedure for the live environment.
 
@@ -26,9 +27,9 @@ This checklist is for the focus-area page workflow:
 2. public site keeps showing the published version
 3. `Focus_area_editors` reviews and publishes
 
-## Current Known Inputs
+## Historical Inputs Used During Clone Validation
 
-- Clone config:
+- Historical repo-local clone config used during validation:
   `/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json`
 - Deployed clone config used for server-side browser testing:
   `/soft/django-cms-01/conf/portal-clone.conf.json`
@@ -87,14 +88,14 @@ git status --short
 ls -1 backups
 ```
 
-Confirm the app can resolve the clone config before doing anything else:
+Historical preflight command used to confirm the app could resolve the clone config before doing anything else:
 
 ```bash
 APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \
 uv run python manage.py check
 ```
 
-Confirm Django resolves the clone DB, not live:
+Historical command used to confirm Django resolved the clone DB, not live:
 
 ```bash
 APP_CONFIG=/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json \

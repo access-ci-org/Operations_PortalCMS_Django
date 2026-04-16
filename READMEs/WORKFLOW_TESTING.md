@@ -175,13 +175,14 @@ If the draft was not submitted cleanly, use **Unlock** first and then continue r
 
 #### Test 6: Historical Clone-Backed Public Browser Path
 
-This is the current browser-based test path used on the server:
+This was the browser-based test path used on the server during clone validation:
 
 Historical note:
 
 - This section describes the short-lived clone-backed validation path.
 - As of 2026-04-06, that validated database has been promoted into the standard `portalcms1` name and the canonical public runtime is back on `portal.service` and `portal.socket`.
 - As of 2026-04-07, the active runtime has moved again and now points at RDS `portal1` through `/soft/django-cms-01/conf/portal.conf.dev.json`.
+- The clone-specific service, socket, and config file below are historical references, not current runtime dependencies.
 
 - public URL: `https://cms2.operations.access-ci.org/`
 - clone DB: `portalcms1_clone`
@@ -292,7 +293,7 @@ python manage.py shell
 2. Treat CMS placeholders/plugins as the only supported focus-area content path
 3. Save as draft and verify from a logged-out browser before reviewer publish
 
-### Browser Test Is Still Hitting Live DB
+### Historical Clone Browser Test Is Still Hitting Live DB
 
 **Problem**: Clone testing changes do not appear to match the clone DB state
 

@@ -40,6 +40,7 @@ As of 2026-04-07:
 - Future intended secret/config source: Ansible-managed `portal.conf` rendered from vaulted deployment variables
 - Latest local pre-cutover backup: `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_pre_rds_cutover_20260407T192613Z.dump`
 - Live config rollback copy: `/soft/django-cms-01/conf/portal.conf.dev.pre_rds_cutover_20260407T192826Z.json`
+- Current manual Django admin wrapper in the repo: `manage.prod.sh.j2`
 
 ### Step 1: Configure News Workflow
 

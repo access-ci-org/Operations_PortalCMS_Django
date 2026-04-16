@@ -7,6 +7,7 @@ Historical note:
 - On 2026-04-07, the live runtime was cut over again from local PostgreSQL to Amazon RDS database `portal1`.
 - References to `portalcms1_clone`, `portal-clone.service`, and `portal-clone.socket` below describe the validation and rollout path that led to the current standard environment.
 - The temporary clone-specific runtime files used during validation were retired after the cutover.
+- Some historical file paths below no longer exist in the repo or active runtime; they are retained as rollout notes only.
 
 ## Purpose
 
@@ -100,7 +101,7 @@ The following are out of scope for the first rollout:
 - `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/portalcms1_post_migrate_20260401T185011Z.dump`
 - `/soft/django-cms-01/tags/Operations_PortalCMS_Django/backups/focus_area_sections_archive_20260401.json`
 
-### Current Clone Config
+### Historical Clone Config Used During Validation
 
 - `/soft/django-cms-01/tags/Operations_PortalCMS_Django/portal.conf.clone.json`
 
