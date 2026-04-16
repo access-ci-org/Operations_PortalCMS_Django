@@ -23,13 +23,13 @@ The Operations Portal CMS uses **two separate permission systems**:
 **Controls:** Author, publish, and manage/review responsibilities  
 **How:** Configured via `setup_groups` command, users assigned manually  
 
-**Groups:**
-- `System Status Authors` - Can create and edit
-- `System Status Publishers` - Can create, edit, and publish
+**Groups (two tiers per news type):**
+- `System Status Authors` - Can create and edit; must submit for review to publish
 - `System Status Managers` - Can create, edit, delete, review, and publish
-- `Integration News Authors` - Can create and edit
-- `Integration News Publishers` - Can create, edit, and publish
+- `Integration News Authors` - Can create and edit; must submit for review to publish
 - `Integration News Managers` - Can create, edit, delete, review, and publish
+
+**Note:** The former `Publishers` tier (System Status Publishers, Integration News Publishers) has been retired. Publisher users should be migrated to the corresponding Managers group.
 
 **See:** [NEWS_PERMISSIONS.md](NEWS_PERMISSIONS.md)
 

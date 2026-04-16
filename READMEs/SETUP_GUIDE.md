@@ -50,11 +50,9 @@ uv run python manage.py setup_groups
 ```
 
 **What this creates:**
-- `System Status Authors` - Can create and edit
-- `System Status Publishers` - Can create, edit, and publish
+- `System Status Authors` - Can create and edit; must submit for review to publish
 - `System Status Managers` - Can create, edit, delete, review, and publish
-- `Integration News Authors` - Can create and edit
-- `Integration News Publishers` - Can create, edit, and publish
+- `Integration News Authors` - Can create and edit; must submit for review to publish
 - `Integration News Managers` - Can create, edit, delete, review, and publish
 
 **Next:** Assign users to these groups via Django Admin (`/admin/auth/group/`)
@@ -172,7 +170,7 @@ That path is now historical reference material only. Current runtime verificatio
 
 1. Go to Django Admin: `/admin/`
 2. Navigate to: **Authentication and Authorization → Groups**
-3. Click on a group (e.g., `System Status Publishers`)
+3. Click on a group (e.g., `System Status Authors`)
 4. Scroll to "Users" section
 5. Move users from "Available users" to "Chosen users"
 6. Click "Save"
@@ -199,16 +197,15 @@ Users must be staff to access Django CMS:
 3. Status defaults to "draft"
 4. Click "Submit for Review" when ready
 
-**For Managers/Reviewers:**
+**For Managers:**
 1. View items with "Pending Review" status
 2. Review content
-3. Click "Approve" or "Reject" with comments
-4. If approved, item moves to "Approved" status
+3. Publish directly, or reject with comments
+4. If published, item status changes to "Published"
 
-**For Publishers:**
-1. View approved items (or items pending review)
-2. Click "Publish" to make live
-3. Item status changes to "Published"
+**For Authors:**
+1. View approved items are now published
+2. No direct publish action available; submit for review instead
 
 ### Focus Area Page Workflow
 
@@ -255,7 +252,7 @@ Validated clone result:
 
 **If a publisher can't publish:**
 1. Verify they're in the correct group:
-   - `System Status Publishers` or `System Status Managers` for news
+   - `System Status Managers` for news publishing/review
    - `Focus_area_editors` for focus area pages
 2. Re-run setup commands:
    ```bash

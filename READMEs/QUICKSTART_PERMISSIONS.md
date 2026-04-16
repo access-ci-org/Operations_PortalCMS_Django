@@ -115,13 +115,11 @@ uv run python manage.py setup_groups
 This creates:
 
 - `System Status Authors`
-- `System Status Publishers`
 - `System Status Managers`
 - `Integration News Authors`
-- `Integration News Publishers`
 - `Integration News Managers`
 
-Use these when you want to test the draft, publish, and review flows separately.
+Use these when you want to test the draft, submit-for-review, and publish flows separately.
 
 ### Legacy Group Migration
 

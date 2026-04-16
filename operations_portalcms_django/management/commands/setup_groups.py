@@ -49,20 +49,7 @@ class Command(BaseCommand):
                     system_status_ct,
                     ['view_systemstatusnews', 'add_systemstatusnews', 'change_systemstatusnews'],
                 ),
-                'Can create and edit System Status news',
-            ),
-            (
-                'System Status Publishers',
-                get_permissions(
-                    system_status_ct,
-                    [
-                        'view_systemstatusnews',
-                        'add_systemstatusnews',
-                        'change_systemstatusnews',
-                        'can_publish_systemstatusnews',
-                    ],
-                ) + [unlock_version],
-                'Can create, edit, and publish System Status news',
+                'Can create and edit System Status news; must submit for review to publish',
             ),
             (
                 'System Status Managers',
@@ -77,7 +64,7 @@ class Command(BaseCommand):
                         'can_publish_systemstatusnews',
                     ],
                 ) + [unlock_version],
-                'Can fully manage and review System Status news',
+                'Can fully manage, review, and publish System Status news',
             ),
             (
                 'Integration News Authors',
@@ -85,20 +72,7 @@ class Command(BaseCommand):
                     integration_ct,
                     ['view_integrationnews', 'add_integrationnews', 'change_integrationnews'],
                 ),
-                'Can create and edit Integration News',
-            ),
-            (
-                'Integration News Publishers',
-                get_permissions(
-                    integration_ct,
-                    [
-                        'view_integrationnews',
-                        'add_integrationnews',
-                        'change_integrationnews',
-                        'can_publish_integrationnews',
-                    ],
-                ) + [unlock_version],
-                'Can create, edit, and publish Integration News',
+                'Can create and edit Integration News; must submit for review to publish',
             ),
             (
                 'Integration News Managers',
@@ -113,7 +87,7 @@ class Command(BaseCommand):
                         'can_publish_integrationnews',
                     ],
                 ) + [unlock_version],
-                'Can fully manage and review Integration News',
+                'Can fully manage, review, and publish Integration News',
             ),
         ]
 
@@ -181,7 +155,9 @@ class Command(BaseCommand):
 
         legacy_group_targets = {
             'System Status Editors': ['System Status Managers'],
+            'System Status Publishers': ['System Status Managers'],
             'Integration News Editors': ['Integration News Managers'],
+            'Integration News Publishers': ['Integration News Managers'],
             'All News Editors': ['System Status Managers', 'Integration News Managers'],
         }
 

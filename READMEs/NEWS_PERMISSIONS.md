@@ -1,22 +1,19 @@
 # News Permissions
 
-This project now uses explicit Django groups for each news type rather than one broad "editor" role.
+This project uses explicit Django groups for each news type with a two-tier model: Authors write and submit for review; Managers review, publish, and have full control.
 
 ## News Roles
 
-Each news type has three roles:
+Each news type has two roles:
 
-- `Authors` - can create and edit items
-- `Publishers` - can create, edit, and publish items
-- `Managers` - can create, edit, delete, review, and publish items
+- `Authors` - can create and edit items; must submit for review to publish
+- `Managers` - can create, edit, delete, review, and publish items directly
 
 The groups created by `setup_groups` are:
 
 - `System Status Authors`
-- `System Status Publishers`
 - `System Status Managers`
 - `Integration News Authors`
-- `Integration News Publishers`
 - `Integration News Managers`
 
 ## Permission Matrix
@@ -24,10 +21,8 @@ The groups created by `setup_groups` are:
 | Group | View | Add | Change | Delete | Review | Publish |
 |------|------|-----|--------|--------|--------|---------|
 | System Status Authors | Yes | Yes | Yes | No | No | No |
-| System Status Publishers | Yes | Yes | Yes | No | No | Yes |
 | System Status Managers | Yes | Yes | Yes | Yes | Yes | Yes |
 | Integration News Authors | Yes | Yes | Yes | No | No | No |
-| Integration News Publishers | Yes | Yes | Yes | No | No | Yes |
 | Integration News Managers | Yes | Yes | Yes | Yes | Yes | Yes |
 
 ## Django Permission Mapping
@@ -56,16 +51,16 @@ The groups created by `setup_groups` are:
 
 ## Workflow Notes
 
-- Authors can create drafts and update news items.
-- Publishers can publish content directly during create or update, and can publish items already in review.
-- Managers are the only non-superuser role with the explicit `can_review_*` permissions.
-- Managers already include publish capability, so users do not need both `Publishers` and `Managers` for the same news type.
-- `can_publish_*` does not imply `add_*` or `change_*`; publisher groups include those permissions on purpose.
+- Authors can create drafts and edit news items; they cannot publish directly.
+- Authors submit a news item for review by changing its status to `pending_review`; a Manager then publishes it.
+- Managers are the only non-superuser role with `can_review_*` and `can_publish_*` permissions.
+- Managers can publish directly without a formal review step if the situation warrants it.
+- The `Publishers` tier has been retired. Any existing Publisher group members should be migrated to the appropriate Managers group (see Legacy Migration below).
 
 ## Current Behavior Notes
 
 - The current edit views are gated by Django's `change_*` permission.
-- That means users in `Authors`, `Publishers`, or `Managers` can edit news items of that type, not only items they personally authored.
+- That means users in `Authors` or `Managers` can edit news items of that type, not only items they personally authored.
 - Submitting an item for review is still limited to the item's author.
 
 ## Setup
@@ -79,8 +74,8 @@ Run these commands to configure news workflow groups and permissions:
 uv run python manage.py setup_groups
 
 # This creates:
-#   - System Status Authors/Publishers/Managers
-#   - Integration News Authors/Publishers/Managers
+#   - System Status Authors / System Status Managers
+#   - Integration News Authors / Integration News Managers
 #   - Assigns appropriate permissions to each group
 ```
 
@@ -106,17 +101,21 @@ uv run python tests/test_news_permissions.py
 
 ## Legacy Migration
 
-If you have legacy editor groups from older versions:
+If you have legacy editor groups or the retired Publishers groups:
 
-**Legacy groups:**
+**Legacy groups (migrate and remove):**
 - `System Status Editors`
+- `System Status Publishers`
 - `Integration News Editors`
+- `Integration News Publishers`
 - `All News Editors`
+
+**All legacy groups map to their respective Managers group.** The `setup_groups` command handles this automatically.
 
 **Migration commands:**
 
 ```bash
-# Migrate users from legacy groups to new groups
+# Migrate users from legacy/publisher groups to manager groups
 uv run python manage.py setup_groups --migrate-legacy-memberships
 
 # Delete legacy groups (after verifying migration)
@@ -133,14 +132,13 @@ uv run python manage.py setup_groups --migrate-legacy-memberships --delete-legac
 Recommended test flow:
 
 1. Assign one user to an `Authors` group
-2. Assign one user to a `Publishers` group
-3. Assign one user to a `Managers` group
-4. Test the workflow:
+2. Assign one user to a `Managers` group
+3. Test the workflow:
    - Authors can create drafts and edit
-   - Authors can submit for review
-   - Publishers can publish directly
-   - Managers can approve/reject items in review
-   - Managers can publish items
+   - Authors can submit for review (status → `pending_review`)
+   - Authors cannot publish directly
+   - Managers can publish items directly
+   - Managers can review and approve items in `pending_review` state
 
 Run automated tests:
 

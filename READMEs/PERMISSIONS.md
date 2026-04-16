@@ -27,10 +27,8 @@ The permission system integrates CILogon authentication with Django's permission
 On top of that, the project also uses explicit Django groups for workflow roles:
 
 - `System Status Authors`
-- `System Status Publishers`
 - `System Status Managers`
 - `Integration News Authors`
-- `Integration News Publishers`
 - `Integration News Managers`
 
 These groups are created by:
