@@ -307,7 +307,8 @@ if 'DJANGO_COLORS' not in os.environ:
     os.environ['DJANGO_COLORS'] = 'dark'
 
 # Application Logging
-APP_LOG = os.environ.get('APP_LOG', str(BASE_DIR / 'var' / 'portalcms.log'))
+APP_LOG = os.environ.get('APP_LOG', str(BASE_DIR / 'var' / 'portal.log'))
+APP_ERROR_LOG = os.environ.get('APP_ERROR_LOG', str(BASE_DIR / 'var' / 'portal.error.log'))
 APP_VERSION = os.environ.get('APP_VERSION', 'dev')
 SYSLOG_SOCK = os.environ.get('SYSLOG_SOCK', '/var/run/syslog')
 
@@ -369,46 +370,58 @@ CMS_PAGE_WIZARD_CONTENT_PLACEHOLDER = "content"
 CMS_PAGE_WIZARD_CONTENT_PLUGIN = "TextPlugin"
 
 # Logging setup
-import logging
-from logging.handlers import SysLogHandler
+os.makedirs(os.path.dirname(APP_LOG), exist_ok=True)
 
-if DEBUG or not os.path.exists('/dev/log'):
-    DEFAULT_LOG = 'console'
-else:
-    DEFAULT_LOG = 'syslog'
+_log_handlers = ['console'] if DEBUG else ['file', 'error_file']
 
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': False,
-#     'formatters': {
-#         'simple': {
-#             'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s'
-#         }
-#     },
-#     'handlers': {
-#         'file': {
-#             'level': 'DEBUG',
-#             'class': 'logging.FileHandler',
-#             'filename': CONF['APP_LOG'],
-#             'formatter': 'simple'
-#         }
-#     },
-#     'loggers': {
-#         'django': {
-#             'handlers': ['file'],
-#             'level': 'WARNING'
-#         },
-#         'django.server': {
-#             'handlers': ['file'],
-# #            'propagate': True,
-#             'level': 'DEBUG'
-#         },
-#         'services': {
-#             'handlers': ['file'],
-#             'level': 'DEBUG'
-#         }
-#     }
-# }
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s',
+            'datefmt': '%Y-%m-%dT%H:%M:%S%z',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': APP_LOG,
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'standard',
+        },
+        'error_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': APP_ERROR_LOG,
+            'level': 'ERROR',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'standard',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': _log_handlers,
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': _log_handlers,
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'operations_portalcms_django': {
+            'handlers': _log_handlers,
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 APP_NAME = 'Portal CMS'
 # APP_VERSION = CONF['APP_VERSION']
