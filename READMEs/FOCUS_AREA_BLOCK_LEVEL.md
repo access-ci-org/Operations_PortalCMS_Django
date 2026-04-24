@@ -31,4 +31,4 @@ The project now standardizes on:
 
 1. CMS page-level permissions
 2. CMS placeholder/plugin content
-3. future Django CMS versioning for page content only
+3. Django CMS versioning for page content only

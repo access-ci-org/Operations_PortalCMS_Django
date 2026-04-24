@@ -1,6 +1,6 @@
 # Runtime Transition Checklist
 
-Date: 2026-04-16
+Date: 2026-04-24
 
 This checklist captures the lowest-risk path from the current manual/demo deployment style to a cleaner future production model.
 
@@ -9,10 +9,13 @@ Current known state:
 - Live Gunicorn is managed by `portal.service`.
 - The installed service currently runs as `jlambertson`.
 - The installed service uses `APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json`.
+- That deployed config points at Amazon RDS `portal1` with `DB_SSLMODE=require`.
 - The installed service starts from `/soft/django-cms-01/PROD`.
 - `/soft/django-cms-01/PROD` currently resolves to this repo checkout.
 - The repo checkout is currently owned primarily as `jlambertson:nogroup`, not `*:appdev`.
 - Both `jlambertson` and `software` are in the `appdev` group.
+
+For the latest verified database/content/runtime snapshot, see [CURRENT_STATE.md](./CURRENT_STATE.md).
 
 ## Step 1: Stabilize the Current Manual Dev Server
 

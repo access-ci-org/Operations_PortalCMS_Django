@@ -38,7 +38,9 @@
             
             <nav class="navbar navbar-expand-lg d-flex flex-column">
                 <div class="container d-flex w-100 branding-wrapper">
-                    <div class="d-flex">
+                    {% settings_value 'DEVELOPMENT_SERVER_BANNER' as development_server_banner %}
+                    {% settings_value 'DEVELOPMENT_SERVER_LABEL' as development_server_label %}
+                    <div class="branding-identity d-flex align-items-center flex-wrap">
                         <a class="nsf-logo" href="https://www.nsf.gov/" target="_blank">
                             <img src="{% static 'operations_portalcms_django/img/nsf-logo.png' %}" alt="National Science Foundation" />
                         </a>
@@ -50,6 +52,11 @@
                                 <img src="{% static 'operations_portalcms_django/img/ACCESS-operations.svg' %}" alt="Home" />
                             </a>
                         </div>
+                        {% if development_server_banner %}
+                        <div class="development-server-badge" style="color: #ff0000;">
+                            {{ development_server_label|default:"DEVELOPMENT SERVER" }}
+                        </div>
+                        {% endif %}
                     </div>
                     
                     {# Main Navigation #}

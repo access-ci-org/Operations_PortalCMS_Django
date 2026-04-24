@@ -11,6 +11,8 @@ Django CMS supports page-level permissions, allowing you to restrict which users
 
 **Note:** This guide covers **CMS page permissions**. For controlling who can add/edit **news items** (System Status and Integration News), see [NEWS_PERMISSIONS.md](NEWS_PERMISSIONS.md).
 
+Last checked against RDS `portal1`: 2026-04-24. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the actual page-permission rows currently installed.
+
 ## Permission Strategy
 
 ### Resource Provider (RP) Groups → News Items Only
@@ -60,8 +62,6 @@ For each CMS page, you can control:
 1. Check **"Can change permissions"** for the groups that should manage this page
 2. Enable specific permissions for each group
 
-### Step 3: Assign RP Groups to Pages
-
 ### Step 3: Assign Groups to Pages
 
 Create groups in Django Admin and assign them to pages:
@@ -73,8 +73,8 @@ Create groups in Django Admin and assign them to pages:
 
 **Example: Focus Area Page**
 - **Can view**: Public (everyone)
-- **Can edit**: Group: "Cybersecurity Managers"
-- **Can publish**: Group: "Cybersecurity Managers"
+- **Can edit**: Group: `Focus_Cybersecurity_Editors`
+- **Can publish**: Group: `Focus_area_editors`
 
 **Example: Internal Operations Page**
 - **Can view**: Group: "Operations Staff"
@@ -106,16 +106,16 @@ Each focus area has dedicated managers:
 
 ```
 /focus-areas/
-  /cybersecurity/      ← Cybersecurity Managers
-  /networking/         ← Networking Managers
-  /operational-support/ ← Operations Managers
-  /step/               ← STEP Managers
+  /cybersecurity/       ← Focus_Cybersecurity_Editors edit; Focus_area_editors publish
+  /networking/          ← Focus_Networking_dataTransfer_Editors edit; Focus_area_editors publish
+  /operational-support/ ← Focus_operationsSupport_Editors edit; Focus_area_editors publish
+  /step/                ← Focus_STEP_Editors edit; Focus_area_editors publish
 ```
 
 **Page Permissions for `/focus-areas/cybersecurity/`:**
 - View: Public
-- Edit: Group: "Cybersecurity Managers"
-- Publish: Group: "Cybersecurity Managers"
+- Edit: Group: `Focus_Cybersecurity_Editors`
+- Publish: Group: `Focus_area_editors`
 
 ### Pattern 3: Internal/Protected Pages
 
@@ -185,23 +185,27 @@ Pages visible only to specific staff:
 You can also set page permissions in code:
 
 ```python
-from cms.models import Page, PagePermission
+from cms.models import ACCESS_PAGE_AND_DESCENDANTS, Page, PagePermission
 from django.contrib.auth.models import Group
 
-# Get the page
-page = Page.objects.get(title_set__title='Cybersecurity')
+# Get the page by current title
+page = next(page for page in Page.objects.all() if page.get_title('en', fallback=True) == 'CyberSecurity')
 
 # Get or create the group
-cyber_group, _ = Group.objects.get_or_create(name='Cybersecurity Managers')
+cyber_group, _ = Group.objects.get_or_create(name='Focus_Cybersecurity_Editors')
 
 # Add edit permission
 PagePermission.objects.create(
     page=page,
     group=cyber_group,
-    can_view=True,
+    grant_on=ACCESS_PAGE_AND_DESCENDANTS,
+    can_view=False,
     can_change=True,
+    can_add=True,
+    can_delete=False,
+    can_move_page=True,
     can_change_advanced_settings=False,
-    can_publish=True,
+    can_publish=False,
     can_change_permissions=False,
 )
 ```

@@ -9,6 +9,7 @@ This note reflects the current implemented direction after the section-model cle
 - `Focus_area_editors` remains the reviewer/publisher group
 - focus pages render from Django CMS placeholders/plugins only
 - legacy `FocusAreaSection` code and data have been retired
+- `djangocms_versioning` is installed and active in the current RDS-backed runtime
 
 ## What Survived From Earlier Work
 
@@ -38,4 +39,4 @@ The project is now positioned for one content path:
 
 1. Django CMS page content
 2. page-level edit/review/publish roles
-3. future Django CMS versioning/bootstrap against that page content only
+3. Django CMS versioning against that page content only

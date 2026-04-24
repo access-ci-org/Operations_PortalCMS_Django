@@ -1,6 +1,8 @@
-# Operations Django-CMS DEV DEMO code
+# Operations Portal CMS
 
 ACCESS Operations Portal Django CMS application for managing & publishing infrastructure, integration, and system status information.
+
+Current state is tracked in [READMEs/CURRENT_STATE.md](READMEs/CURRENT_STATE.md). As of the latest verification pass on 2026-04-24 13:30 UTC, the database of record is Amazon RDS `portal1`, reached through `/soft/django-cms-01/conf/portal.conf.dev.json`.
 
 ## Features
 
@@ -31,25 +33,35 @@ Operations_PortalCMS_Django/
 │   └── ...
 ├── static/                       # Static files (CSS, JS, images)
 ├── media/                        # User-uploaded files
+├── database/                     # Backup, restore, clone, and DB verification scripts
+├── READMEs/                      # Operational and workflow documentation
+├── tests/                        # Standalone integration/check scripts
 ├── manage.py                     # Django management script
 ├── pyproject.toml                # Python dependencies
-├── DEPLOYMENT.md                 # Production deployment guide
-├── QUICKREF.md                   # Quick reference for operations
-└── nginx-portal.conf            # Nginx configuration example
+├── portal.service.j2             # Systemd service template
+├── manage.prod.sh.j2             # Manual manage.py wrapper template
+└── nginx-portal.conf             # Nginx configuration example
 ```
 
 ## Technology Stack
 
-- **Framework:** Django 5.2
-- **CMS:** Django CMS 5.0
+- **Python:** >=3.12,<3.13
+- **Framework:** Django >=5.2,<5.3
+- **CMS:** django CMS >=5.0,<5.1 with djangocms-versioning
 - **Frontend:** Bootstrap 5.3, ACCESS UI Components
-- **Database:** PostgreSQL 15
+- **Database:** PostgreSQL on Amazon RDS (`portal1`)
 - **Authentication:** django-allauth with CILogon
 - **WSGI Server:** Gunicorn
 - **Web Server:** nginx
 - **Package Manager:** uv
+- **Runtime Config:** required `APP_CONFIG` JSON file
 
 ## Documentation
+
+**Current State:**
+- **[CURRENT_STATE.md](READMEs/CURRENT_STATE.md)** - Latest verified runtime, database, content, permission, and check results
+- **[APP_CONFIG_CONTRACT.md](READMEs/APP_CONFIG_CONTRACT.md)** - Runtime config contract
+- **[database_migration_plan.md](READMEs/database_migration_plan.md)** - RDS cutover status and rollback notes
 
 **Getting Started:**
 - **[SETUP_GUIDE.md](READMEs/SETUP_GUIDE.md)** - Complete setup guide for all workflows
@@ -68,16 +80,32 @@ Operations_PortalCMS_Django/
 - **[QUICKSTART_PERMISSIONS.md](READMEs/QUICKSTART_PERMISSIONS.md)** - RP permissions setup
 - **[PERMISSIONS.md](READMEs/PERMISSIONS.md)** - Implementation details
 
-**Other:**
-- DEPLOYMENT.md - Development setup and production deployment (coming soon)
-- QUICKREF.md - Quick reference for common operations (coming soon)
+**Database:**
+- **[database/README.md](database/README.md)** - Database verification, backup, restore, and clone helper scripts
+- **[database/dumps/README.md](database/dumps/README.md)** - Historical committed dump notes and current dump policy
+
+## Common Verification
+
+Use the deployed config when checking the database of record:
+
+```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+APP_LOG=/tmp/portal-check.log \
+APP_ERROR_LOG=/tmp/portal-check.error.log \
+uv run python manage.py check
+```
+
+```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
+```
 
 ## Development Guidelines
 
 - Python code style: Follow Django conventions
 - Templates: Use Bootstrap 5 classes
 - CSS: Extend `static/operations_portalcms_django/style-portalcms.css`
+- Avoid running the standalone scripts in `tests/` against RDS `portal1` unless you intend to create or modify test users/groups/content there.
 
 ---
 
-Original Django server produced by Claude 4.5 Sonnet with assistance from ChatCPT Codex 5.2 & 5.3.
+Original Django server produced by Claude 4.5 Sonnet with assistance from ChatGPT Codex 5.2 & 5.3.

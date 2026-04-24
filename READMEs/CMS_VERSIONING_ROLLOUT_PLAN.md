@@ -19,7 +19,18 @@ useful as a historical runbook for understanding how the clone-first validation 
 
 ## Current State Summary
 
-As of 2026-04-03:
+Current status as of 2026-04-24:
+
+- The active runtime uses RDS `portal1` through `/soft/django-cms-01/conf/portal.conf.dev.json`.
+- `djangocms_versioning` is installed and active.
+- `djangocms_moderation` is not enabled.
+- RDS `portal1` currently has 18 CMS pages, 18 page-content rows, and 26 version records.
+- Version states are `published:18` and `unpublished:8`.
+- Focus-area page-specific groups can edit but cannot publish.
+- `Focus_area_editors` can edit and publish focus-area pages.
+- For the latest full verification snapshot, see [CURRENT_STATE.md](./CURRENT_STATE.md).
+
+Historical state as of 2026-04-03:
 
 - focus-area pages now use Django CMS placeholders/plugins only
 - legacy `FocusAreaSection` code, permissions, and database rows have been retired
@@ -73,16 +84,16 @@ The following are out of scope for the first rollout:
 - migration squashing
 - touching the live site before the clone path is proven
 
-## Key Constraints
+## Historical Key Constraints
 
-### Technical Constraints
+### Historical Technical Constraints
 
-- versioning is not yet installed in code
+- versioning was not yet installed in code at the start of the rollout
 - old versioning/moderation schema artifacts already exist in the DB
 - public page content must remain unchanged during the rollout
 - focus-area content must stay on the CMS page-content path only
 
-### Operational Constraints
+### Historical Operational Constraints
 
 - clone-first only
 - backup before any destructive or schema-changing step

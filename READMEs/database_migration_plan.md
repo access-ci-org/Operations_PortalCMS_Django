@@ -14,6 +14,10 @@ This note records the Amazon RDS cutover that was completed on 2026-04-07 and th
 - Live application schema: `portal_django`
 - Live search path: `"$user",public`
 - Live SSL mode: `require`
+- Last verified against RDS `portal1`: 2026-04-24
+- Latest read-only verification: 66 application tables, 45 sequences, 206 migration rows, 0 unapplied migrations, and all application tables owned by `portal_django`
+
+See [CURRENT_STATE.md](./CURRENT_STATE.md) for current row counts, CMS page titles, CIDER dry-run results, and verification command output.
 
 ## Completed On 2026-04-07
 

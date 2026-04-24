@@ -9,6 +9,7 @@ This file is historical only.
 The block-level `FocusAreaSection` direction described here was not carried forward.
 Focus-area content now lives in Django CMS placeholders/plugins only, and the legacy
 section model has been retired from code and removed from the database.
+The active focus-area workflow now uses Django CMS page versioning.
 
 Use these documents instead:
 

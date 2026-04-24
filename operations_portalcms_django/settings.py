@@ -68,7 +68,19 @@ if CONF.get('API_KEY'):
 SECRET_KEY = CONF['DJANGO_SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+DEBUG = _env_bool('DEBUG', True)
+
+_config_name = config_file.name.lower()
+_default_development_banner = DEBUG or '.dev.' in _config_name or _config_name.endswith('.dev.json')
+DEVELOPMENT_SERVER_BANNER = _env_bool('DEVELOPMENT_SERVER_BANNER', _default_development_banner)
+DEVELOPMENT_SERVER_LABEL = os.environ.get('DEVELOPMENT_SERVER_LABEL', 'DEVELOPMENT SERVER')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else []
 

@@ -4,15 +4,21 @@ This directory contains database management scripts for the Operations Portal CM
 
 Current environment note:
 
-- As of 2026-04-06, the canonical application database is `portalcms1`.
-- The prior pre-cutover database was retained as `portalcms1_old`.
-- Historical references below to `portalcms1_clone` describe the earlier clone-first rollout workflow.
+- As of 2026-04-24, the database of record is Amazon RDS `portal1`.
+- The deployed runtime config is `/soft/django-cms-01/conf/portal.conf.dev.json`.
+- The application role/schema is `portal_django` / `portal_django`.
+- The database owner is `portal_owner`.
+- The RDS host is `opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com`.
+- SSL mode is `require`.
+- Local `portalcms1` and `portalcms1_clone` references are retained as historical/local-helper examples only.
 
-RDS transition note:
+Current verification note:
 
-- The current backup and restore scripts are validated against the local PostgreSQL environment on this host.
-- When the application moves to Amazon RDS, these scripts should be re-validated against the real RDS hostname, auth model, SSL requirements, and privilege limits before assuming full compatibility.
-- In particular, restore flows may need adjustment because RDS often restricts database creation, drop, and other admin-level operations compared with local PostgreSQL.
+- `verify_db.sh` was run read-only against RDS `portal1` on 2026-04-24.
+- It found 66 application tables, 45 sequences, 206 migration rows, and no ownership issues.
+- `pg_dump_cms.sh --dry-run` resolves the RDS `portal1` target correctly through `APP_CONFIG`.
+- Restore/recreate flows should still be treated carefully on RDS because database creation/drop privileges can differ from local PostgreSQL.
+- `clone_db.sh` intentionally refuses non-local hosts unless `--allow-remote-host` is supplied.
 
 ## Scripts
 
@@ -22,7 +28,7 @@ Verifies database schema, ownership, and structure.
 
 **Usage:**
 ```bash
-./database/verify_db.sh
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
 ```
 
 **Checks:**
@@ -35,7 +41,7 @@ Verifies database schema, ownership, and structure.
 - Database size and statistics
 
 **Environment Variables:**
-- `DB_DATABASE` - Database name (default: portalcms1)
+- `DB_DATABASE` - Database name from `APP_CONFIG` when set; shell override supported
 - `DJANGO_USER` - Database user (default: portal_django)
 - `DB_HOSTNAME_READ` - Database host (default: localhost)
 - `DB_PORT` - Database port (default: 5432)
@@ -76,14 +82,13 @@ Supports:
 
 This script is suitable for:
 - local clone/test workflows
-- future RDS backup workflows, as long as the environment variables or `APP_CONFIG` point at the intended RDS instance
+- RDS backup workflows, as long as the environment variables or `APP_CONFIG` point at the intended RDS instance
 
 **Usage:**
 ```bash
-./database/pg_dump_cms.sh
-./database/pg_dump_cms.sh --source-db portalcms1 --format sql
-./database/pg_dump_cms.sh --output database/dumps/portalcms1_clone_seed.dump
-./database/pg_dump_cms.sh --dry-run
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --source-db portal1 --format sql
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --dry-run
 ```
 
 ### pg_restore_cms.sh
@@ -99,8 +104,8 @@ Supports:
 - dry-run preview mode for local or production planning
 
 This script is suitable for:
-- local clone/restore workflows right now
-- future RDS restores, provided the target host/database/user are set deliberately and `--allow-live-target` is only used when intended
+- local clone/restore workflows
+- carefully planned RDS restores, provided the target host/database/user are set deliberately and `--allow-live-target` is only used when intended
 
 **Usage:**
 ```bash
@@ -129,10 +134,30 @@ Convenience wrapper for the clone-first workflow used for safe testing.
 
 ## Quick Examples
 
+### Local Mac From RDS Backup
+
+Future developers should use a local PostgreSQL restore of a current RDS `portal1` backup for Mac/local work. They should not point a local Mac `APP_CONFIG` at the shared RDS host.
+
+Migrations only synchronize schema. They do not copy CMS pages, news, users, permissions, CIDER rows, or uploaded media from RDS. A current `portal1` backup already includes the application data and, as of the latest verification pass, is already migrated for this codebase.
+
+Safe local sequence after restoring the backup:
+
+```bash
+APP_CONFIG=/path/to/local-mac-config.json uv run python manage.py check
+APP_CONFIG=/path/to/local-mac-config.json uv run python manage.py migrate --plan
+APP_CONFIG=/path/to/local-mac-config.json uv run python manage.py migrate
+```
+
+Expected result for a current backup is no planned migration operations. If the backup is older, Django may apply migrations forward, but only to that local restored database.
+
+Make sure the local `APP_CONFIG` points at local PostgreSQL and uses a search path/schema that matches the restore. For the current RDS layout, the app objects live in schema `portal_django`; either restore/use a matching `portal_django` role and schema with `DB_SEARCH_PATH="\"$user\",public"`, or set an equivalent local search path such as `portal_django,public`.
+
+CIDER sync is separate from migrations. Running `sync_cider_from_api` on a Mac will read CIDER and update only the local restored database. Skip it if the goal is to keep the local database exactly as restored from the backup.
+
 ### Verify Database
 ```bash
 # Check if everything looks correct
-./database/verify_db.sh
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
 ```
 
 ### Create Full Backup
@@ -141,23 +166,24 @@ Convenience wrapper for the clone-first workflow used for safe testing.
 ./database/backup_db.sh
 # Choose option 2 for SQL format
 
-# Manual backup (custom format)
-pg_dump -U portal_django -d portalcms1 -F c -b \
-  -f database/dumps/backup_$(date +%Y%m%d).dump
+# Current helper-driven backup preview
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --dry-run
 
-# Manual backup (SQL format)
-pg_dump -U portal_django -d portalcms1 --clean --if-exists \
-  -f database/dumps/backup_$(date +%Y%m%d).sql
+# Current helper-driven custom-format backup
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh
+
+# Current helper-driven SQL backup
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --format sql
 ```
 
 ### Transfer to Remote Server
 ```bash
 # Copy dump file
-scp database/dumps/portalcms1_*.dump software@your-server:/tmp/
+scp database/dumps/portal1_*.dump software@your-server:/tmp/
 
 # OR for SQL format
-gzip database/dumps/portalcms1_*.sql
-scp database/dumps/portalcms1_*.sql.gz software@your-server:/tmp/
+gzip database/dumps/portal1_*.sql
+scp database/dumps/portal1_*.sql.gz software@your-server:/tmp/
 ```
 
 ### Restore on Remote Server
@@ -167,24 +193,24 @@ ssh software@your-server
 
 # For custom format dump
 ./database/pg_restore_cms.sh \
-  --input /tmp/portalcms1_*.dump \
-  --target-db portalcms1 \
+  --input /tmp/portal1_*.dump \
+  --target-db portal1 \
   --allow-live-target
 
 # For SQL format dump
-gunzip /tmp/portalcms1_*.sql.gz
+gunzip /tmp/portal1_*.sql.gz
 ./database/pg_restore_cms.sh \
-  --input /tmp/portalcms1_*.sql \
-  --target-db portalcms1 \
+  --input /tmp/portal1_*.sql \
+  --target-db portal1 \
   --allow-live-target
 ```
 
 ### Safe Clone Workflow
 ```bash
-# Preview the exact clone steps first
+# Preview the exact local clone steps first
 ./database/clone_db.sh portalcms1_clone backups/portalcms1_pre_versioning_20260331T174604Z.dump --dry-run
 
-# Create a disposable clone from the current safety backup
+# Create a disposable local clone from the current safety backup
 ./database/clone_db.sh
 
 # Or be explicit
@@ -196,42 +222,38 @@ gunzip /tmp/portalcms1_*.sql.gz
 
 ## Database Migration Workflow
 
-### From Development to Production
+### Current RDS Backup/Restore Workflow
 
-1. **Verify local database:**
+1. **Verify current database:**
    ```bash
-   ./database/verify_db.sh
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
    ```
 
 2. **Create backup:**
    ```bash
-   ./database/backup_db.sh
-   # Choose option 2 (SQL format)
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh
    ```
 
 3. **Transfer to server:**
    ```bash
-   scp database/dumps/portalcms1_*.sql.gz software@your-server:/tmp/
+   scp database/dumps/portal1_*.dump software@your-server:/tmp/
    ```
 
 4. **Restore on server:**
    ```bash
    ssh software@your-server
-   cd /soft/django-cms-01/PROD/Operations_PortalCMS_Django
-   
-   # Decompress
-   gunzip /tmp/portalcms1_*.sql.gz
-   
-   # Create database if needed
-   sudo -u postgres psql -c "CREATE DATABASE portalcms1 OWNER portal_django;"
-   
-   # Restore
-   psql -U portal_django -d portalcms1 -f /tmp/portalcms1_*.sql
+   cd /soft/django-cms-01/PROD
+
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+     ./database/pg_restore_cms.sh \
+       --input /tmp/portal1_*.dump \
+       --target-db portal1 \
+       --allow-live-target
    ```
 
 5. **Verify restoration:**
    ```bash
-   ./database/verify_db.sh
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
    ```
 
 6. **Restart application:**
@@ -247,7 +269,8 @@ gunzip /tmp/portalcms1_*.sql.gz
 echo $DB_DATABASE $DJANGO_USER
 
 # Or set them explicitly
-export DB_DATABASE=portalcms1
+export APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json
+export DB_DATABASE=portal1
 export DJANGO_USER=portal_django
 export DB_SCHEMA=portal_django
 ./database/verify_db.sh
@@ -255,18 +278,18 @@ export DB_SCHEMA=portal_django
 
 ### Tables Owned by Wrong User
 ```bash
-# Fix ownership (run as postgres user)
-sudo -u postgres psql -d portalcms1 -c \
+# Fix ownership in a local PostgreSQL clone environment (run as postgres user)
+sudo -u postgres psql -d portalcms1_clone -c \
   "REASSIGN OWNED BY old_owner TO portal_django;"
 ```
 
 ### Database Connection Failed
 ```bash
-# Check if PostgreSQL is running
+# Check if local PostgreSQL is running
 sudo systemctl status postgresql
 
-# Check connection
-psql -U portal_django -d portalcms1 -c "SELECT version();"
+# Check the current RDS connection through the helper
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
 ```
 
 ### Role + Schema Cutover
@@ -284,5 +307,6 @@ That script handles:
 
 ## See Also
 
-- [DEPLOYMENT.md](../DEPLOYMENT.md) - Complete deployment guide with database migration section
-- [QUICKREF.md](../QUICKREF.md) - Quick reference for common operations
+- [CURRENT_STATE.md](../READMEs/CURRENT_STATE.md) - Latest verified runtime, database, content, and check results
+- [database_migration_plan.md](../READMEs/database_migration_plan.md) - RDS cutover status and rollback notes
+- [APP_CONFIG_CONTRACT.md](../READMEs/APP_CONFIG_CONTRACT.md) - Runtime config contract

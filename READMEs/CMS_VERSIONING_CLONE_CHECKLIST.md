@@ -10,6 +10,13 @@ Historical note:
 
 This file is now historical runbook material, not the current operational procedure for the live environment.
 
+Current status as of 2026-04-24:
+
+- The live runtime uses RDS `portal1`.
+- `djangocms_versioning` is installed and active in the live runtime.
+- RDS `portal1` currently has 26 CMS version rows: 18 `published`, 8 `unpublished`.
+- For current verification details, use [CURRENT_STATE.md](./CURRENT_STATE.md).
+
 This is the hands-on checklist for rolling out django CMS page versioning safely in the clone database first.
 
 Important:

@@ -42,11 +42,30 @@ As of 2026-04-07:
 - Live config rollback copy: `/soft/django-cms-01/conf/portal.conf.dev.pre_rds_cutover_20260407T192826Z.json`
 - Current manual Django admin wrapper in the repo: `manage.prod.sh.j2`
 
+Last checked against RDS `portal1`: 2026-04-24. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the verified database/content/check snapshot.
+
+### Local Developer Database From RDS Backup
+
+For Mac/local development, restore a current RDS `portal1` backup into local PostgreSQL and point `APP_CONFIG` at that local database. Do not point a local development config at the shared RDS host.
+
+After restore, run the safe migration check sequence:
+
+```bash
+APP_CONFIG=/path/to/local-mac-config.json uv run python manage.py check
+APP_CONFIG=/path/to/local-mac-config.json uv run python manage.py migrate --plan
+APP_CONFIG=/path/to/local-mac-config.json uv run python manage.py migrate
+```
+
+For a current backup, `migrate --plan` should report no planned migration operations. Migrations sync schema only; the restored backup is what brings over pages, news, users, permissions, and CIDER cache rows. CIDER API sync is optional and will update only the local restored database if run.
+
+If the dump restores objects into schema `portal_django`, configure the local database role/schema/search path accordingly. A matching `portal_django` role and schema with `DB_SEARCH_PATH="\"$user\",public"` mirrors RDS; an explicit local search path such as `portal_django,public` is also acceptable if it matches the restore.
+
 ### Step 1: Configure News Workflow
 
 This creates groups and permissions for news item workflow (draft → review → publish).
 
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
 ```
 
@@ -68,6 +87,7 @@ This configures page-level draft/publish workflow for focus area pages.
 
 ```bash
 # Configure page-specific permissions
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_focus_area_page_permissions
 ```
 
@@ -88,10 +108,11 @@ uv run python manage.py setup_focus_area_page_permissions
 This is only needed if you want Resource Provider coordinators to automatically get news access based on CILogon groups.
 
 ```bash
-# Create RP groups and permissions
-uv run python manage.py setup_rp_permissions
+# Preview RP groups and permissions before writing
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_rp_permissions --dry-run
 
-# Load test CIDER data for development
+# Load test CIDER data for local development only
 uv run python manage.py load_test_cider_data
 ```
 
@@ -101,7 +122,8 @@ uv run python manage.py load_test_cider_data
 
 **For production:** Replace `load_test_cider_data` with:
 ```bash
-uv run python manage.py sync_cider_from_api
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py sync_cider_from_api --dry-run
 ```
 
 **Documentation:** [QUICKSTART_PERMISSIONS.md](QUICKSTART_PERMISSIONS.md)
@@ -113,7 +135,7 @@ uv run python manage.py sync_cider_from_api
 ### Test News Workflow
 
 ```bash
-uv run python tests/test_news_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py
 ```
 
 Expected output:
@@ -127,7 +149,7 @@ Expected output:
 ### Test Focus Area Workflow
 
 ```bash
-uv run python tests/test_focus_area_page_workflow.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py
 ```
 
 Expected output:
@@ -137,6 +159,8 @@ Expected output:
 ✓ Django CMS built-in workflow is properly configured
 ✓ All tests passed
 ```
+
+The scripts in `tests/` mutate the configured database. Do not run them against RDS `portal1` unless that is intentional.
 
 ### Historical Clone-Backed Versioning Workflow
 
@@ -294,7 +318,9 @@ This will update existing permissions without breaking anything.
 **After System Updates:**
 - Re-run setup commands to ensure permissions are current:
   ```bash
+  APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
   uv run python manage.py setup_groups
+  APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
   uv run python manage.py setup_focus_area_page_permissions
   ```
 
@@ -323,8 +349,8 @@ This will update existing permissions without breaking anything.
 
 | Command | Purpose |
 |---------|---------|
-| `uv run python tests/test_news_permissions.py` | Test news workflow |
-| `uv run python tests/test_focus_area_page_workflow.py` | Test focus area workflow |
+| `APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py` | Test news workflow |
+| `APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py` | Test focus area workflow |
 
 ---
 
@@ -334,13 +360,16 @@ This will update existing permissions without breaking anything.
 
 **Configure news workflow:**
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
 ```
-Then assign users to Author/Publisher/Manager groups.
+Then assign users to Author/Manager groups.
 
 **Configure focus area workflow:**
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_focus_area_page_permissions
 ```
 Then assign users to focus area editor groups.
@@ -355,7 +384,9 @@ Then assign users to focus area editor groups.
 
 **Reset all permissions:**
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_focus_area_page_permissions
 ```
 

@@ -4,6 +4,8 @@
 
 A working **Resource Provider (RP) permission system** that automatically grants access to **add/edit news items** based on CILogon group memberships from COmanage.
 
+Last checked against RDS `portal1`: 2026-04-24. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the full verification snapshot.
+
 **What RP Groups Control:**
 - ✅ Adding/editing System Status News
 - ✅ Adding/editing Integration News  
@@ -20,18 +22,32 @@ A working **Resource Provider (RP) permission system** that automatically grants
 - `cider_features` - Resource capabilities
 - `cider_groups` - Resource Provider groups
 
-### 2. Django Groups (13 total)
-**Per-RP Groups (10):**
+### 2. Current Django Groups
+
+The live database currently has 23 Django groups total.
+
+**Current per-RP groups (10):**
 - `urn:group:access-ci.org:rp.psc.edu:coordinator`
 - `urn:group:access-ci.org:rp.psc.edu:implementer`
 - `urn:group:access-ci.org:rp.tacc.utexas.edu:coordinator`
 - `urn:group:access-ci.org:rp.tacc.utexas.edu:implementer`
-- (etc. for SDSC, NCSA, ACCESS)
+- paired coordinator/implementer groups also exist for SDSC, NCSA, and ACCESS
 
 **Global Operations Groups (3):**
 - `urn:group:access-ci.org:operations.access-ci.org:concierge`
 - `urn:group:access-ci.org:operations.access-ci.org:badge.maintainer`
 - `urn:group:access-ci.org:operations.access-ci.org:roadmap.maintainer`
+
+**Workflow/CMS groups also present:**
+- `System Status Authors`
+- `System Status Managers`
+- `Integration News Authors`
+- `Integration News Managers`
+- `Focus_area_editors`
+- page-specific focus groups
+- `Home_page_editors`
+
+Important: the current `cider_groups` table contains 26 current CIDER API records, all currently `resource-catalog.access-ci.org` groups. Decide deliberately before running `setup_rp_permissions` against all current CIDER groups, because it writes Django auth groups and permissions. Preview first with `--dry-run`.
 
 ### 3. Permission Logic
 Simple rule: **If you're in ANY RP group, you can add/edit news**
@@ -80,28 +96,32 @@ The CIDER (Cyber Infrastructure Description Repository) data comes from the **Op
 uv run python manage.py load_test_cider_data
 ```
 
-**Production:** Sync from live API
+**Production/RDS dry-run:** Sync from live API without writes
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py sync_cider_from_api --dry-run
+```
+
+**Production/RDS write:** Sync from live API
+```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py sync_cider_from_api
 ```
 
-## Commands You Ran
+## Current Setup Commands
 
 ```bash
-# 1. Created migrations for CIDER models
-uv run python manage.py makemigrations
+# 1. Check model migration drift
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py makemigrations --check --dry-run
 
-# 2. Applied migrations
-uv run python manage.py migrate
+# 2. Check applied migrations
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py showmigrations operations_portalcms_django
 
-# 3. Loaded test CIDER data (5 RPs, 3 orgs, 3 infrastructure items)
-uv run python manage.py load_test_cider_data
-
-# 4. Created permissions and groups
-uv run python manage.py setup_rp_permissions
-
-# 5. Tested the news permissions
-uv run python test_news_permissions.py
+# 3. Create/update RP permissions and groups only after confirming the CIDER group scope
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_rp_permissions --dry-run
 ```
 
 ## News Workflow Groups
@@ -109,6 +129,7 @@ uv run python test_news_permissions.py
 Run this command to create the role-based news groups:
 
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
 ```
 
@@ -126,12 +147,14 @@ Use these when you want to test the draft, submit-for-review, and publish flows 
 If older editor groups already exist, you can migrate users into the new manager groups:
 
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups --migrate-legacy-memberships
 ```
 
 After testing, you can delete the old groups:
 
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups --delete-legacy-groups
 ```
 
@@ -141,18 +164,19 @@ uv run python manage.py setup_groups --delete-legacy-groups
 
 1. **Replace test data with real CIDER API sync:**
    ```bash
-   # Create a command to sync from CIDER API
-   uv run python manage.py sync_cider_data --api-url https://cider.access-ci.org/api
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py sync_cider_from_api --dry-run
    ```
 
 2. **Re-run permission setup when new RPs are added:**
    ```bash
-   uv run python manage.py setup_rp_permissions
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py setup_rp_permissions --dry-run
    ```
 
 3. **Monitor group sync in logs:**
    ```bash
-   tail -f var/portalcms.log | grep "CILogon groups"
+   tail -f /soft/django-cms-01/var/portal.log | grep "CILogon groups"
    ```
 
 ### Using Permissions in Code
@@ -205,14 +229,16 @@ Visit `/admin/` and check:
 
 Run the test suite anytime:
 ```bash
-uv run python test_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_permissions.py
 ```
+
+Do not run the test scripts against RDS `portal1` unless you intend to create/modify test users and groups there. See [tests/README.md](../tests/README.md).
 
 ## Troubleshooting
 
 **Problem: Users not getting groups on login**
 - Check CILogon configuration in `settings.py`
-- View logs: `tail -f var/portalcms.log | grep CILogon`
+- View logs: `tail -f /soft/django-cms-01/var/portal.log | grep CILogon`
 - Verify CILogon is returning `isMemberOf` claim
 
 **Problem: Permission checks fail**

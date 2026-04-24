@@ -6,19 +6,23 @@ Current environment note:
 
 - As of 2026-04-07, the standard runtime uses Amazon RDS database `portal1`.
 - The historical clone-backed browser path below is retained only as rollout history.
+- Last checked against RDS `portal1`: 2026-04-24. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the read-only verification snapshot.
 
 ## Quick Start Testing
 
 ### Run All Automated Tests
+
+These scripts mutate the configured database. Use a disposable clone or explicit non-production config.
+
 ```bash
 # Test Focus Area page workflow
-python tests/test_focus_area_page_workflow.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py
 
 # Test News permissions
-python tests/test_news_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py
 
 # Test all permissions
-python tests/test_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_permissions.py
 ```
 
 ---
@@ -77,7 +81,7 @@ For focus-area workflow testing, always use the standard Django CMS page edit pa
 
 ### Automated Testing
 ```bash
-python tests/test_focus_area_page_workflow.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py
 ```
 
 **Test Coverage**:
@@ -207,7 +211,7 @@ System Status News and Integration News use custom workflow states:
 
 ### Automated Testing
 ```bash
-python tests/test_news_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py
 ```
 
 ### Manual Testing
@@ -309,10 +313,10 @@ python manage.py shell
 **Debug Steps**:
 ```bash
 # Run with verbose output
-python tests/test_focus_area_page_workflow.py -v
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py
 
-# Check test database setup
-# Tests use in-memory database, so permissions must be created per test
+# Check selected database/config first
+APP_CONFIG=/path/to/non-production-config.json uv run python manage.py check
 
 # Review test output for specific assertion failures
 # Common issues:

@@ -2,6 +2,8 @@
 
 This document explains the technical details of how Resource Provider (RP) permissions work in the Operations Portal CMS.
 
+Last checked against RDS `portal1`: 2026-04-24. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the full verification snapshot.
+
 ## What RP Permissions Control
 
 **✅ RP Groups Control:**
@@ -34,6 +36,7 @@ On top of that, the project also uses explicit Django groups for workflow roles:
 These groups are created by:
 
 ```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
 ```
 
@@ -52,7 +55,8 @@ Four models sync data from the CIDER API:
 Run the management command to create permissions and groups:
 
 ```bash
-python manage.py setup_rp_permissions
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_rp_permissions --dry-run
 ```
 
 This creates:
@@ -69,6 +73,8 @@ This creates:
 - `concierge` → `urn:group:access-ci.org:operations.access-ci.org:concierge`
 - `badge.maintainer` → `urn:group:access-ci.org:operations.access-ci.org:badge.maintainer`
 - `roadmap.maintainer` → `urn:group:access-ci.org:operations.access-ci.org:roadmap.maintainer`
+
+Current caveat: the RDS `cider_groups` table contains 26 current CIDER API records, all currently `resource-catalog.access-ci.org` groups. The Django auth group table still contains the older five RP-style group pairs plus three operations URN groups. `setup_rp_permissions` is idempotent and supports `--dry-run`, but a real run writes auth groups and permissions for each selected `CiderGroups` row, so confirm the intended CIDER group scope before running it against the database of record.
 
 ### 3. Automatic Group Sync on Login
 
@@ -126,21 +132,39 @@ View and manage CIDER data in Django Admin:
 
 ## Testing the System
 
-1. **Create database migrations:**
+1. **Check database migrations and model drift:**
    ```bash
-   python manage.py makemigrations
-   python manage.py migrate
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py makemigrations --check --dry-run
+
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py showmigrations operations_portalcms_django
    ```
 
-2. **Load CIDER data** (from API or fixtures):
+2. **Check CIDER data freshness without writes:**
    ```bash
-   python manage.py load_cider_data
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py sync_cider_from_api --dry-run
    ```
 
-3. **Create permissions:**
+3. **Preview permission/auth-group writes:**
    ```bash
-   python manage.py setup_rp_permissions
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py setup_rp_permissions --dry-run --skip-global-operations
    ```
+
+Use `--dry-run`, `--group-prefix`, `--group-type`, and `--skip-global-operations` to preview or narrow the auth group writes before a real run:
+
+```bash
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_rp_permissions --dry-run --skip-global-operations
+
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_rp_permissions \
+  --dry-run \
+  --skip-global-operations \
+  --group-type resource-catalog.access-ci.org
+```
 
 4. **Test login:**
    - Log in via CILogon
@@ -149,7 +173,8 @@ View and manage CIDER data in Django Admin:
 
 5. **Verify permissions:**
    ```bash
-   python manage.py shell
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py shell
    >>> from django.contrib.auth.models import User
    >>> user = User.objects.get(username='your_username')
    >>> user.groups.all()
@@ -162,21 +187,23 @@ View and manage CIDER data in Django Admin:
 
 Check logs for CILogon group sync:
 ```bash
-tail -f var/portalcms.log | grep "CILogon groups"
+tail -f /soft/django-cms-01/var/portal.log | grep "CILogon groups"
 ```
 
 ### No permissions showing up
 
 1. Verify groups were created:
    ```bash
-   python manage.py shell
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py shell
    >>> from django.contrib.auth.models import Group
    >>> Group.objects.filter(name__startswith='urn:group:access-ci.org:')
    ```
 
 2. Re-run permission setup:
    ```bash
-   python manage.py setup_rp_permissions
+   APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+   uv run python manage.py setup_rp_permissions --dry-run
    ```
 
 ### CILogon URNs don't match
@@ -204,9 +231,9 @@ Permissions via Group membership
 View decorators check permissions
 ```
 
-## Next Steps
+## Current Boundaries
 
-- Implement view-level permission checks
-- Create permission-based menu items
-- Add RP-specific dashboards
-- Restrict CMS page editing by RP
+- RP groups are used for news-management access, not CMS page editing.
+- Focus-area CMS page workflow uses separate `Focus_*` groups and `djangocms_versioning`.
+- The current app already has view/admin permission checks for news management.
+- RP-specific dashboards or RP-scoped CMS page editing would be new work, not part of the current verified state.

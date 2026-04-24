@@ -5,19 +5,20 @@ Current environment note:
 - The workflow below was first validated through the former clone path and then promoted on 2026-04-06.
 - As of 2026-04-07, the active standard runtime points at Amazon RDS database `portal1`.
 - The application role/schema model remains `portal_django` / `portal_django`.
+- Last checked against RDS `portal1`: 2026-04-24. The current database has 18 CMS pages, 18 page-content rows, 26 version records, and 9 page-permission rows. See [CURRENT_STATE.md](./CURRENT_STATE.md).
 
 ## Overview
 
 Focus area pages (STEP, Cybersecurity, Operational Support, Data Transfer and Networking) now use Django CMS's built-in draft/publish workflow with role-based permissions.
 
-As of 2026-04-03, this workflow has been verified end-to-end on the clone-backed environment using `djangocms_versioning`:
+As of the current RDS-backed runtime, this workflow uses `djangocms_versioning`:
 
-- a page-specific editor created a new draft for STEP
-- the UI showed a separate draft version and compare-to-published controls
-- a reviewer/superuser published the draft successfully
-- the clone database recorded a new `cms_pagecontent` row and a new published version
+- page-specific editor groups can change assigned focus pages but cannot publish
+- `Focus_area_editors` can change and publish all focus pages
+- page versioning keeps published and unpublished versions separate
+- the database currently records 18 `published` versions and 8 `unpublished` versions
 
-At this point, page versioning has been proven in the historical clone environment and is part of the current standard runtime. `djangocms_moderation` has not been enabled.
+The historical clone environment proved the STEP workflow before promotion. Page versioning is now part of the current standard runtime. `djangocms_moderation` has not been enabled.
 
 ## User Roles
 
@@ -98,9 +99,11 @@ Configuration is done via management commands:
 
 ```bash
 # 1. Configure group permissions (Django model level)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
 
 # 2. Configure page-specific permissions (CMS PagePermission level)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_focus_area_page_permissions
 ```
 
@@ -124,8 +127,10 @@ That path is preserved here as rollout history only. The current operational run
 Run the workflow test to verify permissions:
 
 ```bash
-uv run python tests/test_focus_area_page_workflow.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py
 ```
+
+The focus-area test script mutates users/groups in the configured database. Do not run it against RDS `portal1` unless that is intentional.
 
 For historical rollout browser testing details, see [CMS_VERSIONING_CLONE_CHECKLIST.md](./CMS_VERSIONING_CLONE_CHECKLIST.md).
 

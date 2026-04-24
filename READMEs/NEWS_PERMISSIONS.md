@@ -2,6 +2,8 @@
 
 This project uses explicit Django groups for each news type with a two-tier model: Authors write and submit for review; Managers review, publish, and have full control.
 
+Last checked against RDS `portal1`: 2026-04-24. Current content state: 249 System Status News items are `published`; Integration News has 24 `published` and 1 `pending_review`. See [CURRENT_STATE.md](./CURRENT_STATE.md).
+
 ## News Roles
 
 Each news type has two roles:
@@ -71,6 +73,7 @@ Run these commands to configure news workflow groups and permissions:
 
 ```bash
 # 1. Configure news workflow groups and permissions
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
 
 # This creates:
@@ -94,8 +97,10 @@ After running setup_groups, assign users to the appropriate groups:
 Verify the workflow is configured correctly:
 
 ```bash
-uv run python tests/test_news_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py
 ```
+
+The test script mutates the configured database. Do not run it against RDS `portal1` unless that is intentional.
 
 ---
 
@@ -116,12 +121,15 @@ If you have legacy editor groups or the retired Publishers groups:
 
 ```bash
 # Migrate users from legacy/publisher groups to manager groups
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups --migrate-legacy-memberships
 
 # Delete legacy groups (after verifying migration)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups --delete-legacy-groups
 
 # Or do both in one run:
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups --migrate-legacy-memberships --delete-legacy-groups
 ```
 
@@ -143,7 +151,7 @@ Recommended test flow:
 Run automated tests:
 
 ```bash
-uv run python tests/test_news_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py
 ```
 
 ---

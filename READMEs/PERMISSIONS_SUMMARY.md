@@ -4,6 +4,8 @@
 
 The Operations Portal CMS uses **two separate permission systems**:
 
+Last checked against RDS `portal1`: 2026-04-24. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the full verification snapshot.
+
 ### 1. RP Groups → News Items
 **What:** Resource Provider (RP) groups from CILogon  
 **Controls:** Who can add/edit news items  
@@ -44,11 +46,11 @@ The Operations Portal CMS uses **two separate permission systems**:
 - Page-specific editors (e.g., `Focus_STEP_Editors`) - Can edit but NOT publish
 - `Focus_area_editors` - Can edit AND publish any focus area
 
-**Verified clone result (2026-04-03):**
-- a page-specific editor can create a draft for STEP
-- the published page remains separate until publish
-- reviewer/superuser can publish successfully
-- the old live version becomes `unpublished` after publish
+**Current verified state:**
+- `djangocms_versioning` is installed and active
+- page-specific focus groups can edit assigned focus pages but cannot publish
+- `Focus_area_editors` can edit and publish focus pages
+- RDS `portal1` currently has 18 published CMS versions and 8 unpublished versions
 
 **See:** [FOCUS_AREA_WORKFLOW.md](FOCUS_AREA_WORKFLOW.md)
 
@@ -90,7 +92,7 @@ The Operations Portal CMS uses **two separate permission systems**:
 |--------------|-----|---------------|--------|
 | Configure news workflow | News workflow groups | `setup_groups` | Manual (`/admin/auth/user/`) |
 | Configure focus area workflow | Focus area groups | `setup_groups` + `setup_focus_area_page_permissions` | Manual |
-| Let RPs add status updates | RP groups | `setup_rp_permissions` + `load_test_cider_data` | Auto (CILogon) |
+| Let RPs add status updates | RP groups | `sync_cider_from_api --dry-run`, then `setup_rp_permissions --dry-run` before scope-reviewed writes | Auto (CILogon) |
 | Let PIs edit public pages | Custom group | Manual (`/admin/auth/group/`) | Manual |
 | Let managers edit focus areas | Custom group | Manual | Manual |
 
@@ -102,15 +104,18 @@ The Operations Portal CMS uses **two separate permission systems**:
 
 ```bash
 # 1. Configure news and focus area workflow groups
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
 
 # 2. Configure focus area page-specific permissions
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_focus_area_page_permissions
 
-# 3. Configure RP permissions (optional - for news access)
-uv run python manage.py setup_rp_permissions
+# 3. Configure RP permissions after confirming intended CIDER group scope
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_rp_permissions --dry-run
 
-# 4. Load test data for development (optional)
+# 4. Load test data for local development only
 uv run python manage.py load_test_cider_data
 ```
 
@@ -120,7 +125,9 @@ All setup commands are idempotent and safe to re-run:
 
 ```bash
 # Update all permissions
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_groups
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py setup_focus_area_page_permissions
 ```
 
@@ -132,11 +139,13 @@ Verify configurations:
 
 ```bash
 # Test news workflow
-uv run python tests/test_news_permissions.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py
 
 # Test focus area page workflow
-uv run python tests/test_focus_area_page_workflow.py
+APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py
 ```
+
+The scripts in `tests/` mutate the configured database; do not run them against RDS `portal1` unless that is intentional.
 
 ---
 
@@ -167,6 +176,7 @@ Keep:
 **Testing:**
 - `test_news_permissions.py` - Test news permissions
 - `test_permissions.py` - Test RP group sync
+- [CURRENT_STATE.md](./CURRENT_STATE.md) - Read-only verification snapshot
 
 ---
 
@@ -176,14 +186,15 @@ Keep:
 - RP groups = News
 - Custom groups = Pages
 
-**✅ Focus-area versioning now proven in clone**
+**✅ Focus-area versioning active in the current runtime**
 - `djangocms_versioning` is sufficient for the tested STEP draft/publish workflow
-- `djangocms_moderation` is still optional and not yet enabled
+- `djangocms_moderation` is not enabled
 
 **✅ Simple and flexible**
 - No complex matching rules
 - Easy to understand
 
-**✅ Ready to use**
-- All code implemented
-- All tests passing
+**✅ Ready for normal use**
+- Core Django checks pass
+- RDS schema and ownership checks pass
+- Standalone mutating test scripts should be reserved for clone/test databases

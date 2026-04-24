@@ -1,60 +1,59 @@
 # Database and Media Dumps
 
-This directory contains backup dumps for deployment.
+This directory contains historical deployment dump notes and is still the default output directory for the helper dump script.
 
-## Current Files (Initial Deployment)
+## Current Policy
 
-- `portalcms_production_20260216_133655.sql.gz` - Database dump from local djangocmsjoy
-  - Contains: All tables, CMS pages, users, news items
-  - Database: djangocmsjoy → Will restore as: portalcms1
-  - User: jelambeadmin → Will restore as: portalcms_django
-  - Size: 50KB
+- The database of record is Amazon RDS `portal1`.
+- Use `APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh` from the repo root for current backups.
+- Current backups should not be committed to git.
+- Restore operations into `portal1` require an explicit `--allow-live-target` and should be treated as a maintenance-window action.
 
-- `media_backup_20260216_134007.tar.gz` - Media files archive
-  - Contains: 32 uploaded images (18MB)
-  - Includes: filer_public/ and filer_public_thumbnails/ directories
+## Historical Initial Deployment Files
 
-## Production Deployment Usage
+- `portalcms_production_20260216_133655.sql.gz` - Initial database dump from local `djangocmsjoy`
+  - Contains: initial tables, CMS pages, users, and news items
+  - Historical target database: `portalcms1`
+  - Historical user transition: `jelambeadmin` to `portalcms_django`
 
-On the remote server after `git pull`:
+- `media_backup_20260216_134007.tar.gz` - Initial media files archive
+  - Contains: uploaded images
+  - Includes: `filer_public/` and `filer_public_thumbnails/` directories
+
+These files are not the current production data source. Keep them only as historical bootstrap artifacts.
+
+## Current Backup Usage
+
+From the repo root:
 
 ```bash
-# 1. Restore database
-cd /soft/django-cms-01/PROD/Operations_PortalCMS_Django
-gunzip -c database/dumps/portalcms_production_20260216_133655.sql.gz | \
-  psql -U portalcms_django -d portalcms1
+# Preview the RDS dump command
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --dry-run
 
-# 2. Extract media files
-tar -xzf database/dumps/media_backup_20260216_134007.tar.gz
+# Create a custom-format dump
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh
 
-# 3. Verify
-ls -la media/filer_public/
-psql -U portalcms_django -d portalcms1 -c "SELECT COUNT(*) FROM cms_page;"
+# Create a SQL dump
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --format sql
 ```
 
-## Important Notes
+The current helper names outputs like:
 
-- These dumps are for **initial deployment only** with development data
-- After production deployment, re-enable `.gitignore` rules for `database/dumps/`
-- Future dumps should NOT be committed to git
-- Use the backup scripts in `database/` directory for production backups
+- `database/dumps/portal1_full_YYYYMMDDTHHMMSSZ.dump`
+- `database/dumps/portal1_full_YYYYMMDDTHHMMSSZ.sql`
 
-## Cleanup After First Deployment
+## Media
 
-After successful production deployment, you should:
+The repo also contains current media trees under `media/` and `database/media/`. Media backup/restore should be handled separately from PostgreSQL dumps.
 
-1. Re-enable gitignore rules in `.gitignore`:
-   ```bash
-   # Uncomment these lines:
-   database/dumps/*.dump
-   database/dumps/*.sql
-   database/dumps/*.gz
-   ```
+If restoring a historical media archive, verify the target path first. The active nginx config serves media from:
 
-2. Remove these initial dump files from git:
-   ```bash
-   git rm --cached database/dumps/*.gz
-   git commit -m "Remove initial deployment dumps from tracking"
-   ```
+```text
+/soft/django-cms-01/PROD/media/
+```
 
-3. Use production backup scripts for future backups (not committed to repo)
+## Related Docs
+
+- [database/README.md](../README.md)
+- [Current Project State](../../READMEs/CURRENT_STATE.md)
+- [Database Migration Status](../../READMEs/database_migration_plan.md)

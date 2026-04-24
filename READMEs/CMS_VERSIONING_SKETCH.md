@@ -10,7 +10,7 @@ For the current detailed execution plan, see:
 
 ## Current Findings
 
-Verified in the live app state on 2026-03-31:
+Historical findings verified in the live app state on 2026-03-31:
 
 - `jlambertson` is only in `Focus_STEP_Editors`
 - STEP `PagePermission` is `can_change=True`, `can_publish=False`
@@ -18,11 +18,19 @@ Verified in the live app state on 2026-03-31:
 - project is using `django-cms==5.0.5`
 - `djangocms_versioning` is not installed
 
-Conclusion:
+Historical conclusion at that time:
 
 - Current focus-area behavior is not backed by true CMS content versioning
 - page edit vs publish permissions alone are not enough to create a real moderation workflow here
 - if we want draft/review/publish for CMS page content, CMS versioning support is required
+
+Current status as of 2026-04-24:
+
+- `djangocms_versioning` is installed and active in the RDS-backed runtime.
+- `djangocms_moderation` is not enabled.
+- RDS `portal1` has 26 CMS version rows: 18 `published`, 8 `unpublished`.
+- Focus-area page permissions are configured so page-specific groups can edit but not publish, while `Focus_area_editors` can edit and publish.
+- See [CURRENT_STATE.md](./CURRENT_STATE.md) for the current verification snapshot.
 
 ## Why Edits Still Go Live
 

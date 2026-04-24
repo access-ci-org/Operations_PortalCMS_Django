@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 import requests
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
 
@@ -64,6 +64,14 @@ class Command(BaseCommand):
             action="store_true",
             help="Skip group/org/feature sync from /v2/access-active-groups/.",
         )
+        parser.add_argument(
+            "--prune-stale-groups",
+            action="store_true",
+            help=(
+                "Delete local CIDER groups that are not present in the fetched active_groups "
+                "payload. Honors --dry-run and --group-prefix."
+            ),
+        )
 
     def handle(self, *args, **options):
         if options["api_url"]:
@@ -74,6 +82,7 @@ class Command(BaseCommand):
         dry_run = bool(options["dry_run"])
         skip_infrastructure = bool(options["skip_infrastructure"])
         skip_groups_bundle = bool(options["skip_groups_bundle"])
+        prune_stale_groups = bool(options["prune_stale_groups"])
 
         self.stdout.write("\n" + "=" * 70)
         self.stdout.write("SYNCING CIDER DATA FROM API")
@@ -93,6 +102,7 @@ class Command(BaseCommand):
                         timeout=timeout,
                         dry_run=dry_run,
                         group_prefix=group_prefix,
+                        prune_stale_groups=prune_stale_groups,
                         counts=counts,
                     )
                 if dry_run:
@@ -181,7 +191,14 @@ class Command(BaseCommand):
             else:
                 counts["infrastructure_updated"] += 1
 
-    def sync_groups_bundle(self, timeout: int, dry_run: bool, group_prefix: str, counts) -> None:
+    def sync_groups_bundle(
+        self,
+        timeout: int,
+        dry_run: bool,
+        group_prefix: str,
+        prune_stale_groups: bool,
+        counts,
+    ) -> None:
         self.stdout.write("--- Syncing Groups Bundle (/v2/access-active-groups/) ---")
         url = f"{self.API_BASE}/v2/access-active-groups/"
         data = self.fetch_json(url, timeout=timeout)
@@ -197,6 +214,7 @@ class Command(BaseCommand):
         )
 
         # Sync groups
+        source_group_ids = set()
         for group in active_groups:
             info_groupid = group.get("info_groupid", "")
             if group_prefix and not info_groupid.startswith(group_prefix):
@@ -206,6 +224,7 @@ class Command(BaseCommand):
             if group_id is None:
                 counts["groups_skipped_missing_id"] += 1
                 continue
+            source_group_ids.add(group_id)
 
             defaults = {
                 "info_groupid": self.clip(info_groupid, 40),
@@ -235,6 +254,23 @@ class Command(BaseCommand):
                 counts["groups_created"] += 1
             else:
                 counts["groups_updated"] += 1
+
+        if prune_stale_groups:
+            if not source_group_ids:
+                raise CommandError(
+                    "Refusing to prune stale CIDER groups because no source group IDs were processed."
+                )
+
+            stale_groups = CiderGroups.objects.exclude(group_id__in=source_group_ids)
+            if group_prefix:
+                stale_groups = stale_groups.filter(info_groupid__startswith=group_prefix)
+            stale_count = stale_groups.count()
+
+            if dry_run:
+                counts["groups_would_delete"] += stale_count
+            else:
+                stale_groups.delete()
+                counts["groups_deleted"] += stale_count
 
         # Sync organizations
         for org in organizations:

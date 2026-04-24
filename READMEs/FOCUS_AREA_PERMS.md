@@ -6,6 +6,8 @@ This document describes the **current page-level permission model** for the four
 
 This README is intended to stay aligned with the actual live configuration as development continues.
 
+Last checked against RDS `portal1`: 2026-04-24. For the full verification snapshot, see [CURRENT_STATE.md](./CURRENT_STATE.md).
+
 It covers:
 
 - which focus editor groups exist
@@ -63,8 +65,8 @@ These are Django CMS pages using the `focus_area.html` template under the `Focus
 
 The current live page-level mapping is:
 
-| Focus-Area Page | Broad Group | Page-Specific Group |
-|-----------------|-------------|---------------------|
+| Focus-Area Page | Broad Reviewer/Publisher Group | Page-Specific Editor Group |
+|-----------------|--------------------------------|----------------------------|
 | `CyberSecurity` | `Focus_area_editors` | `Focus_Cybersecurity_Editors` |
 | `Data Transfer and Networking Support` | `Focus_area_editors` | `Focus_Networking_dataTransfer_Editors` |
 | `Operational Support` | `Focus_area_editors` | `Focus_operationsSupport_Editors` |
@@ -72,12 +74,12 @@ The current live page-level mapping is:
 
 This means each focus-area page currently has:
 
-- one **global focus-area editor group**
-- one **matching page-specific editor group**
+- one **global focus-area reviewer/publisher group**
+- one **matching page-specific editor-only group**
 
 ## Current Permission Flags
 
-Each of the configured focus-area page-permission records currently uses the same settings:
+All configured focus-area page-permission records currently use:
 
 - `grant_on = 5`
   - Django CMS meaning: **Page and descendants**
@@ -86,23 +88,28 @@ Each of the configured focus-area page-permission records currently uses the sam
 - `can_change = True`
 - `can_move_page = True`
 - `can_delete = False`
-- `can_publish = False`
 - `can_change_permissions = False`
 - `can_view = False`
+
+Publishing differs by group:
+
+- `Focus_area_editors`: `can_publish = True`
+- page-specific groups: `can_publish = False`
 
 ### Practical Meaning
 
 With the current configuration:
 
-- focus editors can edit the assigned focus-area page
-- focus editors can add child pages beneath the assigned focus-area page
-- focus editors can move pages in the allowed scope
-- focus editors do **not** get delete rights from this page-permission setup
-- focus editors do **not** get publish rights from this page-permission setup
-- focus editors do **not** get permission-management rights from this page-permission setup
+- page-specific focus editors can edit the assigned focus-area page
+- page-specific focus editors can add child pages beneath the assigned focus-area page
+- page-specific focus editors can move pages in the allowed scope
+- page-specific focus editors do **not** get delete, publish, or permission-management rights
+- `Focus_area_editors` can edit and publish each focus-area page, and acts as the reviewer/publisher role
 - public viewing is **not** restricted by these page-permission entries
 
-This is intentional: the current setup is focused on **editing access**, not publishing or permission administration.
+This is intentional: page-specific groups create drafts and submit for review, while `Focus_area_editors` reviews and publishes.
+
+The live database also has one non-focus PagePermission for `Home_page_editors` on `Operations Portal Home` with change/publish rights and page-only scope.
 
 ## How The Current Setup Is Applied
 
@@ -113,13 +120,15 @@ The current focus-area page permissions are configured by the management command
 Run it with:
 
 ```bash
-.venv/bin/python manage.py setup_focus_area_page_permissions
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_focus_area_page_permissions
 ```
 
 Preview changes without saving:
 
 ```bash
-.venv/bin/python manage.py setup_focus_area_page_permissions --dry-run
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+uv run python manage.py setup_focus_area_page_permissions --dry-run
 ```
 
 ## Why We Use A Command
@@ -186,3 +195,4 @@ When updating focus-area permissions in development:
 
 - [CMS_PAGE_PERMISSIONS.md](./CMS_PAGE_PERMISSIONS.md)
 - [PERMISSIONS_SUMMARY.md](./PERMISSIONS_SUMMARY.md)
+- [CURRENT_STATE.md](./CURRENT_STATE.md)
