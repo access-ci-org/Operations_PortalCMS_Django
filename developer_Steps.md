@@ -157,6 +157,23 @@ export APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json"
 
 Keep this file private. Do not commit it.
 
+## APP_CONFIG Is Required For Local Commands
+
+Run every Django or database helper command from a shell where `APP_CONFIG` is set:
+
+```bash
+export APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json"
+```
+
+Or prefix one-off commands:
+
+```bash
+APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" uv run python manage.py check
+APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" ./database/verify_db.sh
+```
+
+Do not rely on repo-root config discovery or a leftover private `portal.conf.dev.json`. If `APP_CONFIG` is unset, stop and set it explicitly.
+
 ## 6. Check The Local App
 
 ```bash

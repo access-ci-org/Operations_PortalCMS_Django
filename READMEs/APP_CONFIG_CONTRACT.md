@@ -54,9 +54,10 @@ To match the live service behavior as closely as possible:
 
 ## Helper Script Guidance
 
-1. Database and admin helper scripts should prefer `APP_CONFIG` first.
+1. Database and admin helper scripts should pass `APP_CONFIG` explicitly.
 2. Repo-root config filename fallback should remain a local convenience only.
-3. Legacy repo-root config names should not be treated as the primary contract going forward.
+3. Legacy repo-root config discovery is compatibility behavior only and should not be relied on for new workflows.
+4. Legacy repo-root config names should not be treated as the primary contract going forward.
 
 ## Transition Direction
 

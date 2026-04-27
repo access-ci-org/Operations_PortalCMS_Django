@@ -20,6 +20,19 @@ Current verification note:
 - Restore/recreate flows should still be treated carefully on RDS because database creation/drop privileges can differ from local PostgreSQL.
 - `clone_db.sh` intentionally refuses non-local hosts unless `--allow-remote-host` is supplied.
 
+## APP_CONFIG For Helper Scripts
+
+Database helper scripts should be run with explicit `APP_CONFIG`.
+
+Examples:
+
+```bash
+APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" ./database/verify_db.sh
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --dry-run
+```
+
+Before any restore, migration, sync, or mutating test command, confirm the resolved database host/name are the intended local or maintenance target.
+
 ## Scripts
 
 ### verify_db.sh
