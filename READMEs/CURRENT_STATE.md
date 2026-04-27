@@ -195,7 +195,7 @@ APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py check --deploy
 ```
 
-Result: seven deployment warnings for security hardening/settings: HSTS, SSL redirect, secret-key quality, secure session cookie, secure CSRF cookie, `DEBUG=True`, and `X_FRAME_OPTIONS='DENY'`.
+Result: deployment warnings remain for production hardening/settings, including HSTS, SSL redirect, secret-key quality, secure session cookie, secure CSRF cookie, and `X_FRAME_OPTIONS` not being `DENY`. These are noted for future production review and were not changed during the developer-handoff documentation pass.
 
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh

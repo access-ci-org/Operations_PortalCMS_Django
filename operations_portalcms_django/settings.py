@@ -21,7 +21,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 ##### ACCESS-CI CUSTOMIZATIONS #####
 # `APP_CONFIG` is the single supported runtime config entry point for this app.
-# For local repo workflows, `portal.conf.dev.json` is the canonical sample file.
 if 'APP_CONFIG' not in os.environ:
     print('Missing APP_CONFIG environment variable')
     sys.exit(1)
@@ -79,8 +78,23 @@ DEBUG = _env_bool('DEBUG', True)
 
 _config_name = config_file.name.lower()
 _default_development_banner = DEBUG or '.dev.' in _config_name or _config_name.endswith('.dev.json')
-DEVELOPMENT_SERVER_BANNER = _env_bool('DEVELOPMENT_SERVER_BANNER', _default_development_banner)
-DEVELOPMENT_SERVER_LABEL = os.environ.get('DEVELOPMENT_SERVER_LABEL', 'DEVELOPMENT SERVER')
+
+# Explicit environment identity. These keys are optional for backward
+# compatibility; APP_CONFIG remains the required path to the JSON config file.
+APP_ENV = os.environ.get('APP_ENV', '').strip().lower()
+PUBLIC_HOSTNAME = os.environ.get('PUBLIC_HOSTNAME', '').strip()
+ENVIRONMENT_LABEL = os.environ.get(
+    'ENVIRONMENT_LABEL',
+    os.environ.get('DEVELOPMENT_SERVER_LABEL', 'DEVELOPMENT SERVER'),
+)
+ENVIRONMENT_BANNER_ENABLED = _env_bool(
+    'ENVIRONMENT_BANNER_ENABLED',
+    _env_bool('DEVELOPMENT_SERVER_BANNER', _default_development_banner),
+)
+
+# Backward-compatible aliases used by existing templates and configs.
+DEVELOPMENT_SERVER_BANNER = ENVIRONMENT_BANNER_ENABLED
+DEVELOPMENT_SERVER_LABEL = ENVIRONMENT_LABEL
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else []
 

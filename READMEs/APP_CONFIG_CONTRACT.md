@@ -14,9 +14,10 @@ This document records the current intended config contract for Operations Portal
 
 ## Canonical Repo Sample
 
-1. The canonical repo-local sample config is `portal.conf.dev.json` at the repo root.
-2. Older alternate names such as `portal.conf.json`, `portalcms.conf.dev.json`, and `portalcms.conf.json` should be treated as legacy compatibility names.
-3. New docs and helper scripts should prefer `APP_CONFIG` explicitly, not implicit filename discovery.
+1. The canonical tracked local developer sample config is `portal.local.example.json` at the repo root.
+2. Developers should copy that sample to a private path such as `$HOME/.config/operations-portal-cms/portal.local.json` and point `APP_CONFIG` at the private copy.
+3. Repo-root runtime config names such as `portal.conf.dev.json`, `portal.conf.json`, `portalcms.conf.dev.json`, and `portalcms.conf.json` should be treated as legacy/private compatibility names, not files to commit with real secrets.
+4. New docs and helper scripts should prefer `APP_CONFIG` explicitly, not implicit filename discovery.
 
 ## Required Keys
 
@@ -26,9 +27,22 @@ The current required keys enforced in `operations_portalcms_django/settings.py` 
 
 Other keys may still be operationally important depending on environment and enabled integrations, but `DJANGO_SECRET_KEY` is the only key currently hard-required during startup.
 
-Operationally important current keys include `DB_DATABASE`, `DB_HOSTNAME_READ`, `DB_HOSTNAME_WRITE`, `DB_PORT`, `DJANGO_USER`, `DJANGO_PASS`, `DB_SEARCH_PATH`, `DB_SSLMODE`, `STATIC_ROOT`, CILogon client settings, and app log paths.
+Operationally important current keys include `APP_ENV`, `PUBLIC_HOSTNAME`, `ENVIRONMENT_BANNER_ENABLED`, `ENVIRONMENT_LABEL`, `DB_DATABASE`, `DB_HOSTNAME_READ`, `DB_HOSTNAME_WRITE`, `DB_PORT`, `DJANGO_USER`, `DJANGO_PASS`, `DB_SEARCH_PATH`, `DB_SSLMODE`, `STATIC_ROOT`, CILogon client settings, and app log paths.
 
-The current deployed dev config resolves `DEBUG=True` when no shell override is present. It also enables the visible development marker through `DEVELOPMENT_SERVER_BANNER=True` and `DEVELOPMENT_SERVER_LABEL="DEVELOPMENT SERVER"`. Production-like deployments should set those values explicitly instead of relying on filename/default behavior.
+Environment identity keys are optional and backward-compatible:
+
+- `APP_ENV` identifies the role of the config, such as `local`, `development`, `staging`, or `production`.
+- `PUBLIC_HOSTNAME` records the expected public host, such as `cms2.operations.access-ci.org`.
+- `ENVIRONMENT_BANNER_ENABLED` controls whether a visible environment marker is shown.
+- `ENVIRONMENT_LABEL` controls the marker text.
+
+The older `DEVELOPMENT_SERVER_BANNER` and `DEVELOPMENT_SERVER_LABEL` keys remain supported as aliases for existing configs and templates. Production-like deployments should set environment identity and banner values explicitly instead of relying on filename/default behavior.
+
+## Deployment Hardening Reference
+
+Future security and production/staging hardening work is tracked in [SECURITY_HARDENING.md](./SECURITY_HARDENING.md).
+
+This config contract only records the runtime config shape. Any new proxy, HTTPS, cookie, CSRF, or clickjacking settings should still be APP_CONFIG-driven so local development can keep those values disabled while staging/production enables them deliberately.
 
 ## Manual Commands
 

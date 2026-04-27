@@ -64,6 +64,7 @@ Operations_PortalCMS_Django/
 - **[database_migration_plan.md](READMEs/database_migration_plan.md)** - RDS cutover status and rollback notes
 
 **Getting Started:**
+- **[developer_Steps.md](developer_Steps.md)** - Local developer setup with `uv` and a restored `portal1` backup
 - **[SETUP_GUIDE.md](READMEs/SETUP_GUIDE.md)** - Complete setup guide for all workflows
 - **[WORKFLOW_TESTING.md](READMEs/WORKFLOW_TESTING.md)** - Testing guide for all workflows (automated + manual)
 
@@ -79,6 +80,7 @@ Operations_PortalCMS_Django/
 - **[CMS_PAGE_PERMISSIONS.md](READMEs/CMS_PAGE_PERMISSIONS.md)** - Django CMS page permissions
 - **[QUICKSTART_PERMISSIONS.md](READMEs/QUICKSTART_PERMISSIONS.md)** - RP permissions setup
 - **[PERMISSIONS.md](READMEs/PERMISSIONS.md)** - Implementation details
+- **[SECURITY_HARDENING.md](READMEs/SECURITY_HARDENING.md)** - Future production/staging security hardening notes
 
 **Database:**
 - **[database/README.md](database/README.md)** - Database verification, backup, restore, and clone helper scripts
