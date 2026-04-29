@@ -21,6 +21,7 @@
   "APP_VERSION": "local-dev",
   "SYSLOG_SOCK": "",
   "API_BASE": "",
+  "API_KEY": "",
   "CILOGON_CLIENT_ID": "",
   "CILOGON_CLIENT_SECRET": ""
 }

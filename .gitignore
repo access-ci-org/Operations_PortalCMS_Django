@@ -63,6 +63,7 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+staticfiles/
 
 # Project Configuration
 portal.conf.dev.json
@@ -230,6 +231,7 @@ database/dumps/*.json
 database/dumps/*.gz
 database/dumps/*.tar.gz
 *.dump
+django.*.dump*.gz
 *.sql
 *.sql.gz
 backup*.sql

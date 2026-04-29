@@ -105,7 +105,7 @@ APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
 
 - Python code style: Follow Django conventions
 - Templates: Use Bootstrap 5 classes
-- CSS: Extend `static/operations_portalcms_django/style-portalcms.css`
+- CSS: Extend `static/operations_portalcms_django/style-portal.css`
 - Avoid running the standalone scripts in `tests/` against RDS `portal1` unless you intend to create or modify test users/groups/content there.
 
 ---

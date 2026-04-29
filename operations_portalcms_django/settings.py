@@ -44,17 +44,18 @@ if missing_required_keys:
     print(f'Missing required APP_CONFIG keys: {", ".join(missing_required_keys)}')
     sys.exit(1)
 
-# Inject config values into the environment for settings that still use os.environ.
+# APP_CONFIG values are authoritative for Django runtime settings. Environment
+# variables remain useful as compatibility fallbacks only when a key is absent
+# from the JSON config.
 for key, value in CONF.items():
-    if key not in os.environ:
-        if isinstance(value, list):
-            os.environ[key] = ','.join(str(v) for v in value)
-        elif isinstance(value, bool):
-            os.environ[key] = 'True' if value else 'False'
-        elif value is None:
-            os.environ[key] = ''
-        else:
-            os.environ[key] = str(value)
+    if isinstance(value, list):
+        os.environ[key] = ','.join(str(v) for v in value)
+    elif isinstance(value, bool):
+        os.environ[key] = 'True' if value else 'False'
+    elif value is None:
+        os.environ[key] = ''
+    else:
+        os.environ[key] = str(value)
 
 if CONF.get('API_KEY'):
     os.environ['API_KEY'] = str(CONF['API_KEY'])
@@ -67,14 +68,19 @@ if CONF.get('API_KEY'):
 SECRET_KEY = CONF['DJANGO_SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
-def _env_bool(name, default=False):
-    value = os.environ.get(name)
+def _bool_value(value, default=False):
     if value is None:
         return default
+    if isinstance(value, bool):
+        return value
     return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
-DEBUG = _env_bool('DEBUG', True)
+def _env_bool(name, default=False):
+    return _bool_value(os.environ.get(name), default)
+
+
+DEBUG = _bool_value(CONF.get('DEBUG'), True)
 
 _config_name = config_file.name.lower()
 _default_development_banner = DEBUG or '.dev.' in _config_name or _config_name.endswith('.dev.json')
