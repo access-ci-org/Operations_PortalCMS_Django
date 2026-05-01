@@ -80,7 +80,7 @@ def _env_bool(name, default=False):
     return _bool_value(os.environ.get(name), default)
 
 
-DEBUG = _bool_value(CONF.get('DEBUG'), True)
+DEBUG = _bool_value(CONF.get('DEBUG'), False)
 
 _config_name = config_file.name.lower()
 _default_development_banner = DEBUG or '.dev.' in _config_name or _config_name.endswith('.dev.json')
@@ -157,7 +157,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
-ROOT_URLCONF = 'operations_portalcms_django.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
@@ -180,7 +180,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'operations_portalcms_django.wsgi.application'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database

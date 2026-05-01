@@ -13,7 +13,7 @@ import django
 
 # Setup Django
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'operations_portalcms_django.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 from django.contrib.auth.models import User, Group

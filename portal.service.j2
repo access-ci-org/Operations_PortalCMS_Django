@@ -7,12 +7,12 @@ StartLimitIntervalSec=0
 Type=simple
 User=jlambertson
 Group=appdev
-WorkingDirectory={{ app_home }}/PROD
+WorkingDirectory={{ app_home }}/PROD/portal
 Environment="APP_CONFIG={{ app_home }}/conf/portal.conf.dev.json"
-Environment="DJANGO_SETTINGS_MODULE=operations_portalcms_django.settings"
+Environment="DJANGO_SETTINGS_MODULE=config.settings"
 Environment="PATH=/home/jlambertson/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
 UMask=0007
-ExecStart=/home/jlambertson/.local/bin/uv run gunicorn operations_portalcms_django.wsgi:application \
+ExecStart=/home/jlambertson/.local/bin/uv run gunicorn config.wsgi:application \
   --bind unix:{{ app_home }}/run/portal.socket \
   --workers 2 \
   --umask 007 \

@@ -24,7 +24,7 @@ urlpatterns = [
     path('filer/', include('filer.urls')),
     path('accounts/', include('allauth.urls')),  # Allauth (login/logout/social auth/CILogon)
     path('access_django_user_admin/', include('access_django_user_admin.urls', namespace="access_django_user_admin")),
-    path('', include('operations_portalcms_django.app_urls')),  # Application views (news, services, etc.)
+    path('', include('operations_portalcms_django.urls')),  # Application views (news, services, etc.)
     path('', include('cms.urls')),  # CMS pages - keep this last as catch-all
 ]
 
