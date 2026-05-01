@@ -59,6 +59,8 @@ cd Operations_PortalCMS_Django
 uv sync
 ```
 
+`pyproject.toml` and `.venv/` live at the repo root. Run `uv sync` from the repo root, not from inside `portal/`.
+
 ## 3. Create A Local Database
 
 Use local names so there is no confusion with production.
@@ -168,15 +170,26 @@ export APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json"
 Or prefix one-off commands:
 
 ```bash
-APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" uv run python manage.py check
+APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" uv run python portal/manage.py check
 APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" ./database/verify_db.sh
 ```
 
 Do not rely on repo-root config discovery or a leftover private `portal.conf.dev.json`. If `APP_CONFIG` is unset, stop and set it explicitly.
 
+## Project Directory
+
+All Django commands (`manage.py`) run from inside the `portal/` subdirectory, not the repo root:
+
+```bash
+cd portal/
+```
+
+Set `APP_CONFIG` first (it uses an absolute path so it works from any directory), then run commands from inside `portal/`. Keep `uv sync` at the repo root.
+
 ## 6. Check The Local App
 
 ```bash
+cd portal/
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
 uv run python manage.py migrate --check
@@ -191,7 +204,7 @@ If `migrate --check` reports unapplied migrations, inspect `migrate --plan` befo
 uv run python manage.py migrate
 ```
 
-Optional database verification:
+Optional database verification (run from repo root):
 
 ```bash
 ./database/verify_db.sh
@@ -202,12 +215,14 @@ Optional database verification:
 If you do not have a usable admin account from the restored backup:
 
 ```bash
+cd portal/
 uv run python manage.py createsuperuser
 ```
 
 ## 8. Run The Development Server
 
 ```bash
+cd portal/
 uv run python manage.py runserver 127.0.0.1:8000
 ```
 
@@ -227,19 +242,20 @@ http://127.0.0.1:8000/admin/
 
 The database restore does not include uploaded media files.
 
-If pages show missing images/files, copy the current `media/` directory into the repo root:
+If pages show missing images/files, copy the current `media/` directory into `portal/media/`:
 
 ```text
-Operations_PortalCMS_Django/media/
+Operations_PortalCMS_Django/portal/media/
 ```
 
 ## 10. Tests Warning
 
-The scripts in `tests/` are not isolated unit tests. They modify whichever database `APP_CONFIG` points to.
+The scripts in `portal/tests/` are not isolated unit tests. They modify whichever database `APP_CONFIG` points to.
 
 Only run them against your local restored database:
 
 ```bash
+cd portal/
 uv run python tests/test_news_permissions.py
 uv run python tests/test_focus_area_page_workflow.py
 ```
