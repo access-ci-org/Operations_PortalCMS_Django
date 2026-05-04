@@ -1,130 +1,153 @@
-# Django Structure Analysis — Side-by-Side
+# Django Structure Analysis — Current State
 
 **Projects compared:**
 - `Operations_PortalCMS_Django` (this repo) — Django 5.2 + django-CMS 5
 - `Operations_ServiceIndex_Django` — Django 5.0, internal service catalog
 
+**Status date:** May 4, 2026
+
 **Note on `access_django_user_admin`:** This package appears embedded as a development clone in the ServiceIndex repo (has its own `.git/`, `LICENSE`, `requirements.txt`). That is intentional for local dev iteration. PortalCMS installs it correctly as a versioned dependency (`access-django-user-admin==1.5.3` in `pyproject.toml`); ServiceIndex should eventually do the same for production releases.
 
 ---
 
-## Manager Feedback — Correction of Prior Analysis
+## Executive Summary
 
-A manager review identified two structural issues with PortalCMS. Both are valid and correct a mistake in the initial analysis:
+PortalCMS has now been restructured to match the manager feedback captured in the prior analysis:
+
+1. `manage.py` now lives inside the Django project directory at `portal/manage.py`.
+2. The project config package is now separate at `portal/config/`.
+3. The application package is now app-only at `portal/operations_portalcms_django/`.
+4. App routes now live in `portal/operations_portalcms_django/urls.py`; the old `app_urls.py` workaround is gone.
+5. Runtime entry points now point to `config.settings`, `config.urls`, and `config.wsgi`.
+
+The main structural issue is now cleanup, not application layout: there are legacy root-level artifact directories left from the previous layout (`operations_portalcms_django/` containing only `__pycache__` trees, plus root-level `static/`, `templates/`, and `staticfiles/` artifacts). They are not part of the active Django import path when running from `portal/`, but they create visual noise and should be removed or ignored after confirming they are not needed.
+
+---
+
+## Manager Feedback — Resolved for PortalCMS
+
+A manager review previously identified two structural issues with PortalCMS:
 
 > "manage.py isn't working because you moved the script from the default/convention in the Django project directory to the parent directory. The Django convention is that manage.py is inside the Django project directory. Another, perhaps more fundamental issue is that the Django project directory doesn't follow the normal Django convention for base directories with module sub-directories."
 
-**On `manage.py` location:** The [Django 5.2 tutorial](https://docs.djangoproject.com/en/5.2/intro/tutorial01/) explicitly scaffolds:
+Both issues are now addressed.
+
+**On `manage.py` location:** The [Django 5.2 tutorial](https://docs.djangoproject.com/en/5.2/intro/tutorial01/) scaffolds a project container containing a Django project directory, and `manage.py` lives inside that project directory:
+
 ```
-$ django-admin startproject mysite djangotutorial
-```
-producing:
-```
-djangotutorial/     ← project container (repo root equivalent)
-    manage.py       ← INSIDE the project directory
+djangotutorial/     ← project container / repo root equivalent
+    manage.py       ← inside the Django project directory
     mysite/         ← config package
         settings.py
         urls.py
         ...
 ```
-The outer directory is the *project container*; `manage.py` lives *inside* it. PortalCMS was created with `django-admin startproject operations_portalcms_django .` (using `.`), which places `manage.py` at the directory where the command was run — making the git repo root both the container and the project directory with no separation. This is why the manager says manage.py was "moved to the parent directory": from Django's convention, `manage.py` belongs one level down, not at the outermost level. The prior analysis gave PortalCMS a ✅ on `manage.py` location — **that was wrong**.
 
-**On ServiceIndex's triple nesting:** The prior analysis called ServiceIndex's three same-name levels a mistake. In fact, the structure is:
-```
-Operations_ServiceIndex_Django/    ← git repo root / container
-└── Operations_ServiceIndex_Django/ ← Django project directory (manage.py lives here ✅)
-    ├── manage.py
-    └── Operations_ServiceIndex_Django/  ← config package
-```
-This correctly matches Django's convention. The *only* real issue is that all three levels share the same name, creating cognitive overhead. But the structural convention — manage.py inside the project directory, inside the repo container — is correct.
+PortalCMS now mirrors that pattern with `Operations_PortalCMS_Django/` as the repo container and `portal/` as the Django project directory.
 
-**On project package structure (second manager point):** The Django tutorial produces a project directory containing `manage.py` + separate module subdirectories for the config package and each app. PortalCMS has one package (`operations_portalcms_django/`) that serves as both the config package (`settings.py`, `urls.py`, `wsgi.py`, `asgi.py`) and the app (`models.py`, `views.py`, etc.). There are no separate module subdirectories. The original analysis correctly identified this conflation; the manager independently flagged the same issue.
+**On project package structure:** The project config package (`config/`) is now separate from the app package (`operations_portalcms_django/`). That resolves the previous conflation where one package held both config files (`settings.py`, `urls.py`, `wsgi.py`, `asgi.py`) and app files (`models.py`, `views.py`, `forms.py`, `admin.py`, etc.).
 
 ---
 
 ## 1. Top-Level Directory Layout
 
 ### Django Convention
+
 ```
 repo-root/
-├── manage.py                  ← project entry point, at repo root
-├── pyproject.toml             ← single dependency file
-├── config/                    ← project config package (settings, urls, wsgi, asgi)
-│   ├── __init__.py
-│   ├── settings.py
-│   ├── urls.py
-│   ├── wsgi.py
-│   └── asgi.py
-├── myapp/                     ← one directory per reusable app
-│   ├── models.py
-│   ├── views.py
-│   └── ...
-├── templates/                 ← project-wide base templates
-├── static/                    ← project-wide static assets
-└── tests/                     ← or inside each app
+├── pyproject.toml             ← dependency file
+├── .venv/                     ← virtual environment, if kept in repo root
+└── project-dir/               ← Django project directory
+    ├── manage.py              ← project entry point
+    ├── config/                ← project config package
+    │   ├── __init__.py
+    │   ├── settings.py
+    │   ├── urls.py
+    │   ├── wsgi.py
+    │   └── asgi.py
+    ├── myapp/                 ← reusable/local app package
+    │   ├── models.py
+    │   ├── views.py
+    │   └── ...
+    ├── templates/             ← project-wide templates
+    ├── static/                ← project-wide source static assets
+    ├── media/                 ← uploaded media
+    └── tests/                 ← project tests, or tests can live inside each app
 ```
 
-Key principle: the **project config package** (settings, urls, wsgi, asgi) is separate from **application packages** (models, views, forms). `manage.py` lives at repo root.
-
----
+Key principle: the **project config package** (settings, urls, wsgi, asgi) is separate from **application packages** (models, views, forms). `manage.py` lives in the Django project directory, not in the config package.
 
 ### PortalCMS Actual Layout
 
 ```
-Operations_PortalCMS_Django/           ← repo root (also Django project dir — no outer container ❌)
-├── manage.py                          ← ❌ should be one level deeper, inside a project subdir
+Operations_PortalCMS_Django/           ← repo root / outer container ✅
 ├── pyproject.toml                     ← single dependency file ✅
-├── operations_portalcms_django/       ← ❌ BOTH project config AND app (no module subdirectory separation)
-│   ├── settings.py                    ← project config
-│   ├── urls.py                        ← project config
-│   ├── wsgi.py                        ← project config
-│   ├── asgi.py                        ← project config
-│   ├── models.py                      ← app code — in same package
-│   ├── views.py                       ← app code — in same package
-│   ├── forms.py                       ← app code — in same package
-│   ├── admin.py                       ← app code — in same package
-│   ├── signals.py                     ← app code — in same package
-│   ├── workflow.py                    ← app code — in same package
-│   ├── utils.py                       ← app code — in same package
-│   ├── app_urls.py                    ← workaround for the conflation
-│   ├── apps.py
-│   ├── cms_plugins.py
-│   ├── cms_toolbars.py
-│   ├── management/commands/           ← ✅ correct location
-│   ├── migrations/                    ← ✅ correct location
-│   └── templatetags/                  ← ✅ correct location
-├── templates/                         ← ✅ project-wide templates
-├── static/                            ← ✅
-└── tests/                             ← ⚠️ outside the app package
+├── uv.lock                            ← locked environment ✅
+├── portal.conf.dev.json               ← local runtime config sample/dev config
+├── portal.local.example.json          ← example runtime config
+├── manage.prod.sh.j2                  ← deployment helper, points into portal/ ✅
+├── portal.service.j2                  ← systemd unit, WorkingDirectory is portal/ ✅
+├── nginx-portal.conf                  ← nginx deployment config
+├── database/                          ← database scripts and media backups
+├── READMEs/                           ← project documentation
+├── portal/                            ← Django project directory ✅
+│   ├── manage.py                      ← correct location ✅
+│   ├── config/                        ← project config package only ✅
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   ├── wsgi.py
+│   │   └── asgi.py
+│   ├── operations_portalcms_django/   ← app package only ✅
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   ├── forms.py
+│   │   ├── admin.py
+│   │   ├── signals.py
+│   │   ├── workflow.py
+│   │   ├── utils.py
+│   │   ├── urls.py                    ← app routes ✅
+│   │   ├── apps.py
+│   │   ├── cms_plugins.py
+│   │   ├── cms_toolbars.py
+│   │   ├── management/commands/       ← correct app command location ✅
+│   │   ├── migrations/                ← correct app migration location ✅
+│   │   └── templatetags/              ← correct app tag location ✅
+│   ├── templates/                     ← active project templates ✅
+│   ├── static/                        ← active source static assets ✅
+│   ├── media/                         ← active media root ✅
+│   └── tests/                         ← project test suite ⚠️ acceptable, but app-local tests would be tighter
+├── operations_portalcms_django/       ← stale bytecode-only artifact directory ⚠️ cleanup candidate
+├── static/                            ← stale/root artifact directory ⚠️ cleanup candidate
+├── staticfiles/                       ← stale/root collected static artifacts ⚠️ cleanup candidate
+└── templates/                         ← stale/root artifact directory ⚠️ cleanup candidate
 ```
 
 **Primary findings:**
-1. `manage.py` is at the repo root with no outer project container. Django's convention (including the tutorial) places `manage.py` *inside* a project directory, which itself sits inside the repo/container. This was created using the `.` form of `startproject`, collapsing the two levels into one.
-2. `operations_portalcms_django` conflates the project config package and the application package into one directory. There are no separate module subdirectories. The `app_urls.py` file is a pragmatic workaround for the URL conflict this creates, but does not resolve the conflation.
-
----
+1. The prior structural debt has been resolved: `portal/` is now the Django project directory, `portal/config/` is config-only, and `portal/operations_portalcms_django/` is app-only.
+2. Deployment helpers have been updated to the new structure: `manage.prod.sh.j2` runs from `portal/`, and `portal.service.j2` uses `WorkingDirectory={{ app_home }}/PROD/portal` with `gunicorn config.wsgi:application`.
+3. Cleanup remains: root-level artifact directories from the old layout should be removed once confirmed unnecessary. The root `operations_portalcms_django/` currently contains only `__pycache__` files and empty support directories.
 
 ### ServiceIndex Actual Layout
 
 ```
 service-index-uv-sand/
 └── Operations_ServiceIndex_Django/    ← repo root
-    └── Operations_ServiceIndex_Django/ ← ❌ extra nesting (startproject run inside named dir)
-        ├── manage.py                  ← ✅ correct relative to Django project root
+    └── Operations_ServiceIndex_Django/ ← Django project directory
+        ├── manage.py                  ← correct relative to Django project root ✅
         ├── Operations_ServiceIndex_Django/  ← project config package
         │   ├── settings.py
         │   ├── urls.py
         │   ├── wsgi.py
         │   ├── asgi.py
-        │   └── views.py               ← ❌ favicon view in project config package
-        ├── services/                  ← ✅ proper app package
+        │   └── views.py               ← favicon view in project config package ❌
+        ├── services/                  ← proper app package ✅
         │   ├── models.py
         │   ├── views.py
         │   ├── forms.py (missing)
         │   ├── admin.py
         │   ├── signals.py
-        │   ├── serializers.py         ← ✅ good separation
-        │   ├── context_processors.py  ← ✅ good separation
+        │   ├── serializers.py         ← good separation ✅
+        │   ├── context_processors.py  ← good separation ✅
         │   ├── urls.py
         │   ├── templatetags/
         │   ├── static/
@@ -134,7 +157,7 @@ service-index-uv-sand/
         └── templates/
 ```
 
-**Primary finding:** The triple same-name nesting is cognitively confusing but structurally correct: the outer folder is the repo container, the middle folder is the Django project directory (where `manage.py` belongs), and the innermost folder is the config package. This is exactly the layout Django's tutorial produces — the issue is purely naming. The `services` app is properly separated from the project config, which is better than PortalCMS on both dimensions (manage.py placement and config/app separation).
+**Primary finding:** The triple same-name nesting is cognitively confusing but structurally valid: the outer folder is the repo container, the middle folder is the Django project directory, and the innermost folder is the config package. The issue is naming clarity, not Django structure.
 
 ---
 
@@ -142,8 +165,8 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| Location | Inside project directory, which is inside repo container | ❌ At repo root — no outer project container; created with `startproject .` | ✅ Inside middle `Operations_ServiceIndex_Django/` (the Django project dir) |
-| `DJANGO_SETTINGS_MODULE` | Points to config package | `operations_portalcms_django.settings` — points into conflated package | `Operations_ServiceIndex_Django.settings` — correct relative to its root |
+| Location | Inside Django project directory | ✅ `portal/manage.py` | ✅ Inside middle `Operations_ServiceIndex_Django/` |
+| `DJANGO_SETTINGS_MODULE` | Points to config package | ✅ `config.settings` | ✅ `Operations_ServiceIndex_Django.settings` |
 | Boilerplate | Standard Django scaffold | ✅ Clean | ✅ Clean |
 
 ---
@@ -152,17 +175,18 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| Location | Config package | ⚠️ In conflated app/config package | ✅ In dedicated config package |
+| Location | Config package | ✅ `portal/config/settings.py` | ✅ Dedicated config package |
 | Secret key | Never hardcoded; from env/secrets | ✅ From `APP_CONFIG` JSON | ✅ From `APP_CONFIG` JSON |
-| `DEBUG` default | `False` for safety | ⚠️ `_bool_value(CONF.get('DEBUG'), True)` — defaults **True** if key absent | ❌ `CONF["DEBUG"]` — `KeyError` if key absent, no default |
-| `ALLOWED_HOSTS` | Explicit list; never `['*']` in prod | ⚠️ Falls back to `[]` (rejects all) if env var absent after config load | ❌ `CONF["ALLOWED_HOSTS"]` — `KeyError` if key absent |
+| `DEBUG` default | `False` for safety | ✅ `_bool_value(CONF.get('DEBUG'), False)` | ❌ `CONF["DEBUG"]` — `KeyError` if key absent, no default |
+| `ALLOWED_HOSTS` | Explicit list; never `['*']` in prod | ⚠️ Falls back to `[]` if env var absent after config load | ❌ `CONF["ALLOWED_HOSTS"]` — `KeyError` if key absent |
 | Required key validation | Explicit contract | ✅ `required_config_keys` list with clear error messages | ❌ No validation; runtime `KeyError` on first access |
 | Type coercion | Validated booleans/lists | ✅ `_bool_value()` and `_env_bool()` helpers | ❌ Raw dict access; `DEBUG` must be an actual bool in JSON |
 | `INSTALLED_APPS` order | Third-party before local; admin style first if used | ✅ Correct; `djangocms_admin_style` first | ✅ Correct |
 | Database config | All credentials from env/secrets | ✅ Via env vars populated from `APP_CONFIG` | ⚠️ Direct `CONF[]` dict access; read/write DB split is a nice addition |
 | SSL/DB options | Configurable | ✅ `DB_SSLMODE`, `DB_SSLROOTCERT`, etc. | ❌ Not present |
 | `SECRET_KEY` | From config, not hardcoded | ✅ | ✅ |
-| `CONN_MAX_AGE` | Should be set for persistent connections | ❌ Not set | ✅ `600` |
+| `CONN_MAX_AGE` | Should be set for persistent connections | ⚠️ Not currently set | ✅ `600` |
+| Paths | Resolve from project directory | ✅ `BASE_DIR = portal/`; templates/static/media resolve under `portal/` | ✅ |
 
 ---
 
@@ -170,11 +194,11 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| Location | Config package | `operations_portalcms_django/urls.py` — conflated | `Operations_ServiceIndex_Django/urls.py` — ✅ config package |
-| App URL separation | `include()` with namespaced app `urls.py` | ✅ `include('operations_portalcms_django.app_urls')` for app routes | ✅ `include('services.urls', namespace='services')` |
+| Location | Config package | ✅ `portal/config/urls.py` | ✅ `Operations_ServiceIndex_Django/urls.py` |
+| App URL separation | `include()` with namespaced app `urls.py` | ✅ `include('operations_portalcms_django.urls')` | ✅ `include('services.urls', namespace='services')` |
 | Catch-all last | CMS/wildcard routes at end | ✅ `cms.urls` is last | ✅ `RedirectView` is last |
-| Dead imports | No unused imports | — | ❌ `from access_django_user_admin import views` then immediately shadowed by `from . import views` |
-| `re_path` vs `path` | Prefer `path()` with converters | — | ⚠️ Several `re_path(r'^edit/(?P<id>\d+)$')` that could be `path('edit/<int:id>')` |
+| Dead imports | No unused imports | ✅ Clean | ❌ `from access_django_user_admin import views` then immediately shadowed by `from . import views` |
+| `re_path` vs `path` | Prefer `path()` with converters | ✅ Uses `path()` | ⚠️ Several `re_path(r'^edit/(?P<id>\d+)$')` that could be `path('edit/<int:id>')` |
 
 ---
 
@@ -182,11 +206,11 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| `default_auto_field` | Set in `AppConfig` or `settings.py` | ✅ `BigAutoField` in `apps.py` | ✅ `BigAutoField` in `apps.py` (services) |
+| `default_auto_field` | Set in `AppConfig` or `settings.py` | ✅ `BigAutoField` in `apps.py` and `settings.py` | ✅ `BigAutoField` in `apps.py` (services) |
 | `__str__` methods | All models should define one | ✅ Consistent | ✅ All have `__str__` (and legacy `__unicode__`) |
 | Explicit `verbose_name` | Recommended for readability | ✅ Thorough | ⚠️ Not used; relies on Django's auto-generated names |
-| `Meta` class | Order, verbose names, permissions | ✅ Custom `permissions` for workflow | ⚠️ Minimal or absent |
-| Choices as class attributes or `TextChoices` | Prefer `TextChoices` or `IntegerChoices` (Django 3.0+) | ⚠️ Uses plain list-of-tuples | ⚠️ Uses plain list-of-tuples |
+| `Meta` class | Order, verbose names, permissions | ✅ Custom permissions for workflow | ⚠️ Minimal or absent |
+| Choices as class attributes or `TextChoices` | Prefer `TextChoices` or `IntegerChoices` | ⚠️ Uses plain list-of-tuples | ⚠️ Uses plain list-of-tuples |
 | Wildcard import in views | `from .models import *` is discouraged | ✅ Explicit imports | ❌ `from services.models import *` in `views.py` and `admin.py` |
 | Business logic separation | Heavy logic → service layer or signals; not in models | ✅ Workflow in `workflow.py` | ⚠️ Some logic in views directly |
 
@@ -197,10 +221,10 @@ service-index-uv-sand/
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
 | Auth enforcement | `@login_required` or `LoginRequiredMixin` | ✅ Consistently applied | ❌ Decorators commented out on `index` and `add_service` |
-| Permission checks | `has_perm()` or `permission_required` | ✅ `has_perm()` | ❌ `editors_check(user)` group check only; `is_privileged()` hardcodes `username == 'navarro'` |
+| Permission checks | `has_perm()` or `permission_required` | ✅ `has_perm()` and workflow checks | ❌ `editors_check(user)` group check only; `is_privileged()` hardcodes `username == 'navarro'` |
 | Import hygiene | Explicit imports only | ✅ | ❌ `from services.models import *` |
 | Function-based vs class-based | Either fine; CBVs preferred for CRUD | ✅ FBVs consistent | ✅ FBVs consistent |
-| Views in config package | Views belong in apps only | ✅ All in app | ❌ `favicon` view in `Operations_ServiceIndex_Django/views.py` (config package) |
+| Views in config package | Views belong in apps only | ✅ App views live in `portal/operations_portalcms_django/views.py` | ❌ `favicon` view in `Operations_ServiceIndex_Django/views.py` |
 | Query optimization | `select_related`, `prefetch_related` | ✅ Used consistently | ⚠️ `Service.objects.order_by('name')` in loop with `s.host_set.all()` — N+1 risk |
 
 ---
@@ -231,9 +255,9 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| Location | Config package | ⚠️ In conflated app/config package | ✅ In dedicated config package |
-| `DJANGO_SETTINGS_MODULE` | Must match config package path | ✅ Matches | ✅ Matches |
-| Module docstrings | Reference correct project name | ⚠️ Both reference `djangocmsjoy` (stale copy-paste) | ✅ |
+| Location | Config package | ✅ `portal/config/wsgi.py`, `portal/config/asgi.py` | ✅ Dedicated config package |
+| `DJANGO_SETTINGS_MODULE` | Must match config package path | ✅ `config.settings` | ✅ Matches |
+| Module docstrings | Reference correct project name | ✅ `Operations Portal CMS` | ✅ |
 
 ---
 
@@ -251,8 +275,8 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| Location | `app/migrations/` | ✅ | ✅ |
-| Squashing | Periodic squashing keeps history manageable | — | ✅ `0001_squashed_0004_...` present |
+| Location | `app/migrations/` | ✅ `portal/operations_portalcms_django/migrations/` | ✅ |
+| Squashing | Periodic squashing keeps history manageable | ⚠️ 17 migrations, not yet squashed | ✅ `0001_squashed_0004_...` present |
 | Committed to version control | Yes | ✅ | ✅ |
 
 ---
@@ -261,9 +285,10 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| Project-wide base templates | `templates/` at repo root | ✅ `templates/base.html`, `page.html`, etc. | ✅ `templates/` present |
-| App templates | `appname/templates/appname/` namespacing | ✅ `templates/operations_portalcms_django/` | ✅ `templates/services/` |
-| `APP_DIRS = True` | Lets Django find `app/templates/` | ✅ | ✅ |
+| Project-wide base templates | `project-dir/templates/` | ✅ `portal/templates/base.html`, `page.html`, etc. | ✅ `templates/` present |
+| App templates | `templates/appname/` namespacing | ✅ `portal/templates/operations_portalcms_django/` | ✅ `templates/services/` |
+| `APP_DIRS = True` | Lets Django find app templates | ✅ | ✅ |
+| Root leftovers | Avoid duplicate inactive template roots | ⚠️ Root `templates/` appears to contain only `.DS_Store` artifacts | — |
 
 ---
 
@@ -271,9 +296,10 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| App static | `appname/static/appname/` namespacing | ✅ `static/operations_portalcms_django/` | ✅ `services/static/` |
-| `STATICFILES_DIRS` vs `STATIC_ROOT` | Separate source dirs from collected output | ✅ | ✅ |
+| Source static | `project-dir/static/appname/` namespacing | ✅ `portal/static/operations_portalcms_django/` | ✅ `services/static/` |
+| `STATICFILES_DIRS` vs `STATIC_ROOT` | Separate source dirs from collected output | ✅ `STATICFILES_DIRS = [BASE_DIR / 'static']`; `STATIC_ROOT = BASE_DIR / 'staticfiles'` by default | ✅ |
 | Serving in development | `urlpatterns += static(...)` in DEBUG | ✅ | ✅ |
+| Root leftovers | Avoid duplicate inactive static roots | ⚠️ Root `static/` and `staticfiles/` remain from the old layout | — |
 
 ---
 
@@ -282,7 +308,8 @@ service-index-uv-sand/
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
 | Single dependency file at repo root | `pyproject.toml` (modern) or `requirements.txt` | ✅ `pyproject.toml` with pinned ranges | ❌ No project-level file; `access_django_user_admin/requirements.txt` only |
-| Version pinning | Use ranges (`>=x,<y`) not exact pins for flexibility | ✅ | N/A |
+| Lockfile | Commit lockfile for reproducible app deploys | ✅ `uv.lock` | — |
+| Version pinning | Use ranges (`>=x,<y`) where practical | ✅ | N/A |
 | Virtual environment | `.venv` at repo root | ✅ `.venv/` | ✅ `.venv/` (in outer repo) |
 
 ---
@@ -291,8 +318,8 @@ service-index-uv-sand/
 
 | Aspect | Convention | PortalCMS | ServiceIndex |
 |---|---|---|---|
-| Location | `app/tests/` or `tests/` inside app | ⚠️ `tests/` at repo root, not inside app | ❌ `services/tests.py` is an empty stub |
-| Test isolation | Each app's tests in its own directory | ⚠️ All tests in one top-level folder | ❌ No real tests |
+| Location | `app/tests/` or project-level `tests/` inside project dir | ✅ `portal/tests/` | ❌ `services/tests.py` is an empty stub |
+| Test isolation | Each app's tests in its own directory for reusable apps | ⚠️ Project-level tests are acceptable, but app-local tests would better encapsulate app behavior | ❌ No real tests |
 | Test runner config | `pyproject.toml` or `setup.cfg` | ❌ Not configured | ❌ Not configured |
 
 ---
@@ -301,162 +328,69 @@ service-index-uv-sand/
 
 | Category | PortalCMS | ServiceIndex |
 |---|---|---|
-| Directory layout / project vs app separation | ❌ No outer container; `manage.py` at repo root; config+app conflated | ⚠️ Correct layout (container→project dir→config pkg); naming confusing |
-| `manage.py` | ❌ At repo root (no outer container) | ✅ Inside project directory |
+| Directory layout / project vs app separation | ✅ `portal/` project dir, `config/` config package, app package separated | ⚠️ Correct layout, but triple same-name nesting is confusing |
+| `manage.py` | ✅ `portal/manage.py` | ✅ Inside project directory |
 | `settings.py` (config safety) | ✅ Strong | ❌ Fragile (raw dict, no defaults) |
-| `urls.py` | ✅ | ⚠️ Dead import, `re_path` overuse |
+| `urls.py` | ✅ Config/app URLs separated cleanly | ⚠️ Dead import, `re_path` overuse |
 | `models.py` | ✅ | ⚠️ Wildcard imports, no `verbose_name` |
 | `views.py` | ✅ | ❌ Auth decorators disabled, hardcoded authz, wildcard imports |
 | `admin.py` | ✅ | ⚠️ Old registration style, wildcard imports |
 | `signals.py` connection | ✅ via `ready()` | ❌ via view import |
-| `wsgi.py` / `asgi.py` | ⚠️ Stale docstrings | ✅ |
+| `wsgi.py` / `asgi.py` | ✅ Current docstrings and `config.settings` | ✅ |
 | `apps.py` | ✅ | ⚠️ No `ready()`, no `verbose_name` |
 | Migrations | ✅ | ✅ |
-| Templates | ✅ | ✅ |
+| Templates | ✅ Active templates under `portal/`; root leftovers need cleanup | ✅ |
+| Static files | ✅ Active static under `portal/`; root leftovers need cleanup | ✅ |
 | Dependency management | ✅ | ❌ No project-level file |
-| Tests | ⚠️ Outside app | ❌ Stub only |
+| Tests | ⚠️ Present under `portal/tests/`; no runner config | ❌ Stub only |
 
 ---
 
 ## Priority Recommendations
 
-### PortalCMS (structural debt — two issues flagged by manager)
+### PortalCMS
 
-1. **Add project directory container** — The repo root should contain a subdirectory (e.g. `portal/`) that holds `manage.py`, the config package, and app packages. Currently `manage.py` is at the repo root with no outer container, contrary to Django convention. This requires updating `DJANGO_SETTINGS_MODULE`, `ROOT_URLCONF`, `WSGI_APPLICATION`, `ASGI_APPLICATION`, and the deployment service files.
-2. **Split config from app** — Create a separate config package (e.g. `config/`) inside that project directory for `settings.py`, `urls.py`, `wsgi.py`, `asgi.py`. Keep `operations_portalcms_django/` as the app-only package. Rename `app_urls.py` back to `urls.py`. This resolves both manager-raised issues together.
-2. **`DEBUG` default** — Change `_bool_value(CONF.get('DEBUG'), True)` to default `False`.
-3. **Fix stale docstrings** — `wsgi.py` and `asgi.py` reference `djangocmsjoy`.
-4. **Move `tests/`** — Place inside `operations_portalcms_django/tests/` for proper app encapsulation.
+1. **Clean up old root artifacts** — Remove stale root-level `operations_portalcms_django/` bytecode directories and inactive root `static/`, `templates/`, and `staticfiles/` artifacts after confirming no deployment process still depends on them.
+2. **Add test runner config** — Add a `pytest`/Django test configuration or document the canonical `uv run python portal/manage.py test` command.
+3. **Consider app-local tests** — `portal/tests/` is valid for project integration tests, but app behavior would be better encapsulated in `portal/operations_portalcms_django/tests/` if this app is expected to stay reusable.
+4. **Set `CONN_MAX_AGE`** — Add persistent DB connection tuning if this deployment benefits from it.
+5. **Consider migration squashing later** — The app currently has 17 migrations. That is not urgent, but squashing can reduce setup noise once the schema stabilizes.
 
-### ServiceIndex (higher urgency — active security/reliability concerns)
+### ServiceIndex
 
 1. **Re-enable auth decorators** — `@login_required` and `@user_passes_test` are commented out on `index` and `add_service`.
-2. **Remove hardcoded authorization** — `is_privileged()` checking `username == 'navarro'` must go; use group membership or `is_staff`.
-3. **Fix `settings.py`** — Add required key validation, default for `DEBUG`, type coercion for booleans.
+2. **Remove hardcoded authorization** — `is_privileged()` checking `username == 'navarro'` must go; use group membership, permissions, or `is_staff`.
+3. **Fix `settings.py`** — Add required key validation, default for `DEBUG`, and type coercion for booleans.
 4. **Fix `urls.py`** — Remove the shadowed `access_django_user_admin` import.
 5. **Add `pyproject.toml`** at project root with proper dependencies.
 6. **Connect signals via `ready()`** — Move `import services.signals` from `views.py` into `ServicesConfig.ready()`.
 7. **Replace wildcard imports** — `from services.models import *` → explicit imports in `views.py` and `admin.py`.
-8. **Rename triple-nested directories** — Rename the same-name levels so the structure is self-explanatory; the convention is already correct, only the naming is confusing.
+8. **Rename triple-nested directories if feasible** — The structure is valid, but the identical names make path discussion and operational work harder than necessary.
 
 ---
 
-## PortalCMS Restructure Plan
+## PortalCMS Current Runtime Contract
 
-### Target layout
+Run Django management commands from the Django project directory:
 
-```
-Operations_PortalCMS_Django/        ← git repo root (outer container only)
-├── pyproject.toml                  ← stays here
-├── .venv/                          ← stays here
-├── .gitignore                      ← stays here
-├── portal.conf.dev.json            ← stays here (APP_CONFIG points to absolute path)
-├── portal.local.example.json       ← stays here
-├── nginx-portal.conf               ← stays here
-├── manage.prod.sh.j2               ← stays here (update paths inside)
-├── portal.service.j2               ← stays here (update paths inside)
-├── database/                       ← stays here
-├── READMEs/                        ← stays here
-└── portal/                         ← NEW: Django project directory
-    ├── manage.py                   ← moved from repo root
-    ├── config/                     ← NEW: project config package only
-    │   ├── __init__.py
-    │   ├── settings.py             ← moved from operations_portalcms_django/
-    │   ├── urls.py                 ← moved from operations_portalcms_django/
-    │   ├── wsgi.py                 ← moved from operations_portalcms_django/
-    │   └── asgi.py                 ← moved from operations_portalcms_django/
-    ├── operations_portalcms_django/ ← app only (internal files unchanged)
-    │   ├── urls.py                 ← renamed from app_urls.py
-    │   └── ... (models, views, forms, admin, signals, etc. — all unchanged)
-    ├── templates/                  ← moved from repo root
-    ├── static/                     ← moved from repo root
-    ├── staticfiles/                ← moved from repo root
-    ├── media/                      ← moved from repo root
-    └── tests/                      ← moved from repo root
-```
-
-### Step-by-step
-
-**1. Create the new directory structure**
 ```bash
-mkdir portal portal/config
-touch portal/config/__init__.py
+cd portal
+uv run python manage.py check
+uv run python manage.py test
 ```
 
-**2. Move files into place**
-```bash
-# manage.py moves down into the project directory
-mv manage.py portal/
+Runtime settings:
 
-# Config files move into config/
-mv operations_portalcms_django/settings.py portal/config/
-mv operations_portalcms_django/urls.py portal/config/
-mv operations_portalcms_django/wsgi.py portal/config/
-mv operations_portalcms_django/asgi.py portal/config/
-
-# Rename app_urls.py → urls.py now that the project urls.py is gone
-mv operations_portalcms_django/app_urls.py operations_portalcms_django/urls.py
-
-# Move the app and project-scoped directories
-mv operations_portalcms_django/ portal/
-mv templates/ portal/
-mv static/ portal/
-mv staticfiles/ portal/
-mv media/ portal/
-mv tests/ portal/
-```
-
-**3. Update `portal/manage.py`**
 ```python
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+DJANGO_SETTINGS_MODULE = "config.settings"
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+BASE_DIR = Path(__file__).resolve().parent.parent  # portal/
 ```
 
-**4. Update `portal/config/wsgi.py` and `portal/config/asgi.py`**
-```python
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-```
-Also fix the stale docstrings — both still reference `djangocmsjoy`.
+Deployment templates match this structure:
 
-**5. Update `portal/config/settings.py`**
+- `manage.prod.sh.j2` changes into `$APP_DJANGO/portal` and runs `uv run python manage.py`.
+- `portal.service.j2` uses `WorkingDirectory={{ app_home }}/PROD/portal`.
+- Gunicorn starts `config.wsgi:application`.
 
-`BASE_DIR` resolves from `config/settings.py` → `config/` → `portal/`, so the value is unchanged if you keep `parent.parent`. Verify:
-```python
-BASE_DIR = Path(__file__).resolve().parent.parent  # → portal/ ✅
-
-ROOT_URLCONF = 'config.urls'
-WSGI_APPLICATION = 'config.wsgi.application'
-ASGI_APPLICATION = 'config.asgi.application'  # if wired
-```
-Check that `TEMPLATES[DIRS]`, `STATIC_ROOT`, `MEDIA_ROOT`, and `STATICFILES_DIRS` all resolve from `BASE_DIR` and are not hardcoded.
-
-**6. Update `portal/config/urls.py`**
-```python
-# Change the app include from:
-path('', include('operations_portalcms_django.app_urls')),
-# to:
-path('', include('operations_portalcms_django.urls')),
-```
-
-**7. Update `portal/operations_portalcms_django/urls.py`** (was `app_urls.py`)
-
-The `app_name`, `app_name = 'operations_portalcms_django'`, and all `urlpatterns` entries stay exactly the same. Remove the comment referencing `app_urls.py` in the docstring.
-
-**8. Update deployment files at repo root**
-
-These reference the old `manage.py` path and `DJANGO_SETTINGS_MODULE`:
-- `manage.prod.sh.j2` — update path to `portal/manage.py` and `DJANGO_SETTINGS_MODULE=config.settings`
-- `portal.service.j2` — `WorkingDirectory` should point to `portal/`; `ExecStart` path for gunicorn/manage.py needs updating
-- `portal.conf.dev.json` — check for any path references to project files
-
-**9. Verify `APP_CONFIG` and startup scripts**
-
-`APP_CONFIG` uses an absolute path to the JSON config file — no change needed. Any script that does `cd <repo-root> && python manage.py ...` must become `cd portal && python manage.py ...` or use an absolute path.
-
-### Key gotchas
-
-- **`BASE_DIR`** — After the move, `config/settings.py` is at `portal/config/settings.py`, so `Path(__file__).resolve().parent.parent` = `portal/`. All paths built from `BASE_DIR` (`STATIC_ROOT`, `MEDIA_ROOT`, `TEMPLATES DIRS`) resolve correctly as long as they weren't hardcoded.
-- **Migrations** — The app label `operations_portalcms_django` is unchanged; existing migration history is fine. Run `python manage.py migrate --check` to confirm.
-- **`.venv` stays at repo root** — Activate it from wherever, but run `manage.py` from inside `portal/`.
-- **`pyproject.toml` stays at repo root** — `uv`/pip installs are unaffected.
-- **`portal.conf.dev.json` and `portal.local.example.json` stay at repo root** — `APP_CONFIG` references them by absolute path; no change needed.
-- **Post-move verification** — Run `python manage.py check` immediately after restructuring. Then `python manage.py check --deploy` before deploying.
