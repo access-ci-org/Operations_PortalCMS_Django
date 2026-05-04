@@ -59,7 +59,7 @@ cd Operations_PortalCMS_Django
 uv sync
 ```
 
-`pyproject.toml` and `.venv/` live at the repo root. Run `uv sync` from the repo root, not from inside `portal/`.
+`pyproject.toml` and `.venv/` live at the repo root. Run `uv sync` from the repo root, not from inside `operations_portalcms_django/`.
 
 ## 3. Create A Local Database
 
@@ -170,7 +170,7 @@ export APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json"
 Or prefix one-off commands:
 
 ```bash
-APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" uv run python portal/manage.py check
+APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" uv run python operations_portalcms_django/manage.py check
 APP_CONFIG="$HOME/.config/operations-portal-cms/portal.local.json" ./database/verify_db.sh
 ```
 
@@ -178,18 +178,18 @@ Do not rely on repo-root config discovery or a leftover private `portal.conf.dev
 
 ## Project Directory
 
-All Django commands (`manage.py`) run from inside the `portal/` subdirectory, not the repo root:
+All Django commands (`manage.py`) run from inside the `operations_portalcms_django/` subdirectory, not the repo root:
 
 ```bash
-cd portal/
+cd operations_portalcms_django/
 ```
 
-Set `APP_CONFIG` first (it uses an absolute path so it works from any directory), then run commands from inside `portal/`. Keep `uv sync` at the repo root.
+Set `APP_CONFIG` first (it uses an absolute path so it works from any directory), then run commands from inside `operations_portalcms_django/`. Keep `uv sync` at the repo root.
 
 ## 6. Check The Local App
 
 ```bash
-cd portal/
+cd operations_portalcms_django/
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
 uv run python manage.py migrate --check
@@ -215,14 +215,14 @@ Optional database verification (run from repo root):
 If you do not have a usable admin account from the restored backup:
 
 ```bash
-cd portal/
+cd operations_portalcms_django/
 uv run python manage.py createsuperuser
 ```
 
 ## 8. Run The Development Server
 
 ```bash
-cd portal/
+cd operations_portalcms_django/
 uv run python manage.py runserver 127.0.0.1:8000
 ```
 
@@ -242,20 +242,20 @@ http://127.0.0.1:8000/admin/
 
 The database restore does not include uploaded media files.
 
-If pages show missing images/files, copy the current `media/` directory into `portal/media/`:
+If pages show missing images/files, copy the current `media/` directory into `operations_portalcms_django/media/`:
 
 ```text
-Operations_PortalCMS_Django/portal/media/
+Operations_PortalCMS_Django/operations_portalcms_django/media/
 ```
 
 ## 10. Tests Warning
 
-The scripts in `portal/tests/` are not isolated unit tests. They modify whichever database `APP_CONFIG` points to.
+The scripts in `operations_portalcms_django/tests/` are not isolated unit tests. They modify whichever database `APP_CONFIG` points to.
 
 Only run them against your local restored database:
 
 ```bash
-cd portal/
+cd operations_portalcms_django/
 uv run python tests/test_news_permissions.py
 uv run python tests/test_focus_area_page_workflow.py
 ```
@@ -265,7 +265,7 @@ uv run python tests/test_focus_area_page_workflow.py
 - A recent `portal1` backup should already contain CMS pages, news records, users, groups, permissions, CIDER cache rows, and migration history.
 - Do not run setup or sync management commands unless your task explicitly requires it and you have confirmed the active database is local.
 - Local runserver does not need production reverse-proxy or HTTPS settings.
-- Future deployment and security hardening notes live in `READMEs/SECURITY_HARDENING.md`.
+- Future deployment and security hardening notes live in `dev_documentation/SECURITY_HARDENING.md`.
 
 ## Handoff Checklist
 

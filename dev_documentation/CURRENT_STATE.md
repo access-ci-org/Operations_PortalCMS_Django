@@ -1,6 +1,6 @@
 # Current Project State
 
-Last verified: 2026-04-24 13:30 UTC.
+Last verified: 2026-05-04 UTC.
 
 This snapshot records the current state observed from the deployed runtime config, the Django app, and read-only checks against the database of record.
 
@@ -16,7 +16,7 @@ This snapshot records the current state observed from the deployed runtime confi
 - Active service/socket: `portal.service` / `/soft/django-cms-01/run/portal.socket`
 - Public nginx host in this repo config: `cms2.operations.access-ci.org`
 - Static root from deployed config: `/soft/django-cms-01/www/static`
-- Media root from Django settings: repo `media/`; nginx serves `/soft/django-cms-01/PROD/media/`
+- Media root from Django settings: repo `media/`; nginx serves `/soft/django-cms-01/PROD/operations_portalcms_django/media/`
 - Deployed dev config resolves `DEBUG=True` when no shell override is present.
 - Development server banner: enabled, label `DEVELOPMENT SERVER`.
 - Logging with `DEBUG=True`: app and Django logs go to Gunicorn stdout/stderr and then journald. App logger level is `INFO`; Django logger level is `WARNING`.

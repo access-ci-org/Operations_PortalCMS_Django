@@ -21,11 +21,7 @@ PortalCMS has been fully restructured to match the vanilla `djangocms <project>`
 5. Deployment templates updated: `manage.prod.sh.j2`, `portal.service.j2`, and `nginx-portal.conf` all point to `operations_portalcms_django/`.
 6. `django manage.py check` passes clean (0 issues) after restructure.
 
-**DB migration note:** The `django_migrations` table stores the old `app_label = 'operations_portalcms_django'`. Before running `migrate` against any existing database, execute:
-```sql
-UPDATE django_migrations SET app = 'portal' WHERE app = 'operations_portalcms_django';
-```
-This is the only change that cannot be reversed by git alone.
+**DB migration note:** The production `django_migrations` table was updated on May 4, 2026 (`UPDATE django_migrations SET app = 'portal' WHERE app = 'operations_portalcms_django';`). When restoring a **pre-May 4, 2026 backup** to a new environment, run this SQL after restore and before `migrate`.
 
 ---
 
