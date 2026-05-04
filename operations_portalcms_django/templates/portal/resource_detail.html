@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ resource.resource_descriptive_name|default:"Resource Details" }} | Operations{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item">
+    <a href="{% url 'portal:access_allocated' %}">ACCESS Active Resources</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">
+    {{ resource.resource_descriptive_name|default:"Resource Details" }}
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% if error_message %}
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle"></i> {{ error_message }}
+    </div>
+    {% elif resource %}
+    
+    {# Resource Title #}
+    <h1 class="mb-4">{{ resource.resource_descriptive_name|default:"Resource" }}</h1>
+    
+    {# Resource Type #}
+    {% if resource.cider_type %}
+    <div class="mb-3">
+        <div class="fw-bold mb-2">Resource Type</div>
+        <div>{{ resource.cider_type }}</div>
+    </div>
+    {% endif %}
+    
+    {# Latest Status #}
+    {% if resource.latest_status %}
+    <div class="mb-3">
+        <div class="fw-bold mb-2">Latest Status</div>
+        <div>{{ resource.latest_status }}</div>
+    </div>
+    {% endif %}
+    
+    {# Description #}
+    {% if resource.resource_description %}
+    <div class="mb-3">
+        <div class="fw-bold mb-2">Description</div>
+        <div>{{ resource.resource_description|safe }}</div>
+    </div>
+    {% endif %}
+    
+    {# User Guide URL #}
+    {% if resource.user_guide_url %}
+    <div class="mb-3">
+        <div class="fw-bold mb-2">User Guide URL</div>
+        <div>
+            <a href="{{ resource.user_guide_url }}" target="_blank" rel="noopener noreferrer">{{ resource.user_guide_url }}</a>
+        </div>
+    </div>
+    {% endif %}
+    
+    {# Features #}
+    {% if resource.features %}
+    <div class="mb-3">
+        <div class="fw-bold mb-2">Features</div>
+        <div>
+            {% for feature in resource.features %}
+            <div>{{ feature.description|default:feature.name }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    {# Organization Name #}
+    {% if resource.organization_name %}
+    <div class="mb-3">
+        <div class="fw-bold mb-2">Organization Name</div>
+        <div>{{ resource.organization_name }}</div>
+    </div>
+    {% endif %}
+    
+    {# Global Resource ID #}
+    {% if resource.info_resourceid %}
+    <div class="mb-3">
+        <div class="fw-bold mb-2">Global Resource ID</div>
+        <div>{{ resource.info_resourceid }}</div>
+    </div>
+    {% endif %}
+    
+    {# CIDER Detail View URL #}
+    {% if resource.cider_view_url and resource.cider_view_url != 'None' %}
+    <div class="mt-4 mb-3">
+        <a class="btn btn-warning" href="{{ resource.cider_view_url }}" target="_blank" rel="noopener noreferrer">
+            View in CiDER
+        </a>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle"></i> Resource not found.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

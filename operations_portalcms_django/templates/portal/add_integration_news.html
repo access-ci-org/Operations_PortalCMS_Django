@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Integration News{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Add Integration News</h1>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+        
+        <div class="card mb-3">
+            <div class="card-header">Basic Information</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="{{ form.title.id_for_label }}" class="form-label">{{ form.title.label }}</label>
+                    {{ form.title }}
+                    {% if form.title.errors %}<div class="text-danger">{{ form.title.errors }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="{{ form.content.id_for_label }}" class="form-label">{{ form.content.label }}</label>
+                    {{ form.content }}
+                    {% if form.content.help_text %}<small class="form-text text-muted">{{ form.content.help_text|safe }}</small>{% endif %}
+                    {% if form.content.errors %}<div class="text-danger">{{ form.content.errors }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-header">Integration Details</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="{{ form.news_type.id_for_label }}" class="form-label">{{ form.news_type.label }}</label>
+                    {{ form.news_type }}
+                    {% if form.news_type.errors %}<div class="text-danger">{{ form.news_type.errors }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="{{ form.affected_elements.id_for_label }}" class="form-label">{{ form.affected_elements.label }}</label>
+                    {{ form.affected_elements }}
+                    {% if form.affected_elements.help_text %}<small class="form-text text-muted">{{ form.affected_elements.help_text }}</small>{% endif %}
+                    {% if form.affected_elements.errors %}<div class="text-danger">{{ form.affected_elements.errors }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="{{ form.effective_date.id_for_label }}" class="form-label">{{ form.effective_date.label }}</label>
+                    {{ form.effective_date }}
+                    {% if form.effective_date.help_text %}<small class="form-text text-muted">{{ form.effective_date.help_text }}</small>{% endif %}
+                    {% if form.effective_date.errors %}<div class="text-danger">{{ form.effective_date.errors }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="{{ form.expiration_date.id_for_label }}" class="form-label">{{ form.expiration_date.label }}</label>
+                    {{ form.expiration_date }}
+                    {% if form.expiration_date.help_text %}<small class="form-text text-muted">{{ form.expiration_date.help_text }}</small>{% endif %}
+                    {% if form.expiration_date.errors %}<div class="text-danger">{{ form.expiration_date.errors }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <button type="submit" name="draft" class="btn btn-primary">Save as Draft</button>
+        {% if can_publish %}
+        <button type="submit" name="publish" class="btn btn-success">Save and Publish</button>
+        {% endif %}
+        <a href="{% url 'portal:integration_news' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}
