@@ -38,6 +38,7 @@ except (ValueError, OSError):
 # automation can stay aligned as the runtime moves toward infra management.
 required_config_keys = [
     'DJANGO_SECRET_KEY',
+    'APP_LOG',
 ]
 missing_required_keys = [key for key in required_config_keys if key not in CONF or CONF[key] in ('', None)]
 if missing_required_keys:
@@ -339,8 +340,8 @@ if 'DJANGO_COLORS' not in os.environ:
     os.environ['DJANGO_COLORS'] = 'dark'
 
 # Application Logging
-APP_LOG = os.environ.get('APP_LOG', str(BASE_DIR / 'var' / 'portal.log'))
-APP_ERROR_LOG = os.environ.get('APP_ERROR_LOG', str(BASE_DIR / 'var' / 'portal.error.log'))
+APP_LOG       = CONF['APP_LOG']  # required in runtime .conf; points to operator-managed log dir
+APP_ERROR_LOG = str(Path(APP_LOG).parent / 'portal.error.log')  # co-located with APP_LOG, derived
 APP_VERSION = os.environ.get('APP_VERSION', 'dev')
 SYSLOG_SOCK = os.environ.get('SYSLOG_SOCK', '/var/run/syslog')
 
@@ -402,8 +403,6 @@ CMS_PAGE_WIZARD_CONTENT_PLACEHOLDER = "content"
 CMS_PAGE_WIZARD_CONTENT_PLUGIN = "TextPlugin"
 
 # Logging setup
-os.makedirs(os.path.dirname(APP_LOG), exist_ok=True)
-
 _log_handlers = ['console'] if DEBUG else ['file', 'error_file']
 
 LOGGING = {

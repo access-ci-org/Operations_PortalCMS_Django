@@ -17,7 +17,6 @@
   "DJANGO_SECRET_KEY": "replace-with-your-local-django-secret-key",
   "STATIC_ROOT": "./staticfiles",
   "APP_LOG": "./var/portal.log",
-  "APP_ERROR_LOG": "./var/portal.error.log",
   "APP_VERSION": "local-dev",
   "SYSLOG_SOCK": "",
   "API_BASE": "",
