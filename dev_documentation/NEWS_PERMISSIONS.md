@@ -2,7 +2,7 @@
 
 This project uses explicit Django groups for each news type with a two-tier model: Authors write and submit for review; Managers review, publish, and have full control.
 
-Last checked against RDS `portal1`: 2026-04-24. Current content state: 249 System Status News items are `published`; Integration News has 24 `published` and 1 `pending_review`. See [CURRENT_STATE.md](./CURRENT_STATE.md).
+Last checked against RDS `portal1`: 2026-05-08. Current content state: 249 System Status News items are `published`; Integration News has 24 `published` and 1 `pending_review`. See [CURRENT_STATE.md](./CURRENT_STATE.md).
 
 ## News Roles
 
@@ -32,24 +32,24 @@ The groups created by `setup_groups` are:
 ### System Status News
 
 - Default Django permissions:
-  - `view_systemstatusnews`
-  - `add_systemstatusnews`
-  - `change_systemstatusnews`
-  - `delete_systemstatusnews`
+  - `infrastructure_news.view_systemstatusnews`
+  - `infrastructure_news.add_systemstatusnews`
+  - `infrastructure_news.change_systemstatusnews`
+  - `infrastructure_news.delete_systemstatusnews`
 - Custom workflow permissions:
-  - `can_review_systemstatusnews`
-  - `can_publish_systemstatusnews`
+  - `infrastructure_news.can_review_systemstatusnews`
+  - `infrastructure_news.can_publish_systemstatusnews`
 
 ### Integration News
 
 - Default Django permissions:
-  - `view_integrationnews`
-  - `add_integrationnews`
-  - `change_integrationnews`
-  - `delete_integrationnews`
+  - `integration_news.view_integrationnews`
+  - `integration_news.add_integrationnews`
+  - `integration_news.change_integrationnews`
+  - `integration_news.delete_integrationnews`
 - Custom workflow permissions:
-  - `can_review_integrationnews`
-  - `can_publish_integrationnews`
+  - `integration_news.can_review_integrationnews`
+  - `integration_news.can_publish_integrationnews`
 
 ## Workflow Notes
 

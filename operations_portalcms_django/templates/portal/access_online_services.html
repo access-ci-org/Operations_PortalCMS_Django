@@ -65,7 +65,7 @@
                         
                         {% if resource.cider_resource_id %}
                         <div class="mt-3">
-                            <a class="btn btn-link resource-link" href="{% url 'portal:resource_detail' resource.cider_resource_id %}">
+                            <a class="btn btn-link resource-link" href="{% url 'resources:resource_detail' resource.cider_resource_id %}">
                                 {{ resource.resource_descriptive_name|default:"View Service" }}
                             </a>
                         </div>

@@ -24,7 +24,10 @@ urlpatterns = [
     path('filer/', include('filer.urls')),
     path('accounts/', include('allauth.urls')),  # Allauth (login/logout/social auth/CILogon)
     path('access_django_user_admin/', include('access_django_user_admin.urls', namespace="access_django_user_admin")),
-    path('', include('portal.urls')),  # Application views (news, services, etc.)
+    path('', include('resources.urls', namespace='resources')),  # Resources (CIDER) views
+    path('', include('infrastructure_news.urls', namespace='infrastructure_news')),  # Infrastructure/system status news
+    path('', include('integration_news.urls', namespace='integration_news')),  # Integration news
+    path('', include('portal.urls')),  # Application views (portal core, etc.)
     path('', include('cms.urls')),  # CMS pages - keep this last as catch-all
 ]
 

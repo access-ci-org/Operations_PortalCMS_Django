@@ -20,7 +20,7 @@
     {% endif %}
     
     {# Search Form #}
-    <form method="get" action="{% url 'portal:software_discovery' %}" class="mb-4">
+    <form method="get" action="{% url 'resources:software_discovery' %}" class="mb-4">
         <div class="row">
             <div class="col-12">
                 <div class="input-group mb-3">
@@ -68,7 +68,7 @@
     <div class="row">
         {# Left Sidebar - Filters #}
         <div class="col-lg-3 col-md-4 mb-4">
-            <a href="{% url 'portal:software_discovery' %}" class="btn btn-outline-secondary w-100 mb-3">
+            <a href="{% url 'resources:software_discovery' %}" class="btn btn-outline-secondary w-100 mb-3">
                 <i class="bi bi-arrow-clockwise"></i> Reset Filters
             </a>
             
@@ -101,7 +101,7 @@
                 <div class="card mb-3">
                     <div class="card-body">
                         <h5 class="card-title mb-2">
-                            <a href="{% url 'portal:software_detail' software.ID %}" class="text-decoration-none">
+                            <a href="{% url 'resources:software_detail' software.ID %}" class="text-decoration-none">
                                 {{ software.AppName|default:"Unknown Software" }}{% if software.AppVersion %} <span class="text-muted">v{{ software.AppVersion }}</span>{% endif %}
                             </a>
                         </h5>

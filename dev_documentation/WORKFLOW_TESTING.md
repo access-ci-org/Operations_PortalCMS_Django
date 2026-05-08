@@ -377,17 +377,23 @@ python manage.py shell
 ## Key Files Reference
 
 ### Setup Commands
-- `operations_portalcms_django/management/commands/setup_groups.py`
-- `operations_portalcms_django/management/commands/setup_focus_area_page_permissions.py`
+- `portal/management/commands/setup_groups.py`
+- `portal/management/commands/setup_focus_area_page_permissions.py`
+- `resources/management/commands/sync_cider_from_api.py`
+- `resources/management/commands/setup_rp_permissions.py`
+- `resources/management/commands/load_test_cider_data.py`
+- `infrastructure_news/management/commands/import_drupal_news.py`
 
 ### Tests
-- `tests/test_focus_area_page_workflow.py` - Focus area page workflow
-- `tests/test_news_permissions.py` - News workflow
+- `tests/test_news_permissions.py` - News workflow (plain Python functions, not Django TestCase)
 - `tests/test_permissions.py` - General permissions
 
 ### Models
-- `operations_portalcms_django/models.py` - news models and plugin models
-- Note: focus-area content is now CMS-placeholder-only
+- `infrastructure_news/models.py` - SystemStatusNews, SystemStatusNewsItemPlugin
+- `integration_news/models.py` - IntegrationNews, IntegrationNewsItemPlugin, IntegrationElement
+- `resources/models.py` - CiderInfrastructure, CiderOrganizations, CiderFeatures, CiderGroups
+- `portal/models.py` - re-exports from the above (backwards compat; no model definitions)
+- Note: focus-area content is CMS-placeholder-only
 
 ### Documentation
 - `READMEs/FOCUS_AREA_WORKFLOW.md` - Detailed focus area workflow guide

@@ -20,12 +20,12 @@
     <ul class="nav nav-tabs">
         <li class="nav-item">
         {% if page == 'system_status_news' %}<a class="nav-link active" aria-current="page" href="#">
-        {% else %}<a class="nav-link" href="{% url 'portal:system_status_news' %}">
+        {% else %}<a class="nav-link" href="{% url 'infrastructure_news:system_status_news' %}">
         {% endif %}System Status News</a></li>
 
         <li class="nav-item">
         {% if page == 'integration_news' %}<a class="nav-link active" aria-current="page" href="#">
-        {% else %}<a class="nav-link" href="{% url 'portal:integration_news' %}">
+        {% else %}<a class="nav-link" href="{% url 'integration_news:integration_news' %}">
         {% endif %}Integration News</a></li>
 
     </ul>

@@ -6,7 +6,7 @@
 {% block content %}
 <div class="container mt-4">
     <div class="mb-3">
-        <a href="{% url 'portal:software_discovery' %}" class="btn btn-outline-primary">
+        <a href="{% url 'resources:software_discovery' %}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Back to Software Discovery
         </a>
     </div>
@@ -72,11 +72,11 @@
                     <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Related</h5>
                 </div>
                 <div class="card-body">
-                    <a href="{% url 'portal:software_discovery' %}" class="btn btn-outline-primary me-2 mb-2">
+                    <a href="{% url 'resources:software_discovery' %}" class="btn btn-outline-primary me-2 mb-2">
                         <i class="bi bi-arrow-left"></i> Back to Software Discovery
                     </a>
                     {% if software.ResourceID %}
-                    <a href="{% url 'portal:software_discovery' %}?provider={{ software.ResourceID|urlencode }}" class="btn btn-outline-secondary mb-2">
+                    <a href="{% url 'resources:software_discovery' %}?provider={{ software.ResourceID|urlencode }}" class="btn btn-outline-secondary mb-2">
                         <i class="bi bi-filter"></i> View all software on {{ software.ResourceID }}
                     </a>
                     {% endif %}

@@ -66,7 +66,7 @@
         {% if can_publish %}
         <button type="submit" name="publish" class="btn btn-success">Update and Publish</button>
         {% endif %}
-        <a href="{% url 'portal:integration_news' %}" class="btn btn-secondary">Cancel</a>
+        <a href="{% url 'integration_news:integration_news' %}" class="btn btn-secondary">Cancel</a>
         {% if perms.operations_portalcms_django.delete_integrationnews %}
             <button type="submit" name="delete" class="btn btn-danger float-end">Delete</button>
         {% endif %}

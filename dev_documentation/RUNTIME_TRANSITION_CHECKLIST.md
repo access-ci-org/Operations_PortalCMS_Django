@@ -10,8 +10,7 @@ Current known state:
 - The installed service currently runs as `jlambertson`.
 - The installed service uses `APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json`.
 - That deployed config points at Amazon RDS `portal1` with `DB_SSLMODE=require`.
-- The installed service starts from `/soft/django-cms-01/PROD`.
-- `/soft/django-cms-01/PROD` currently resolves to this repo checkout.
+- The installed service starts from `/soft/django-cms-01/tags/Operations_PortalCMS_Django/operations_portalcms_django`.
 - The repo checkout is currently owned primarily as `jlambertson:nogroup`, not `*:appdev`.
 - Both `jlambertson` and `software` are in the `appdev` group.
 
@@ -23,7 +22,7 @@ Goal: keep the server working while allowing `jlambertson` to continue manual de
 
 1. Keep `portal.service` running as `jlambertson` for now.
 2. Do not switch the live service to `software` until runtime paths, `uv`, and ownership are aligned.
-3. Treat `/soft/django-cms-01/PROD` as the live app path, since that is what the installed service uses.
+3. The live app path is `/soft/django-cms-01/tags/Operations_PortalCMS_Django/operations_portalcms_django`.
 4. Keep `/soft/django-cms-01/conf/portal.conf.dev.json` as the active runtime config path until infra code is ready.
 5. Use the installed systemd service as the source of truth for Gunicorn behavior, not old shell wrappers or removed Gunicorn config templates.
 
@@ -42,8 +41,8 @@ Goal: allow collaboration without changing the live service user yet.
 
 Goal: make manual `manage.py` usage behave like the running service.
 
-1. Make the production helper script use `APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json`.
-2. Make the production helper script use `/soft/django-cms-01/PROD` as the working directory.
+1. Make the production helper script use `APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json`. Note: `APP_ERROR_LOG` is no longer a required config key; the error log path is now derived automatically from `APP_LOG`.
+2. Make the production helper script use `/soft/django-cms-01/tags/Operations_PortalCMS_Django/operations_portalcms_django` as the working directory.
 3. Make the production helper script use the same `uv` path or execution context as the installed service.
 4. Confirm that manual commands run against the same Django settings and code path as the service.
 5. Test at least `check`, `showmigrations`, and one harmless read-only command before relying on the helper script operationally.

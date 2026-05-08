@@ -1,6 +1,6 @@
 # Current Project State
 
-Last verified: 2026-05-04 UTC.
+Last verified: 2026-05-08 UTC.
 
 This snapshot records the current state observed from the deployed runtime config, the Django app, and read-only checks against the database of record.
 
@@ -16,7 +16,7 @@ This snapshot records the current state observed from the deployed runtime confi
 - Active service/socket: `portal.service` / `/soft/django-cms-01/run/portal.socket`
 - Public nginx host in this repo config: `cms2.operations.access-ci.org`
 - Static root from deployed config: `/soft/django-cms-01/www/static`
-- Media root from Django settings: repo `media/`; nginx serves `/soft/django-cms-01/PROD/operations_portalcms_django/media/`
+- Media root from Django settings: repo `media/`; nginx serves `/soft/django-cms-01/tags/Operations_PortalCMS_Django/operations_portalcms_django/media/`
 - Deployed dev config resolves `DEBUG=True` when no shell override is present.
 - Development server banner: enabled, label `DEVELOPMENT SERVER`.
 - Logging with `DEBUG=True`: app and Django logs go to Gunicorn stdout/stderr and then journald. App logger level is `INFO`; Django logger level is `WARNING`.
@@ -30,7 +30,8 @@ This snapshot records the current state observed from the deployed runtime confi
 - django CMS moderation: not enabled
 - Authentication: django-allauth CILogon provider plus local Django auth backend
 - Package manager: `uv`
-- Runtime config contract: Django exits during startup if `APP_CONFIG` is missing or cannot load JSON.
+- Runtime config contract: Django exits during startup if `APP_CONFIG` is missing or cannot load JSON. `APP_ERROR_LOG` is no longer a required or accepted config key; the error log path is derived automatically from `APP_LOG`.
+- App structure (4 apps): `portal` (core: unprivileged view, CMS versioning workflow views, utils, toolbars); `resources` (CIDER models + public resource/software views); `infrastructure_news` (system status news); `integration_news` (integration news). All models were moved out of `portal` into the feature apps (May 8, 2026) — no DDL required, `db_table` values preserved.
 - Public pages render the bright-red `DEVELOPMENT SERVER` marker from `templates/base.html`.
 - Local developer workflow: restore a current RDS `portal1` backup into local PostgreSQL, point `APP_CONFIG` at that local database, then run `migrate --plan` before `migrate`. Migrations sync schema only; the restored backup carries content and permissions.
 
@@ -42,7 +43,7 @@ Read-only `database/verify_db.sh` against RDS `portal1` reported:
 - Application schema target: `portal_django`
 - Application tables: 66
 - Sequences: 45
-- Applied migration rows: 206
+- Applied migration rows: 210 (206 baseline + portal/0018 + resources/0001 + infrastructure_news/0001 + integration_news/0001)
 - Ownership: all application tables owned by `portal_django`
 - Unapplied migrations: 0
 - Model migration drift: none (`makemigrations --check --dry-run` reported no changes)
@@ -182,7 +183,6 @@ Note: verification commands were run with any inherited shell `DEBUG` override u
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py check
 ```
 
@@ -191,7 +191,6 @@ Result: no issues.
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py check --deploy
 ```
 
@@ -206,7 +205,6 @@ Result: database reachable and ownership/schema checks passed.
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py makemigrations --check --dry-run
 ```
 
@@ -215,7 +213,6 @@ Result: no changes detected.
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py migrate --check
 ```
 
@@ -224,7 +221,6 @@ Result: no unapplied migrations.
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py migrate --plan
 ```
 
@@ -233,7 +229,6 @@ Result: no planned migration operations.
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py sync_cider_from_api --dry-run
 ```
 
@@ -242,7 +237,6 @@ Result: fetched 78 infrastructure records, 26 groups, 21 organizations, 14 featu
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py sync_cider_from_api --dry-run --skip-infrastructure --prune-stale-groups
 ```
 
@@ -251,7 +245,6 @@ Result: `groups_would_delete: 0`.
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py setup_rp_permissions --dry-run --skip-global-operations
 ```
 
@@ -260,7 +253,6 @@ Result: selected 26 CIDER groups; would create 52 permissions, 52 auth groups, a
 ```bash
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py collectstatic --dry-run --noinput
 ```
 
@@ -270,7 +262,6 @@ Result: dry-run completed; Django reported the known duplicate static destinatio
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 ALLOWED_HOSTS=* \
 APP_LOG=/tmp/portal-readme-check.log \
-APP_ERROR_LOG=/tmp/portal-readme-check.error.log \
 uv run python manage.py shell -c "from django.test import Client; ..."
 ```
 

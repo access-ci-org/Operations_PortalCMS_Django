@@ -22,6 +22,8 @@ Primary endpoints:
 
 ## Local Models Synced
 
+All four models live in the **`resources`** app (`resources/models.py`):
+
 - `CiderInfrastructure` from `v2/access-active/`
 - `CiderGroups` from `v2/access-active-groups/` `active_groups`
 - `CiderOrganizations` from `v2/access-active-groups/` `organizations`
@@ -33,6 +35,8 @@ Primary endpoints:
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 uv run python manage.py sync_cider_from_api
 ```
+
+The command lives in `resources/management/commands/sync_cider_from_api.py`.
 
 Useful options:
 
@@ -103,10 +107,10 @@ Example crontab:
 
 ```cron
 # Nightly full sync at 02:15 UTC
-15 2 * * * cd /soft/django-cms-01/PROD && APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json /home/jlambertson/.local/bin/uv run python manage.py sync_cider_from_api >> /soft/django-cms-01/var/cider_sync.log 2>&1
+15 2 * * * cd /soft/django-cms-01/tags/Operations_PortalCMS_Django/operations_portalcms_django && APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json /home/jlambertson/.local/bin/uv run python manage.py sync_cider_from_api >> /soft/django-cms-01/var/cider_sync.log 2>&1
 
 # Optional midday refresh at 14:15 UTC
-15 14 * * * cd /soft/django-cms-01/PROD && APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json /home/jlambertson/.local/bin/uv run python manage.py sync_cider_from_api >> /soft/django-cms-01/var/cider_sync.log 2>&1
+15 14 * * * cd /soft/django-cms-01/tags/Operations_PortalCMS_Django/operations_portalcms_django && APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json /home/jlambertson/.local/bin/uv run python manage.py sync_cider_from_api >> /soft/django-cms-01/var/cider_sync.log 2>&1
 ```
 
 Ansible direction:

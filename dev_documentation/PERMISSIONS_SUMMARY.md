@@ -4,7 +4,7 @@
 
 The Operations Portal CMS uses **two separate permission systems**:
 
-Last checked against RDS `portal1`: 2026-04-24. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the full verification snapshot.
+Last checked against RDS `portal1`: 2026-05-08. See [CURRENT_STATE.md](./CURRENT_STATE.md) for the full verification snapshot.
 
 ### 1. RP Groups → News Items
 **What:** Resource Provider (RP) groups from CILogon  

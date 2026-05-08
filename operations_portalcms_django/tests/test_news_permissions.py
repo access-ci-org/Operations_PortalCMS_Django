@@ -18,7 +18,8 @@ django.setup()
 
 from django.contrib.auth.models import User, Group
 from portal.models import SystemStatusNews, IntegrationNews
-from portal.admin import SystemStatusNewsAdmin, IntegrationNewsAdmin
+from infrastructure_news.admin import SystemStatusNewsAdmin
+from integration_news.admin import IntegrationNewsAdmin
 from portal.utils import (
     is_rp_user, 
     is_operations_user, 

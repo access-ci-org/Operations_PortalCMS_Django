@@ -5,7 +5,7 @@
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item">
-    <a href="{% url 'portal:access_allocated' %}">ACCESS Active Resources</a>
+    <a href="{% url 'resources:access_allocated' %}">ACCESS Active Resources</a>
 </li>
 <li class="breadcrumb-item active" aria-current="page">
     {{ resource.resource_descriptive_name|default:"Resource Details" }}

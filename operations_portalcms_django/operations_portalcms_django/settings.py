@@ -124,6 +124,9 @@ INSTALLED_APPS = [
     'sekizai',
     'django_bootstrap5',
     'portal.apps.OperationsPortalcmsDjangoConfig',
+    'resources.apps.ResourcesConfig',
+    'infrastructure_news.apps.InfrastructureNewsConfig',
+    'integration_news.apps.IntegrationNewsConfig',
     # Django CMS plugins
     'djangocms_text_ckeditor',
     'djangocms_picture',

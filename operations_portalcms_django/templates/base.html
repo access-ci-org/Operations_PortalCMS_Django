@@ -65,10 +65,10 @@
                             <h5 class="visually-hidden" id="block-main-navigation-menu">Main navigation</h5>
                             <ul data-block="nav_main" class="navbar-nav justify-content-end flex-wrap nav-level-0">
                                 <li class="nav-item">
-                                    <a href="{% url 'portal:integration_news' %}" class="nav-link{% if page == 'integration_news' %} active is-active{% endif %}"{% if page == 'integration_news' %} aria-current="page"{% endif %}>Integration News</a>
+                                    <a href="{% url 'integration_news:integration_news' %}" class="nav-link{% if page == 'integration_news' %} active is-active{% endif %}"{% if page == 'integration_news' %} aria-current="page"{% endif %}>Integration News</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="{% url 'portal:system_status_news' %}" class="nav-link{% if page == 'system_status_news' %} active is-active{% endif %}"{% if page == 'system_status_news' %} aria-current="page"{% endif %}>System Status News</a>
+                                    <a href="{% url 'infrastructure_news:system_status_news' %}" class="nav-link{% if page == 'system_status_news' %} active is-active{% endif %}"{% if page == 'system_status_news' %} aria-current="page"{% endif %}>System Status News</a>
                                 </li>
                             </ul>
                         </nav>
