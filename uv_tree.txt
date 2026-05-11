@@ -73,6 +73,14 @@ portalcms v0.1.0
 │   │   └── webencodings v0.5.1
 │   ├── packaging v25.0
 │   └── pillow v12.1.0
+├── djangocms-versioning v2.5.1
+│   ├── django-cms v5.0.5 (*)
+│   ├── django-fsm-2 v4.2.4
+│   │   ├── django v5.2.9 (*)
+│   │   └── django-stubs-ext v6.0.2
+│   │       ├── django v5.2.9 (*)
+│   │       └── typing-extensions v4.15.0
+│   └── packaging v25.0
 ├── djangocms-video v3.1.0
 │   ├── django-cms v5.0.5 (*)
 │   ├── django-filer v3.4.3 (*)
