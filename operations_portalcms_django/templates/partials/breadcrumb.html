@@ -1,0 +1,19 @@
+<script type="module">
+    import {
+        breadcrumbs
+    } from "https://unpkg.com/@access-ci/ui@0.20.6/dist/access-ci-ui.js";
+
+    const breadcrumbTarget = document.getElementById("breadcrumbs");
+    const breadcrumbItems = [
+        {name: "Operations", href: "/"},
+        {% for node in ancestors %}
+            {name: "{{ node.get_menu_title }}", href: "{{ node.get_absolute_url }}"},
+        {% endfor %}
+    ];
+
+    breadcrumbs({
+        items: breadcrumbItems,
+        target: breadcrumbTarget,
+    });
+</script>
+
