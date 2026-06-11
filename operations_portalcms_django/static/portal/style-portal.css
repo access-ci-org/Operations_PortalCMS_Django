@@ -79,45 +79,92 @@ a:hover {
 /* ============================================
    HEADER STYLES
    ============================================ */
-header {
-    background-color: white;
-    border-bottom: 1px solid var(--contrast-9);
+/*header {*/
+/*    background-color: white;*/
+/*    border-bottom: 1px solid var(--contrast-9);*/
+/*}*/
+
+/*.navbar-brand img,*/
+/*.navbar-brand .site-logo img {*/
+/*    height: 80px !important;*/
+/*    width: auto !important;*/
+/*}*/
+
+/*.nsf-logo img {*/
+/*    height: 82px;*/
+/*    width: 82px;*/
+/*}*/
+
+/*.nsf-logo {*/
+/*    padding-right: 20px;*/
+/*}*/
+
+/*.logo-divider img {*/
+/*    height: 50px;*/
+/*    margin: 0 15px;*/
+/*}*/
+
+/*.branding-wrapper {*/
+/*    padding: 50px 20px 64px 20px;*/
+/*    align-items: center;*/
+/*    justify-content: space-between;*/
+/*    gap: 1rem;*/
+/*    flex-wrap: wrap;*/
+/*}*/
+
+/*.branding-identity {*/
+/*    gap: 0;*/
+/*    min-width: 0;*/
+/*}*/
+
+
+.branding-wrapper {
+    padding-top: 50px;
+    padding-bottom: 64px;
+    padding-left: 20px;
+    padding-right: 20px;
 }
 
-.navbar-brand img,
-.navbar-brand .site-logo img {
-    height: 80px !important;
-    width: auto !important;
+.branding-wrapper .nsf-logo {
+    padding-right: 20px;
 }
 
-.nsf-logo img {
+.branding-wrapper .nsf-logo img {
     height: 82px;
     width: 82px;
 }
 
-.nsf-logo {
-    padding-right: 20px;
+.branding-wrapper .logo-divider {
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
 
-.logo-divider img {
-    height: 50px;
-    margin: 0 15px;
+.branding-wrapper .logo-divider img {
+    height: 70px;
 }
 
-.branding-wrapper {
-    padding: 50px 20px 64px 20px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
+.branding-wrapper .navbar-brand .site-logo {
+    padding-top: 22px;
+    padding-left: 23px;
 }
 
-.branding-identity {
-    gap: 0;
-    min-width: 0;
+.branding-wrapper .navbar-brand .site-logo img {
+    height: 75px;
+    width: 253px;
 }
 
-.development-server-badge {
+.branding-wrapper .region-nav-main li a {
+    --bs-border-opacity: 1;
+    border: 2px solid;
+    padding: 8px;
+    margin: 10px;
+    font-size: 20px;
+    font-weight: 400;
+    color: black;
+    border-color: black;
+}
+
+.branding-wrapper .development-server-badge {
     color: #ff0000;
     background-color: #fff;
     border: 3px solid #ff0000;
@@ -128,105 +175,6 @@ header {
     padding: 0.55rem 0.75rem;
     text-transform: uppercase;
     white-space: nowrap;
-}
-
-/* ============================================
-   NAVIGATION
-   ============================================ */
-.navbar nav {
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
-    padding: 1rem 0;
-}
-
-.navbar .nav-link {
-    color: var(--contrast-1);
-    background-color: #fff;
-    font-weight: 500;
-    font-size: 1.125rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.375rem;
-    border: 1px solid var(--contrast-6);
-    transition: all 0.2s ease;
-    text-decoration: none;
-}
-
-.navbar .nav-link:hover {
-    color: var(--teal-600);
-    background-color: rgba(0, 151, 169, 0.1);
-    border-color: var(--teal-600);
-}
-
-.navbar .nav-link.active,
-.navbar .nav-link.is-active {
-    color: #fff;
-    background-color: var(--teal-600);
-    border-color: var(--teal-600);
-    font-weight: 600;
-}
-
-.navbar-nav {
-    gap: 0.5rem;
-}
-
-@media (max-width: 767.98px) {
-    .development-server-badge {
-        font-size: 0.95rem;
-        margin-left: 0;
-        margin-top: 0.75rem;
-    }
-}
-
-/* Nav Tabs */
-.nav-tabs .nav-link {
-    font-weight: 600 !important;
-}
-
-.nav-tabs .nav-link.active {
-    font-weight: 700 !important;
-}
-
-/* Multi-level Navigation */
-.sf-depth-1 ul {
-    padding: 10px !important;
-    background-color: var(--teal-600);
-}
-
-.sf-depth-2 {
-    color: var(--teal-050);
-    background-color: var(--teal-600);
-    font-weight: 600;
-    font-size: 16px;
-    line-height: 18px;
-    padding: 9px 20px;
-}
-
-.access-subdomain-global-navigation {
-    border-color: var(--teal-700);
-    border-style: solid;
-    border-left-width: 0;
-    border-right-width: 0;
-    border-bottom-width: 0;
-    border-top-width: 3px;
-}
-
-/* ============================================
-   BREADCRUMBS
-   ============================================ */
-.access-subdomain-breadcrumb-wrapper {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid var(--contrast-9);
-    padding: 0.75rem 0;
-}
-
-.breadcrumb {
-    margin-bottom: 0;
-    background-color: transparent;
-}
-
-.breadcrumb-item + .breadcrumb-item::before {
-    content: ">";
 }
 
 /* ============================================
@@ -325,52 +273,6 @@ main {
     color: var(--yellow-400);
 }
 
-/* ============================================
-   FOOTER
-   ============================================ */
-footer {
-    background-color: #f8f9fa;
-    border-top: 1px solid var(--contrast-9);
-    padding: 2rem 0;
-    margin-top: auto;
-}
-
-.footer-links {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.footer-links li {
-    display: inline-block;
-    margin-right: 1.5rem;
-}
-
-/* Footer Social Links */
-footer .social-link {
-    text-decoration: none;
-    transition: transform 0.1s ease;
-    height: fit-content;
-    margin-right: 1rem;
-}
-
-footer .social-link:hover {
-    transform: scale(1.1);
-}
-
-/* Footer Policy Links */
-footer .footer-policies a.btn.btn-link {
-    font-size: 12px;
-    font-weight: 600;
-}
-
-/* Footer Read More Links */
-footer a.btn.btn-link.read-more {
-    color: var(--teal-600);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 18px;
-}
 
 /* ============================================
    CMS TOOLBAR
@@ -777,3 +679,5 @@ img[src*="community_support_icon_"] {
     max-width: 75px !important;
     height: auto !important;
 }
+
+
