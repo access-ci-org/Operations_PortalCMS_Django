@@ -83,13 +83,11 @@
 
                         <ul data-block="nav_main" class="navbar-nav justify-content-end flex-wrap nav-level-0">
                             <li class="nav-item">
-                                <a href="/integration_news" class="nav-link"
-                                   data-drupal-link-system-path="integration_news">Integration News</a>
+                                <a href="{% url 'integration_news:integration_news' %}" class="nav-link">Integration News</a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="/infrastructure_news_view" class="nav-link"
-                                   data-drupal-link-system-path="node/658">System Status News</a>
+                                <a href="{% url 'infrastructure_news:system_status_news' %}" class="nav-link">System Status News</a>
                             </li>
                         </ul>
                     </nav>
