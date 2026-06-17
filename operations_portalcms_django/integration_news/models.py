@@ -122,6 +122,7 @@ class IntegrationNewsItemPlugin(CMSPlugin):
 
     class Meta:
         ordering = ['-published_date']
+        db_table = 'operations_portalcms_django_integrationnewsitemplugin'
 
     def __str__(self):
         return self.title
