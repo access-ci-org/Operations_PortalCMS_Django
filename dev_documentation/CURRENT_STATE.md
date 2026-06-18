@@ -1,6 +1,31 @@
 # Current Project State
 
-Last verified: 2026-05-08 UTC.
+Last verified: 2026-06-18 UTC.
+
+## 2026-06-18 Update
+
+- **Bug fix — `db_table` mismatch on plugin models:** `SystemStatusNewsItemPlugin` and `IntegrationNewsItemPlugin` were missing explicit `db_table` in their `Meta`, causing Django to auto-generate `<app_label>_<modelname>` names that didn't match the actual DB tables. This produced `ProgrammingError: relation "..." does not exist` when deleting users (cascade) or rendering CMS plugin pages. Fixed by adding explicit `db_table` to both models.
+
+- **Table rename — `portal_*` prefix:** All 7 application tables in `infrastructure_news` and `integration_news` were renamed from `operations_portalcms_django_*` to the simpler `portal_*` convention matching their origin. New migrations `0002`, `0003`, `0004` added to both apps. No data loss; all FK constraints preserved.
+
+  | Old name | New name |
+  |---|---|
+  | `operations_portalcms_django_systemstatusnews` | `portal_systemstatusnews` |
+  | `operations_portalcms_django_systemstatusnewsitemplugin` | `portal_systemstatusnewsitemplugin` |
+  | `operations_portalcms_django_systemstatusnews_affected_infrastructure_items` | `portal_systemstatusnews_affected_infrastructure_items` |
+  | `operations_portalcms_django_integrationnews` | `portal_integrationnews` |
+  | `operations_portalcms_django_integrationnewsitemplugin` | `portal_integrationnewsitemplugin` |
+  | `operations_portalcms_django_integrationnews_affected_elements` | `portal_integrationnews_affected_elements` |
+  | `operations_portalcms_django_integrationelement` | `portal_integrationelement` |
+
+- **Migration state drift resolved:** `help_text` additions and `cmsplugin_ptr` parent-link attribute drift (pre-existing since app split) resolved by auto-generated `0004` state-correction migrations in both apps (no DDL).
+
+- **Colleagues:** after `git pull`, run `migrate` before starting the app. The conditional `DO $$` block in `0003` is safe on both production-history DBs and fresh databases.
+
+- `manage.py check`: 0 issues. `makemigrations --check`: no drift. `migrate --check`: no pending.
+- Applied migration rows: 218 (previous 210 + 4 new infra_news + 4 new integ_news).
+
+---
 
 This snapshot records the current state observed from the deployed runtime config, the Django app, and read-only checks against the database of record.
 
@@ -268,3 +293,149 @@ uv run python manage.py shell -c "from django.test import Client; ..."
 Result: `/integration-news/` returned HTTP 200 and rendered the `DEVELOPMENT SERVER` label with inline bright-red text styling.
 
 The test scripts in `tests/` were inspected but not run against `portal1` because they create or modify users, groups, and news records. Run them only against a disposable clone or an explicitly approved live-maintenance window.
+
+---
+
+## APP_CONFIG Contract
+
+`APP_CONFIG` is the single required environment variable. Django exits at startup if it is missing or cannot parse as JSON. The canonical template is `portal.local.example.json`.
+
+**Required:**
+
+| Key | Description |
+|---|---|
+| `DJANGO_SECRET_KEY` | Django secret key |
+
+**Operational (all required in practice):**
+
+| Key | Description |
+|---|---|
+| `DB_DATABASE` | PostgreSQL database name (e.g. `portal1`) |
+| `DJANGO_USER` | DB user (e.g. `portal_django`) |
+| `DJANGO_PASS` | DB password |
+| `DB_HOSTNAME` | DB write host |
+| `DB_HOSTNAME_READ` | DB read host (used by scripts) |
+| `DB_PORT` | DB port (default: `5432`) |
+| `DB_SCHEMA` | PostgreSQL schema (e.g. `portal_django`) |
+| `DB_SSLMODE` | SSL mode (e.g. `require`) |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hostnames |
+| `APP_LOG` | Log file path |
+| `COMANAGE_CLIENT_ID` | CILogon OAuth2 client ID |
+| `COMANAGE_CLIENT_SECRET` | CILogon OAuth2 secret |
+
+**Optional / behavioural:**
+
+| Key | Description |
+|---|---|
+| `DEBUG` | `true`/`false` (default: `false`) |
+| `DJANGO_DEVELOPMENT_SERVER` | Show development server banner |
+| `CIDER_API_BASE_URL` | CIDER API endpoint |
+| `OPERATIONS_API_BASE_URL` | Operations API endpoint |
+
+Note: `APP_ERROR_LOG` is no longer accepted — the error log path is auto-derived from `APP_LOG`.
+
+---
+
+## Permission Systems
+
+### 1. News Workflow Groups
+
+Two-tier Author/Manager model per news type. Created by `manage.py setup_groups`.
+
+| Group | Permissions |
+|---|---|
+| `System Status Authors` | create, edit; must submit for review to publish |
+| `System Status Managers` | create, edit, delete, review, publish |
+| `Integration News Authors` | create, edit; must submit for review to publish |
+| `Integration News Managers` | create, edit, delete, review, publish |
+
+Statuses: `draft` → `pending_review` → `approved` → `published` (or `rejected`).
+
+Django permission codenames: `can_review_systemstatusnews`, `can_publish_systemstatusnews`, `can_review_integrationnews`, `can_publish_integrationnews`.
+
+### 2. Focus Area Page Workflow
+
+CMS versioning-based draft/publish. Created by `manage.py setup_focus_area_page_permissions`.
+
+| Group | Role |
+|---|---|
+| `Focus_area_editors` | Can change and publish any focus area page |
+| `Focus_STEP_Editors` | Can change STEP pages (edit only, no publish) |
+| `Focus_Cybersecurity_Editors` | Can change Cybersecurity pages (edit only) |
+| `Focus_operationsSupport_Editors` | Can change Operational Support pages (edit only) |
+| `Focus_Networking_dataTransfer_Editors` | Can change Networking pages (edit only) |
+| `Home_page_editors` | Can change and publish the home page |
+
+Workflow: editor creates draft → submits for review → `Focus_area_editors` approves and publishes.
+
+### 3. RP Permissions (optional)
+
+Automatic news access for Resource Provider coordinators based on CIDER group membership. Created by `manage.py setup_rp_permissions`.
+
+**Caution:** the current `auth_group` table contains older RP-style group names (`rp.ncsa.illinois.edu`, etc.) alongside 26 current CIDER groups. Do not run `setup_rp_permissions` without reviewing which CIDER group IDs should become login-authorization groups. The command supports `--dry-run`.
+
+### Setup Commands
+
+```bash
+# News workflow groups
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  uv run python manage.py setup_groups
+
+# Focus area page permissions
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  uv run python manage.py setup_focus_area_page_permissions
+
+# RP permissions (dry-run first)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  uv run python manage.py setup_rp_permissions --dry-run
+```
+
+---
+
+## CIDER Sync
+
+```bash
+# Sync all CIDER data (dry-run first)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  uv run python manage.py sync_cider_from_api --dry-run
+
+# Prune stale groups only
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  uv run python manage.py sync_cider_from_api --dry-run --skip-infrastructure --prune-stale-groups
+```
+
+---
+
+## Open Security Items
+
+Items from `manage.py check --deploy` not yet resolved — noted for future production hardening:
+
+- `SECURE_HSTS_SECONDS` not set — enable only after confirming full HTTPS coverage
+- `SECURE_SSL_REDIRECT` not `True` — handled by nginx; set this if nginx redirect is removed
+- `SECRET_KEY` quality warning — replace with a long random value before production
+- `SESSION_COOKIE_SECURE` not `True`
+- `CSRF_COOKIE_SECURE` not `True`
+- `DEBUG = True` in deployed config — intentional for dev; must be `False` in production
+- `X_FRAME_OPTIONS` not `DENY` — django CMS requires framing; assess before changing
+
+Additional open items:
+
+- **`|safe` on external HTML** — three templates render CIDER/API HTML through `|safe` without sanitisation: `portal/resource_detail.html`, `portal/software_detail.html`, `portal/access_allocated.html`. Audit and add sanitisation before production.
+- **CSRF on news state transitions** — news workflow POST actions (`submit_for_review`, `approve`, `publish`, `reject`) should be reviewed for CSRF coverage.
+- **External assets** — Bootstrap and ACCESS UI loaded from CDN. Pin versions or self-host for production.
+
+---
+
+## Runtime Transition Checklist
+
+Steps 1–3 complete. Steps 4–6 remain:
+
+- [x] 1. Stabilise manual dev server on `cms2`
+- [x] 2. Shared repository ownership (`appdev` group, `g+w`)
+- [x] 3. Align manual Django management commands (`manage.prod.sh.j2`)
+- [ ] 4. Prepare `software` user handoff — create `software` OS user, transfer ownership of `/soft/django-cms-01/` tree
+- [ ] 5. Introduce infra-managed model — Ansible renders `portal.conf` from vaulted deployment variables; systemd `APP_CONFIG` points at rendered file
+- [ ] 6. Careful cutover — retire manual `portal_django` user workflow; `software` user owns the service
+
+**Definition of done:** the portal service runs under the `software` user, config is rendered by Ansible, no manual `portal_django` session is required for normal operation.
+
