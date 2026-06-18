@@ -9,7 +9,7 @@ class IntegrationElement(models.Model):
     label = models.CharField(max_length=200)
 
     class Meta:
-        db_table = 'operations_portalcms_django_integrationelement'
+        db_table = 'portal_integrationelement'
         verbose_name = 'Integration Element'
         verbose_name_plural = 'Integration Elements'
         ordering = ['label']
@@ -85,7 +85,7 @@ class IntegrationNews(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Integration News'
         verbose_name_plural = 'Integration News'
-        db_table = 'operations_portalcms_django_integrationnews'
+        db_table = 'portal_integrationnews'
         permissions = [
             ('can_review_integrationnews', 'Can review Integration News'),
             ('can_publish_integrationnews', 'Can publish Integration News'),
@@ -122,7 +122,7 @@ class IntegrationNewsItemPlugin(CMSPlugin):
 
     class Meta:
         ordering = ['-published_date']
-        db_table = 'operations_portalcms_django_integrationnewsitemplugin'
+        db_table = 'portal_integrationnewsitemplugin'
 
     def __str__(self):
         return self.title
