@@ -78,6 +78,15 @@ wheels = [
 ]
 
 [[package]]
+name = "cilogon-tokenauth"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/8d/60465eb015ba299e1ac3fdac7d4d71f28967628b1446a6c5a0ff063bab1a/cilogon_tokenauth-0.4.0.tar.gz", hash = "sha256:a3f4f424bab07fa948828c282a34afa47ffd61554be7d3927b73ff5539fe58e8", size = 5851, upload-time = "2025-05-14T23:18:19.631Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/22/a12c14401b2b11d552593c7e9863fe968ce7877f6bc6cbd24e4189e1c703/cilogon_tokenauth-0.4.0-py3-none-any.whl", hash = "sha256:93e45eea7ec8ca320dea46eccbad2cc8a591df069843af8bc52e2d8e5278bd17", size = 7246, upload-time = "2025-05-14T23:18:18.437Z" },
+]
+
+[[package]]
 name = "cryptography"
 version = "48.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -540,6 +549,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "access-django-user-admin" },
+    { name = "cilogon-tokenauth" },
     { name = "django" },
     { name = "django-allauth", extra = ["socialaccount"] },
     { name = "django-bootstrap5" },
@@ -563,6 +573,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "access-django-user-admin", specifier = "==1.6.3" },
+    { name = "cilogon-tokenauth", specifier = "==0.4.*" },
     { name = "django", specifier = ">=5.2,<5.3" },
     { name = "django-allauth", extras = ["socialaccount"], specifier = ">=65.0,<66" },
     { name = "django-bootstrap5", specifier = ">=25.0,<26" },

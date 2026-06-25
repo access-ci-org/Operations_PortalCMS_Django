@@ -22,6 +22,7 @@ dependencies = [
     "django-allauth[socialaccount]>=65.0,<66",
     "psycopg2-binary>=2.9",
     "access-django-user-admin==1.6.3",
+    "cilogon-tokenauth==0.4.*",
     "python-dotenv>=1.0.0",
     "djangocms-versioning>=2.5.1,<3",
 ]
