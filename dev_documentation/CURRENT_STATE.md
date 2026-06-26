@@ -420,8 +420,8 @@ Items from `manage.py check --deploy` not yet resolved — noted for future prod
 
 Additional open items:
 
-- **`|safe` on external HTML** — three templates render CIDER/API HTML through `|safe` without sanitisation: `portal/resource_detail.html`, `portal/software_detail.html`, `portal/access_allocated.html`. Audit and add sanitisation before production.
-- **CSRF on news state transitions** — news workflow POST actions (`submit_for_review`, `approve`, `publish`, `reject`) should be reviewed for CSRF coverage.
+- **Resource/API HTML rendering** — CIDER/API descriptions in resource templates are escaped and rendered with line breaks; remaining `|safe` uses are limited to trusted form help text and should stay that way.
+- **News state transitions** — workflow state-changing endpoints require POST, and list-page controls submit CSRF-protected forms.
 - **External assets** — Bootstrap and ACCESS UI loaded from CDN. Pin versions or self-host for production.
 
 ---
@@ -438,4 +438,3 @@ Steps 1–3 complete. Steps 4–6 remain:
 - [ ] 6. Careful cutover — retire manual `portal_django` user workflow; `software` user owns the service
 
 **Definition of done:** the portal service runs under the `software` user, config is rendered by Ansible, no manual `portal_django` session is required for normal operation.
-

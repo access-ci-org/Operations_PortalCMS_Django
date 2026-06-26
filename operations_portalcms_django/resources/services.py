@@ -99,9 +99,44 @@ def _resource_to_dict(resource):
 def _group_resources_by_org(resources):
     resources_by_org = defaultdict(list)
     for resource in resources:
-        org_name = resource.get("organization_name") or "Unknown Organization"
+        org_name = resource.get("organization_name")
+        if not _has_value(org_name):
+            continue
+        org_name = str(org_name).strip()
         resources_by_org[org_name].append(resource)
     return dict(sorted(resources_by_org.items()))
+
+
+def _has_value(value):
+    return value is not None and str(value).strip() != ""
+
+
+def _is_access_resource(resource):
+    return str(resource.get("project_affiliation", "")).strip().upper() == "ACCESS"
+
+
+def _publishable_resources(kind, resources):
+    publishable = []
+    for resource in resources:
+        if not isinstance(resource, dict):
+            continue
+        if not _has_value(resource.get("organization_name")):
+            continue
+        if kind == "allocated" and not _is_access_resource(resource):
+            continue
+        publishable.append(resource)
+    return publishable
+
+
+def _resource_kind(resource):
+    cider_type = str(resource.get("cider_type", "")).strip()
+    if cider_type.lower() == ONLINE_SERVICE_TYPE.lower():
+        return "online_services"
+    return "allocated"
+
+
+def _is_publishable_resource(resource):
+    return bool(_publishable_resources(_resource_kind(resource), [resource]))
 
 
 def _results_from_payload(data, label):
@@ -142,12 +177,12 @@ def _remote_resource_listing(kind):
     results, error_message = _results_from_payload(data, "resources")
     if error_message:
         return {}, error_message
-    return _group_resources_by_org(results), None
+    return _group_resources_by_org(_publishable_resources(kind, results)), None
 
 
 def get_resource_listing(kind):
     try:
-        local_resources = _local_resource_dicts(kind)
+        local_resources = _publishable_resources(kind, _local_resource_dicts(kind))
     except DatabaseError:
         local_resources = []
 
@@ -166,7 +201,9 @@ def get_resource_detail(node_id):
         resource = None
 
     if resource is not None:
-        return _resource_to_dict(resource), None
+        resource_dict = _resource_to_dict(resource)
+        if _is_publishable_resource(resource_dict):
+            return resource_dict, None
 
     try:
         data = fetch_json(
@@ -178,7 +215,9 @@ def get_resource_detail(node_id):
         return None, str(e)
 
     detail = data.get("results", {}) if isinstance(data, dict) else {}
-    if not detail:
+    if not isinstance(detail, dict):
+        detail = {}
+    if not detail or not _is_publishable_resource(detail):
         return None, "Resource not found"
     return detail, None
 
