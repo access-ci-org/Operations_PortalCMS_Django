@@ -56,9 +56,18 @@ This snapshot records the current state observed from the deployed runtime confi
 - Authentication: django-allauth CILogon provider plus local Django auth backend
 - Package manager: `uv`
 - Runtime config contract: Django exits during startup if `APP_CONFIG` is missing or cannot load JSON. `APP_ERROR_LOG` is no longer a required or accepted config key; the error log path is derived automatically from `APP_LOG`.
-- App structure (4 apps): `portal` (core: unprivileged view, CMS versioning workflow views, utils, toolbars); `resources` (CIDER models + public resource/software views); `infrastructure_news` (system status news); `integration_news` (integration news). All models were moved out of `portal` into the feature apps (May 8, 2026) — no DDL required, `db_table` values preserved.
 - Public pages render the bright-red `DEVELOPMENT SERVER` marker from `templates/base.html`.
-- Local developer workflow: restore a current RDS `portal1` backup into local PostgreSQL, point `APP_CONFIG` at that local database, then run `migrate --plan` before `migrate`. Migrations sync schema only; the restored backup carries content and permissions.
+
+## Application Structure
+
+- `portal`: shared CMS/runtime glue, unprivileged view, CMS versioning workflow helpers, permissions utilities, and toolbar integration.
+- `resources`: CIDER cache models, infrastructure/software special views, resource listing/detail behavior, and Operations API service-layer access.
+- `infrastructure_news`: system status news models, forms, views, workflow transitions, admin registration, import tooling, and CMS plugins.
+- `integration_news`: integration roadmap/software news models, forms, views, workflow transitions, admin registration, and CMS plugins.
+- `templates`: shared base layout plus CMS/special-view templates; public pages use `templates/base.html`.
+- `static` and `media`: static assets collected for nginx and user-uploaded/media content served from the repo media path.
+- `database`: hands-on RDS inspection, dump, restore, and verification scripts; not official infrastructure automation.
+- All news models were moved out of `portal` into feature apps on May 8, 2026. The migrations preserve existing database tables through explicit `db_table` settings.
 
 ## Database Verification
 
@@ -199,140 +208,27 @@ Current dry-run after pruning:
 - unfiltered auth setup would add 52 group-permission links
 - no auth groups were created during this pass
 
-## Verification Commands
+## Current Health Snapshot
 
-Commands run during this pass:
-
-Note: verification commands were run with any inherited shell `DEBUG` override unset so they match `portal.service`, which does not set `DEBUG` and therefore lets the deployed config file decide.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py check
-```
-
-Result: no issues.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py check --deploy
-```
-
-Result: deployment warnings remain for production hardening/settings, including HSTS, SSL redirect, secret-key quality, secure session cookie, secure CSRF cookie, and `X_FRAME_OPTIONS` not being `DENY`. These are noted for future production review and were not changed during the developer-handoff documentation pass.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/verify_db.sh
-```
-
-Result: database reachable and ownership/schema checks passed.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py makemigrations --check --dry-run
-```
-
-Result: no changes detected.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py migrate --check
-```
-
-Result: no unapplied migrations.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py migrate --plan
-```
-
-Result: no planned migration operations.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py sync_cider_from_api --dry-run
-```
-
-Result: fetched 78 infrastructure records, 26 groups, 21 organizations, 14 feature categories, and 54 features. Dry-run would update existing local metadata rows.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py sync_cider_from_api --dry-run --skip-infrastructure --prune-stale-groups
-```
-
-Result: `groups_would_delete: 0`.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py setup_rp_permissions --dry-run --skip-global-operations
-```
-
-Result: selected 26 CIDER groups; would create 52 permissions, 52 auth groups, and 52 group-permission links. No writes were made.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py collectstatic --dry-run --noinput
-```
-
-Result: dry-run completed; Django reported the known duplicate static destination `admin/img/search.svg` and otherwise found 34 files to copy with 1136 unmodified.
-
-```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-ALLOWED_HOSTS=* \
-APP_LOG=/tmp/portal-readme-check.log \
-uv run python manage.py shell -c "from django.test import Client; ..."
-```
-
-Result: `/integration-news/` returned HTTP 200 and rendered the `DEVELOPMENT SERVER` label with inline bright-red text styling.
-
-The test scripts in `tests/` were inspected but not run against `portal1` because they create or modify users, groups, and news records. Run them only against a disposable clone or an explicitly approved live-maintenance window.
+- Django system checks: clean.
+- Deployment checks: known production-hardening warnings remain and are tracked under Open Security Items.
+- Database: RDS `portal1` reachable; schema, ownership, row counts, and sequence checks passed.
+- Migrations: no unapplied migrations, no model drift, and no planned migration operations.
+- CIDER sync dry-runs: current API metadata was inspected; stale-group prune reports no remaining group deletions.
+- RP permission dry-run: selected 26 current CIDER groups and would create auth objects if run for real; no writes were made during inspection.
+- Static assets: dry-run completed with the known duplicate `admin/img/search.svg` destination.
+- Smoke check: `/integration-news/` returned HTTP 200 and rendered the development-server banner.
+- Repo-level scripts under `tests/` can create or modify users, groups, and news records; run them only against a disposable clone or an approved maintenance window.
 
 ---
 
 ## APP_CONFIG Contract
 
-`APP_CONFIG` is the single required environment variable. Django exits at startup if it is missing or cannot parse as JSON. The canonical template is `portal.local.example.json`.
+`APP_CONFIG` is the single required environment variable. Django exits at startup if it is missing or cannot parse as JSON.
 
-**Required:**
+On this server the active config is `/soft/django-cms-01/conf/portal.conf.dev.json`. It carries the Django secret, database connection details, allowed hosts, logging path, OAuth/CILogon credentials, and optional runtime behavior such as `DEBUG`, the development-server banner, and API base URLs.
 
-| Key | Description |
-|---|---|
-| `DJANGO_SECRET_KEY` | Django secret key |
-
-**Operational (all required in practice):**
-
-| Key | Description |
-|---|---|
-| `DB_DATABASE` | PostgreSQL database name (e.g. `portal1`) |
-| `DJANGO_USER` | DB user (e.g. `portal_django`) |
-| `DJANGO_PASS` | DB password |
-| `DB_HOSTNAME` | DB write host |
-| `DB_HOSTNAME_READ` | DB read host (used by scripts) |
-| `DB_PORT` | DB port (default: `5432`) |
-| `DB_SCHEMA` | PostgreSQL schema (e.g. `portal_django`) |
-| `DB_SSLMODE` | SSL mode (e.g. `require`) |
-| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hostnames |
-| `APP_LOG` | Log file path |
-| `COMANAGE_CLIENT_ID` | CILogon OAuth2 client ID |
-| `COMANAGE_CLIENT_SECRET` | CILogon OAuth2 secret |
-
-**Optional / behavioural:**
-
-| Key | Description |
-|---|---|
-| `DEBUG` | `true`/`false` (default: `false`) |
-| `DJANGO_DEVELOPMENT_SERVER` | Show development server banner |
-| `CIDER_API_BASE_URL` | CIDER API endpoint |
-| `OPERATIONS_API_BASE_URL` | Operations API endpoint |
-
-Note: `APP_ERROR_LOG` is no longer accepted — the error log path is auto-derived from `APP_LOG`.
+`APP_ERROR_LOG` is no longer accepted; the error log path is derived automatically from the application log path.
 
 ---
 
@@ -374,35 +270,14 @@ Automatic news access for Resource Provider coordinators based on CIDER group me
 
 **Caution:** the current `auth_group` table contains older RP-style group names (`rp.ncsa.illinois.edu`, etc.) alongside 26 current CIDER groups. Do not run `setup_rp_permissions` without reviewing which CIDER group IDs should become login-authorization groups. The command supports `--dry-run`.
 
-### Setup Commands
+## Maintenance Commands To Know
 
-```bash
-# News workflow groups
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-  uv run python manage.py setup_groups
-
-# Focus area page permissions
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-  uv run python manage.py setup_focus_area_page_permissions
-
-# RP permissions (dry-run first)
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-  uv run python manage.py setup_rp_permissions --dry-run
-```
-
----
-
-## CIDER Sync
-
-```bash
-# Sync all CIDER data (dry-run first)
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-  uv run python manage.py sync_cider_from_api --dry-run
-
-# Prune stale groups only
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
-  uv run python manage.py sync_cider_from_api --dry-run --skip-infrastructure --prune-stale-groups
-```
+- `manage.py setup_groups`: creates/updates news workflow author and manager groups.
+- `manage.py setup_focus_area_page_permissions`: creates/updates focus-area CMS page workflow groups and page permissions.
+- `manage.py setup_rp_permissions`: maps current CIDER RP groups into Django auth groups and permissions; dry-run first.
+- `manage.py sync_cider_from_api`: refreshes CIDER infrastructure, organization, group, category, and feature metadata.
+- `manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups`: checks or prunes stale local CIDER group rows.
+- `database/verify_db.sh`: read-only RDS schema, ownership, count, and migration-state verification.
 
 ---
 
