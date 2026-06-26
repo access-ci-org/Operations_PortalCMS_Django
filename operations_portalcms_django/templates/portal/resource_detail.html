@@ -43,7 +43,7 @@
     {% if resource.resource_description %}
     <div class="mb-3">
         <div class="fw-bold mb-2">Description</div>
-        <div>{{ resource.resource_description|safe }}</div>
+        <div>{{ resource.resource_description|linebreaks }}</div>
     </div>
     {% endif %}
     
