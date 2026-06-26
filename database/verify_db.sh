@@ -189,7 +189,18 @@ ORDER BY tablename;
 echo ""
 echo -e "${YELLOW}Key Django CMS Tables:${NC}"
 echo "-----------------------------------"
-TABLES=("auth_user" "cms_page" "django_migrations" "operations_portalcms_django_integrationnews" "operations_portalcms_django_systemstatusnews")
+TABLES=(
+    "auth_user"
+    "cms_page"
+    "django_migrations"
+    "portal_systemstatusnews"
+    "portal_systemstatusnewsitemplugin"
+    "portal_systemstatusnews_affected_infrastructure_items"
+    "portal_integrationnews"
+    "portal_integrationnewsitemplugin"
+    "portal_integrationnews_affected_elements"
+    "portal_integrationelement"
+)
 for table in "${TABLES[@]}"; do
     REGCLASS=$(run_psql -t -A -c "SELECT to_regclass('\"${TARGET_SCHEMA}\".\"${table}\"');" | xargs)
     if [[ -n "$REGCLASS" ]]; then
