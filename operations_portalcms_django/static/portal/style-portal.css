@@ -1,683 +1,80 @@
-/**
- * ACCESS Operations Portal - Main Stylesheet
- * Based on ACCESS Design System and Bootstrap 5
- */
 
-/* ============================================
-   CSS VARIABLES - ACCESS Color Palette
-   ============================================ */
-:root {
-    /* Teal Palette */
-    --teal-050: #ECF9F8;
-    --teal-100: #D5F3F0;
-    --teal-400: #4DB8A8;
-    --teal-600: #138597;
-    --teal-700: #1A5B6E;
-    
-    /* Yellow Palette */
-    --yellow-200: #FFE69C;
-    --yellow-400: #FFC42D;
-    
-    /* Additional Colors */
-    --orange-400: #FF8C42;
-    --green-400: #52C41A;
-    --red-400: #FF4D4F;
-    
-    /* Neutral Colors */
-    --contrast: #232323;
-    --contrast-6: #999999;
-    --contrast-8: #CCCCCC;
-    --contrast-9: #D9D9D9;
-    
-    /* Bootstrap Overrides */
-    --bs-dark: #1A5B6E;
-    --bs-dark-rgb: 26, 91, 110;
-    --bs-light: #ECF9F8;
-    --bs-light-rgb: 236, 249, 248;
-    --bs-primary: #FFC42D;
-    --bs-primary-rgb: 255, 196, 45;
-    --bs-secondary: #138597;
-    --bs-secondary-rgb: 19, 133, 151;
+#header {
+    min-height: 104px;
 }
 
-/* ============================================
-   BASE STYLES
-   ============================================ */
-body {
-    font-family: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+#header .container {
+    height: 200px;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 52px;
+}
+
+#header .container .logo {
+    align-items: start;
     display: flex;
-    flex-direction: column;
-    min-height: 100vh;
+    flex-direction: row
 }
 
-a {
-    color: var(--teal-600);
-    text-decoration: none;
+#header .container .nsf-logo {
+    height: 49px
 }
 
-a:hover {
-    color: var(--teal-700);
+#header .container .access-logo {
+    height: 23px;
+    margin-top: 12px
 }
 
-/* ============================================
-   ACCESSIBILITY
-   ============================================ */
-.skip-link {
-    position: absolute;
-    left: -10000px;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-}
-
-.skip-link:focus {
-    position: static;
-    width: auto;
-    height: auto;
-}
-
-/* ============================================
-   HEADER STYLES
-   ============================================ */
-/*header {*/
-/*    background-color: white;*/
-/*    border-bottom: 1px solid var(--contrast-9);*/
-/*}*/
-
-/*.navbar-brand img,*/
-/*.navbar-brand .site-logo img {*/
-/*    height: 80px !important;*/
-/*    width: auto !important;*/
-/*}*/
-
-/*.nsf-logo img {*/
-/*    height: 82px;*/
-/*    width: 82px;*/
-/*}*/
-
-/*.nsf-logo {*/
-/*    padding-right: 20px;*/
-/*}*/
-
-/*.logo-divider img {*/
-/*    height: 50px;*/
-/*    margin: 0 15px;*/
-/*}*/
-
-/*.branding-wrapper {*/
-/*    padding: 50px 20px 64px 20px;*/
-/*    align-items: center;*/
-/*    justify-content: space-between;*/
-/*    gap: 1rem;*/
-/*    flex-wrap: wrap;*/
-/*}*/
-
-/*.branding-identity {*/
-/*    gap: 0;*/
-/*    min-width: 0;*/
-/*}*/
-
-
-.branding-wrapper {
-    padding-top: 50px;
-    padding-bottom: 64px;
-    padding-left: 20px;
-    padding-right: 20px;
-}
-
-.branding-wrapper .nsf-logo {
-    padding-right: 20px;
-}
-
-.branding-wrapper .nsf-logo img {
-    height: 82px;
-    width: 82px;
-}
-
-.branding-wrapper .logo-divider {
-    padding-top: 6px;
-    padding-bottom: 6px;
-}
-
-.branding-wrapper .logo-divider img {
-    height: 70px;
-}
-
-.branding-wrapper .navbar-brand .site-logo {
-    padding-top: 22px;
-    padding-left: 23px;
-}
-
-.branding-wrapper .navbar-brand .site-logo img {
-    height: 75px;
-    width: 253px;
-}
-
-.branding-wrapper .region-nav-main li a {
-    --bs-border-opacity: 1;
-    border: 2px solid;
-    padding: 8px;
-    margin: 10px;
-    font-size: 20px;
-    font-weight: 400;
-    color: black;
-    border-color: black;
-}
-
-.branding-wrapper .development-server-badge {
-    color: #ff0000;
-    background-color: #fff;
-    border: 3px solid #ff0000;
-    font-size: 1.125rem;
-    font-weight: 900;
-    line-height: 1;
-    margin-left: 1rem;
-    padding: 0.55rem 0.75rem;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-/* ============================================
-   MAIN CONTENT
-   ============================================ */
-main {
-    flex: 1;
-    padding: 2rem 0;
-}
-
-/* ============================================
-   BUTTONS
-   ============================================ */
-.btn-primary {
-    font-family: "Archivo", sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: #000;
-    background-color: #fec42d;
-    border-color: #fec42d;
-    border-radius: 0;
-    border-width: 4px;
-    padding: 8px;
-    text-decoration: none;
-    vertical-align: middle;
-}
-
-.btn-primary:hover {
-    color: #000;
-    background-color: #fff;
-    border-color: #000;
-}
-
-/* ACCESS Primary Button (Yellow) */
-.btn-access-primary,
-.btn-access-auth {
-    font-family: "Archivo", sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: #000;
-    background-color: #fec42d;
-    border-color: #fec42d;
-    border-radius: 0;
-    border-width: 4px;
-    padding: 8px;
-    text-decoration: none;
-    vertical-align: middle;
-}
-
-.btn-access-primary:hover,
-.btn-access-auth:hover {
-    color: #000;
-    background-color: #fff;
-    border-color: #000;
-}
-
-/* ============================================
-   UTILITY CLASSES
-   ============================================ */
-
-/* Background Colors */
-.bg-access-dark {
-    background-color: var(--teal-700);
-}
-
-.bg-access-medium {
-    background-color: var(--teal-600);
-}
-
-.bg-access-light {
-    background-color: var(--teal-050);
-}
-
-.bg-header {
-    background-color: #eee;
-}
-
-/* Background with Headings */
-.bg-access-dark h3,
-.bg-access-dark .h3,
-.bg-access-dark h4,
-.bg-access-dark .h4 {
-    color: var(--teal-050);
-}
-
-/* Text Colors */
-.text-medium {
-    color: var(--teal-600);
-}
-
-.text-light {
-    color: var(--teal-050);
-}
-
-.text-yellow {
-    color: var(--yellow-400);
-}
-
-
-/* ============================================
-   CMS TOOLBAR
-   ============================================ */
-.cms-toolbar {
-    /* Ensure CMS toolbar is always visible */
-    position: relative !important;
-}
-
-/* ============================================
-   LEGACY STYLES - Keep for backward compatibility
-   ============================================ */
-
-h1 {
-    font-size: 36px;
-    color: #333;
-}
-
-h2 {
-    font-size: 24px;
-    color: #333;
-}
-
-h3 {
-    font-size: 20px;
-    color: #333;
-}
-
-h4 {
-    font-size: 18px;
-    color: #333;
-}
-
-h5 {
-    font-size: 16px;
-    color: #333;
-}
-
-.access-intro {
-    font-size: 24px;
-}
-
-.access-paragraph {
-    font-size: 18px;
-}
-
-input, textarea {
-    font-size: 1.2em;
-}
-
-input.medium {
-    width: 300px;
-}
-
-select.medium {
-    font-size: 1.2em;
-    width: 140px;
-}
-
-div.submit {
-    width: 100%;
-    text-align: center;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-td {
-    padding: 0.25em;
-}
-
-div.field_row {
-    width: 100%;
-    height: 50px;
-    position: relative;
-    clear: left;
-    margin-bottom: 10px;
-}
-
-div.field {
-    float: left;
-    margin-left: 10px;
-}
-
-div.field span {
+#header .container .access,
+#header .container .nsf {
     display: block;
-    width: 150px;
-    text-align: right;
-    color: #777;
-    float: left;
-    margin-right: 7px;
-    margin-top: 5px;
+    text-decoration: none
 }
 
-div.field span.short {
-    width: 70px;
+#header .container .divider {
+    border-right: 2px solid #bbbbbb;
+    height: 40px;
+    margin: 4px 15px 0 12px;
+    width: 0
 }
 
-div.field span.error {
-    color: red;
-    font-style: italic;
-    margin-left: 150px;
+#header .container .additional-actions {
+    max-width: 450px;
+    align-content: center;
+    padding-bottom: 10px;
 }
 
-div.field span.above {
-    float: none;
-    text-align: left;
-}
-
-fieldset {
-    clear: left;
-}
-
-/* LEGACY: Service/Index Tables - May be obsolete */
-
-/* LEGACY: Service/Index Tables - May be obsolete */
-table#index {
-    width: 100%;
-    max-width: 1200px;
-    font-size: 1em;
-}
-
-table#index a {
-    font-weight: bold;
-    color: #277cc1;
-    text-decoration: none;
-}
-
-table#index a:hover {
-    text-decoration: underline;
-}
-
-table.service {
-    font-size: 1em;
-}
-
-td.short {
-    width: 100px;
-}
-
-td.medium {
-    width: 170px;
-}
-
-td span {
-    font-weight: bold;
-    color: #ccc;
-}
-
-td.outlined {
-    border: 1px solid #ccc;
-}
-
-/* Bootstrap Card Overrides */
-.card > .card-header {
-    color: #31708f;
-    background-color: #d9edf7;
-    border-color: #bce8f1;
-}
-
-/* Nav Pills Overrides */
-.nav-pills li {
-    color: #428bca !important;
-}
-
-.nav-pills a:hover {
-    color: #000000 !important;
-}
-
-.nav-pills > li.active {
-    background-color: #428bca !important;
-}
-
-.nav-pills > li.active > a {
-    color: #fff;
-    text-decoration: none;
-}
-
-/* Glyphicons Font Face */
-@font-face {
-    font-family: 'Glyphicons Halflings';
-    src: url('/static/services/fonts/glyphicons-halflings-regular.eot');
-    src: url('/static/services/fonts/glyphicons-halflings-regular.eot?#iefix') format('embedded-opentype'),
-         url('/static/services/fonts/glyphicons-halflings-regular.woff') format('woff'),
-         url('/static/services/fonts/glyphicons-halflings-regular.ttf') format('truetype'),
-         url('/static/services/fonts/glyphicons-halflings-regular.svg#glyphicons_halflingsregular') format('svg');
-}
-
-.glyphicon {
-    position: relative;
-    top: 1px;
-    display: inline-block;
-    font-family: 'Glyphicons Halflings';
-    font-style: normal;
-    font-weight: 400;
-    line-height: 1;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-.glyphicon-chevron-up:before {
-    content: "\e113";
-}
-
-.glyphicon-chevron-down:before {
-    content: "\e114";
-}
-
-.glyphicon-pencil:before {
-    content: "\270f";
-}
-
-.glyphicon-plus:before {
-    content: "\2b";
-}
-
-.glyphicon-remove:before {
-    content: "\e014";
-}
-
-.glyphicon-info-sign:before {
-    content: "\e086";
-}
-
-.accordion-button::after {
-    order: -1;
-    margin-left: 0;
-    margin-right: 1rem;
-}
-
-/* ============================================
-   RESOURCES PAGE STYLES
-   ============================================ */
-
-/* Resource Actions Header */
-.resource-actions-header {
-    padding: 1.5rem;
-    background-color: #f8f9fa;
-    border-bottom: 3px solid var(--teal-600);
-    border-radius: 0.25rem;
-}
-
-.resource-actions-header .btn-access-primary {
-    font-size: 14px;
-    white-space: nowrap;
-}
-
-/* Organization Sections */
-.organization-section {
-    background-color: #fff;
-    border: 1px solid var(--contrast-9);
-    border-radius: 0.375rem;
-    padding: 1.25rem;
-}
-
-.organization-header {
-    color: var(--contrast-1);
-    font-size: 1.25rem;
+#header .container .development-server-badge {
+    margin: 10px;
+    padding: 4px 10px;
+    color: white;
+    background: #495057;
+    border-radius: 10px;
     font-weight: 700;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid var(--teal-600);
+    font-size: xx-small;
 }
 
-/* Accordion Customization */
-.accordion-flush .accordion-item {
-    border: none;
-    border-bottom: 1px solid var(--contrast-9);
+@media (min-width: 900px) {
+    #header {
+        min-height: 196px;
+    }
+
+    #header .container {
+        height: 144px;
+    }
+
+    #header .container .nsf-logo {
+        height: 82px
+    }
+
+    #header .container .divider {
+        height: 70px;
+        margin: 6px 23px 0 20px
+    }
+
+    #header .container .access-logo {
+        height: auto;
+        margin-top: 22px;
+        width: 253px
+    }
 }
-
-.accordion-flush .accordion-item:last-child {
-    border-bottom: none;
-}
-
-/* More specific selector to override Bootstrap */
-.organization-section .accordion-button {
-    background-color: #fff !important;
-    color: #138597 !important;
-    font-weight: 600;
-    font-size: 1rem;
-    padding: 1rem 1.25rem;
-}
-
-.organization-section .accordion-button:not(.collapsed) {
-    background-color: #e6f5f7 !important;
-    color: #1a5b6e !important;
-    font-weight: 700;
-    box-shadow: none;
-}
-
-.organization-section .accordion-button:focus {
-    box-shadow: none;
-    border-color: transparent;
-}
-
-.organization-section .accordion-button:hover {
-    background-color: #e6f5f7 !important;
-    color: #138597 !important;
-}
-
-.accordion-body {
-    padding: 1.25rem;
-}
-
-/* Resource Description */
-.description-label {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--contrast-2);
-    margin-bottom: 0.75rem;
-}
-
-.description-content {
-    color: var(--contrast-3);
-    line-height: 1.6;
-}
-
-.description-content p {
-    margin-bottom: 1rem;
-}
-
-.description-content p:last-child {
-    margin-bottom: 0;
-}
-
-/* Resource Links */
-.resource-link {
-    color: var(--teal-600);
-    text-decoration: none;
-    font-weight: 500;
-    padding: 0;
-}
-
-.resource-link:hover {
-    color: var(--teal-700);
-    text-decoration: underline;
-}
-
-/* ============================================
-   ACCORDION STYLES
-   ============================================ */
-.accordion-button {
-    background-color: #f8f9fa;
-    color: #008597;
-}
-
-.accordion-button:not(.collapsed) {
-    background-color: #48C0B9;
-    color: #ffffff;
-}
-
-.accordion-button:focus {
-    box-shadow: 0 0 0 0.25rem rgba(72, 192, 185, 0.25);
-    border-color: #48C0B9;
-}
-
-.accordion-button:not(.collapsed)::after {
-    filter: brightness(0) invert(1);
-}
-
-/* Links inside accordion bodies */
-.accordion-body .btn-link {
-    color: #008597;
-    text-decoration: none;
-    padding: 0;
-    vertical-align: baseline;
-}
-
-.accordion-body .btn-link:hover {
-    color: #1A5B6E;
-    text-decoration: underline;
-}
-
-/* Resource links in accordions - dark teal styling */
-.accordion-body .resource-link {
-    color: #008597 !important;
-    text-decoration: none;
-}
-
-.accordion-body .resource-link:hover {
-    color: #1A5B6E !important;
-    text-decoration: underline;
-}
-
-/* Links inside dark backgrounds - yellow for visibility */
-.bg-dark .btn-link {
-    color: #FFC42D !important;
-    text-decoration: none;
-    padding: 0;
-    vertical-align: baseline;
-}
-
-.bg-dark .btn-link:hover {
-    color: #FFE69C !important;
-    text-decoration: underline;
-}
-
-/* ============================================
-   COMMUNITY SUPPORT ICONS
-   ============================================ */
-img[src*="community_support_icon_"] {
-    max-width: 75px !important;
-    height: auto !important;
-}
-
-
