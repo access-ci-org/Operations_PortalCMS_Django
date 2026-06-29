@@ -1,0 +1,75 @@
+name: CI Skeleton - PortalCMS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  skeleton:
+    name: CI Framework Placeholder
+    runs-on: self-hosted
+
+    steps:
+      - name: Explain skeleton status
+        run: |
+          echo "PortalCMS CI framework is scaffolded but not active."
+          echo "No pull_request or push triggers are enabled yet."
+          echo "Future static checks should target operations_portalcms_django/."
+          echo "Do not run DB-touching integration scripts in CI until a disposable APP_CONFIG/database exists."
+
+      # Future CI implementation outline:
+      #
+      # - name: Checkout code
+      #   uses: actions/checkout@v5
+      #   with:
+      #     fetch-depth: 0
+      #
+      # - name: Set up Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: "3.12"
+      #
+      # - name: Install uv
+      #   run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      #
+      # - name: Add uv to PATH
+      #   run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      #
+      # - name: Install quality tools
+      #   run: uv pip install --system black isort flake8 bandit safety
+      #
+      # - name: Run Black formatting check
+      #   run: black --check --diff operations_portalcms_django/
+      #
+      # - name: Run isort import check
+      #   run: isort --check-only --diff operations_portalcms_django/
+      #
+      # - name: Run Flake8 lint check
+      #   run: |
+      #     flake8 operations_portalcms_django/ \
+      #       --count \
+      #       --select=E9,F63,F7,F82 \
+      #       --show-source \
+      #       --statistics \
+      #       --max-line-length=120
+      #
+      # - name: Run Bandit security check
+      #   run: |
+      #     bandit -r operations_portalcms_django/ \
+      #       -f json -o bandit-report.json \
+      #       -ll -ii
+      #
+      # - name: Upload Bandit report
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: bandit-security-report
+      #     path: bandit-report.json
+      #
+      # - name: Dependency review
+      #   if: github.event_name == 'pull_request'
+      #   uses: actions/dependency-review-action@v4
+      #   with:
+      #     fail-on-severity: moderate

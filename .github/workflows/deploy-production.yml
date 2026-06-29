@@ -1,0 +1,75 @@
+name: Deploy Production Skeleton - PortalCMS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  skeleton:
+    name: Production Deployment Framework Placeholder
+    runs-on: self-hosted
+
+    steps:
+      - name: Explain skeleton status
+        run: |
+          echo "PortalCMS production deployment framework is scaffolded but inactive."
+          echo "No deployment, checkout, SSH, Ansible, release, migration, or cert commands run from this workflow."
+          echo "Future production host: cms1.operations.access-ci.org"
+          echo "Future production URL: https://operations.access-ci.org"
+          echo "Future infrastructure repo: access-ci-org/Operations_CMS_Infrastructure"
+
+      # Future production deployment implementation outline:
+      #
+      # Triggers to add later:
+      #   push:
+      #     tags:
+      #       - "v*.*.*"
+      #
+      # workflow_dispatch inputs to add later:
+      #   version_tag:
+      #     description: "Git tag to deploy to production, for example v1.0.0"
+      #     required: true
+      #     type: string
+      #   skip_backup:
+      #     description: "Skip pre-deployment backup"
+      #     required: false
+      #     type: boolean
+      #     default: false
+      #
+      # jobs to add later:
+      # - validate-tag:
+      #     Validate tag exists in access-ci-org/Operations_PortalCMS_Django.
+      #     Validate semantic version shape.
+      #     Validate tag is reachable from main.
+      #
+      # - create-release:
+      #     Elevate permissions to contents: write only for this job.
+      #     Create or update the GitHub release from the validated tag.
+      #
+      # - pre-deployment-checks:
+      #     runs-on: [self-hosted, linux, deployment, portalcms]
+      #     Checkout access-ci-org/Operations_CMS_Infrastructure using INFRASTRUCTURE_REPO_TOKEN_PORTAL.
+      #     Verify production host reachability without disabling SSH host verification.
+      #     Verify Ansible can reach only cms1.operations.access-ci.org.
+      #
+      # - deploy-production:
+      #     environment:
+      #       name: production
+      #       url: https://operations.access-ci.org
+      #     Create a pre-deployment backup unless skip_backup is true.
+      #     Run the CMS infrastructure playbook with an explicit production limit:
+      #       ansible-playbook \
+      #         -i hosts \
+      #         application_playbook.yml \
+      #         --limit=cms1.operations.access-ci.org \
+      #         -e "app_tag=${{ needs.validate-tag.outputs.tag }}"
+      #     Then run migrations, collectstatic, restart the portal service, and smoke test:
+      #       https://operations.access-ci.org
+      #
+      # - rollback-on-failure:
+      #     Provide rollback instructions only; do not auto-rollback without an approved policy.
+      #
+      # Future Let's Encrypt work belongs in access-ci-org/Operations_CMS_Infrastructure.
+      # Production certificate/domain target: operations.access-ci.org.
