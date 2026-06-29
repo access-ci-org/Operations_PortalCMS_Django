@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.utils import timezone
 from django.urls import reverse_lazy
+from django.views.decorators.http import require_POST
 from .models import SystemStatusNews
 
 
@@ -31,6 +32,7 @@ def can_unpublish(news, user):
 
 
 @login_required
+@require_POST
 def submit_systemstatus_for_review(request, pk):
     """Submit system status news for review"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
@@ -48,6 +50,7 @@ def submit_systemstatus_for_review(request, pk):
 @login_required
 @permission_required('infrastructure_news.can_review_systemstatusnews',
                      login_url=reverse_lazy('portal:unprivileged'))
+@require_POST
 def approve_systemstatus_news(request, pk):
     """Approve system status news"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
@@ -67,6 +70,7 @@ def approve_systemstatus_news(request, pk):
 @login_required
 @permission_required('infrastructure_news.can_review_systemstatusnews',
                      login_url=reverse_lazy('portal:unprivileged'))
+@require_POST
 def reject_systemstatus_news(request, pk):
     """Reject system status news with comments"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
@@ -75,22 +79,20 @@ def reject_systemstatus_news(request, pk):
         messages.error(request, 'You cannot reject this news.')
         return redirect('infrastructure_news:system_status_news')
 
-    if request.method == 'POST':
-        comments = request.POST.get('review_comments', '')
-        news.status = 'rejected'
-        news.reviewer = request.user
-        news.reviewed_at = timezone.now()
-        news.review_comments = comments
-        news.save()
-        messages.warning(request, 'News rejected. Author has been notified.')
-        return redirect('infrastructure_news:system_status_news')
-
-    return redirect('infrastructure_news:update_system_status_news', pk=pk)
+    comments = request.POST.get('review_comments', '')
+    news.status = 'rejected'
+    news.reviewer = request.user
+    news.reviewed_at = timezone.now()
+    news.review_comments = comments
+    news.save()
+    messages.warning(request, 'News rejected. Author has been notified.')
+    return redirect('infrastructure_news:system_status_news')
 
 
 @login_required
 @permission_required('infrastructure_news.can_publish_systemstatusnews',
                      login_url=reverse_lazy('portal:unprivileged'))
+@require_POST
 def publish_systemstatus_news(request, pk):
     """Publish approved system status news"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
@@ -108,6 +110,7 @@ def publish_systemstatus_news(request, pk):
 
 
 @login_required
+@require_POST
 def unpublish_systemstatus_news(request, pk):
     """Unpublish system status news (return to draft)"""
     news = get_object_or_404(SystemStatusNews, pk=pk)

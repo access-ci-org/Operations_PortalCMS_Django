@@ -84,7 +84,7 @@ class SystemStatusNews(models.Model):
         ordering = ['-start_datetime']
         verbose_name = 'System and Infrastructure Status News'
         verbose_name_plural = 'System and Infrastructure Status News'
-        db_table = 'operations_portalcms_django_systemstatusnews'
+        db_table = 'portal_systemstatusnews'
         permissions = [
             ('can_review_systemstatusnews', 'Can review System Status News'),
             ('can_publish_systemstatusnews', 'Can publish System Status News'),
@@ -129,6 +129,7 @@ class SystemStatusNewsItemPlugin(CMSPlugin):
 
     class Meta:
         ordering = ['-published_date']
+        db_table = 'portal_systemstatusnewsitemplugin'
 
     def __str__(self):
         return self.title

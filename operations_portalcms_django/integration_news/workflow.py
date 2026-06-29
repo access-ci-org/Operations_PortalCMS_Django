@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.utils import timezone
 from django.urls import reverse_lazy
+from django.views.decorators.http import require_POST
 from .models import IntegrationNews
 
 
@@ -31,6 +32,7 @@ def can_unpublish(news, user):
 
 
 @login_required
+@require_POST
 def submit_integration_for_review(request, pk):
     """Submit integration news for review"""
     news = get_object_or_404(IntegrationNews, pk=pk)
@@ -48,6 +50,7 @@ def submit_integration_for_review(request, pk):
 @login_required
 @permission_required('integration_news.can_review_integrationnews',
                      login_url=reverse_lazy('portal:unprivileged'))
+@require_POST
 def approve_integration_news(request, pk):
     """Approve integration news"""
     news = get_object_or_404(IntegrationNews, pk=pk)
@@ -67,6 +70,7 @@ def approve_integration_news(request, pk):
 @login_required
 @permission_required('integration_news.can_review_integrationnews',
                      login_url=reverse_lazy('portal:unprivileged'))
+@require_POST
 def reject_integration_news(request, pk):
     """Reject integration news with comments"""
     news = get_object_or_404(IntegrationNews, pk=pk)
@@ -75,22 +79,20 @@ def reject_integration_news(request, pk):
         messages.error(request, 'You cannot reject this news.')
         return redirect('integration_news:integration_news')
 
-    if request.method == 'POST':
-        comments = request.POST.get('review_comments', '')
-        news.status = 'rejected'
-        news.reviewer = request.user
-        news.reviewed_at = timezone.now()
-        news.review_comments = comments
-        news.save()
-        messages.warning(request, 'News rejected. Author has been notified.')
-        return redirect('integration_news:integration_news')
-
-    return redirect('integration_news:update_integration_news', pk=pk)
+    comments = request.POST.get('review_comments', '')
+    news.status = 'rejected'
+    news.reviewer = request.user
+    news.reviewed_at = timezone.now()
+    news.review_comments = comments
+    news.save()
+    messages.warning(request, 'News rejected. Author has been notified.')
+    return redirect('integration_news:integration_news')
 
 
 @login_required
 @permission_required('integration_news.can_publish_integrationnews',
                      login_url=reverse_lazy('portal:unprivileged'))
+@require_POST
 def publish_integration_news(request, pk):
     """Publish approved integration news"""
     news = get_object_or_404(IntegrationNews, pk=pk)
@@ -108,6 +110,7 @@ def publish_integration_news(request, pk):
 
 
 @login_required
+@require_POST
 def unpublish_integration_news(request, pk):
     """Unpublish integration news (return to draft)"""
     news = get_object_or_404(IntegrationNews, pk=pk)

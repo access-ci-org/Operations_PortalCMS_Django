@@ -60,17 +60,30 @@
                                             <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
                                         {% endif %}
                                         {% if news.author == user %}
-                                            <a href="{% url 'infrastructure_news:submit_systemstatus_for_review' news.id %}" class="btn btn-sm btn-success">Submit for Review</a>
+                                            <form method="post" action="{% url 'infrastructure_news:submit_systemstatus_for_review' news.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-success">Submit for Review</button>
+                                            </form>
                                         {% endif %}
                                     {% endif %}
                                     
                                     {% if news.status == 'pending_review' and can_review %}
-                                        <a href="{% url 'infrastructure_news:approve_systemstatus_news' news.id %}" class="btn btn-sm btn-success">Approve</a>
-                                        <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-warning">Reject</a>
+                                        <form method="post" action="{% url 'infrastructure_news:approve_systemstatus_news' news.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                                        </form>
+                                        <form method="post" action="{% url 'infrastructure_news:reject_systemstatus_news' news.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="review_comments" value="">
+                                            <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Reject this news item?');">Reject</button>
+                                        </form>
                                     {% endif %}
                                     
                                     {% if news.status in 'approved,pending_review' and can_publish %}
-                                        <a href="{% url 'infrastructure_news:publish_systemstatus_news' news.id %}" class="btn btn-sm btn-info">Publish</a>
+                                        <form method="post" action="{% url 'infrastructure_news:publish_systemstatus_news' news.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-info">Publish</button>
+                                        </form>
                                     {% endif %}
                                     
                                     {% if news.status == 'rejected' and news.author == user %}
@@ -82,7 +95,10 @@
                                             <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
                                         {% endif %}
                                         {% if news.author == user or user.is_superuser %}
-                                            <a href="{% url 'infrastructure_news:unpublish_systemstatus_news' news.id %}" class="btn btn-sm btn-secondary" onclick="return confirm('Are you sure you want to unpublish this news item? It will no longer be visible to the public.');">Unpublish</a>
+                                            <form method="post" action="{% url 'infrastructure_news:unpublish_systemstatus_news' news.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-secondary" onclick="return confirm('Are you sure you want to unpublish this news item? It will no longer be visible to the public.');">Unpublish</button>
+                                            </form>
                                         {% endif %}
                                     {% endif %}
                                 </div>
