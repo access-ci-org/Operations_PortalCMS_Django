@@ -4,16 +4,18 @@
 }
 
 #header .container {
-    height: 200px;
+    height: auto;
+    min-height: 84px;
     padding-left: 0;
     padding-right: 0;
-    padding-top: 52px;
+    padding-top: 20px;
 }
 
 #header .container .logo {
     align-items: start;
     display: flex;
-    flex-direction: row
+    flex-direction: row;
+    flex-wrap: wrap
 }
 
 #header .container .nsf-logo {
@@ -22,7 +24,8 @@
 
 #header .container .access-logo {
     height: 23px;
-    margin-top: 12px
+    margin-top: 12px;
+    width: auto
 }
 
 #header .container .access,
@@ -40,18 +43,141 @@
 
 #header .container .additional-actions {
     max-width: 450px;
-    align-content: center;
+    display: flex;
+    align-items: center;
     padding-bottom: 10px;
 }
 
 #header .container .development-server-badge {
     margin: 10px;
-    padding: 4px 10px;
-    color: white;
-    background: #495057;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: xx-small;
+    padding: 8px 14px;
+    color: #fff;
+    background: #dc3545;
+    border: 3px solid #8b0000;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(139, 0, 0, 0.35);
+    font-weight: 900;
+    font-size: 1rem;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    --bs-btn-color: #000;
+    --bs-btn-bg: #ffc42d;
+    --bs-btn-border-color: #ffc42d;
+    --bs-btn-hover-color: #000;
+    --bs-btn-hover-bg: #fff;
+    --bs-btn-hover-border-color: #000;
+    --bs-btn-focus-shadow-rgb: 255, 196, 45;
+    --bs-btn-active-color: #000;
+    --bs-btn-active-bg: #e6ad00;
+    --bs-btn-active-border-color: #e6ad00;
+    --bs-btn-disabled-color: #000;
+    --bs-btn-disabled-bg: #ffc42d;
+    --bs-btn-disabled-border-color: #ffc42d;
+}
+
+.btn-primary,
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary:disabled,
+.btn-primary.disabled,
+.btn-primary.active,
+.show > .btn-primary.dropdown-toggle,
+.btn-warning,
+.btn-warning:hover,
+.btn-warning:focus,
+.btn-warning:active,
+.btn-warning:disabled,
+.btn-warning.disabled,
+.btn-warning.active,
+.show > .btn-warning.dropdown-toggle,
+.btn-accent-primary,
+.btn-accent-primary:hover,
+.btn-accent-primary:focus,
+.btn-accent-primary:active,
+.btn-accent-primary:disabled,
+.btn-accent-primary.disabled,
+.btn-accent-primary.active,
+.show > .btn-accent-primary.dropdown-toggle {
+    color: #000 !important;
+}
+
+.btn-primary,
+.btn-primary:disabled,
+.btn-primary.disabled {
+    background-color: var(--bs-btn-bg) !important;
+    border-color: var(--bs-btn-border-color) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--bs-btn-hover-bg) !important;
+    border-color: var(--bs-btn-hover-border-color) !important;
+}
+
+.btn-warning:hover,
+.btn-warning:focus,
+.btn-accent-primary:hover,
+.btn-accent-primary:focus {
+    background-color: #fff !important;
+    border-color: #000 !important;
+}
+
+.btn-primary:active,
+.btn-primary.active,
+.show > .btn-primary.dropdown-toggle {
+    background-color: var(--bs-btn-active-bg) !important;
+    border-color: var(--bs-btn-active-border-color) !important;
+}
+
+.bg-dark h1,
+.bg-dark h2,
+.bg-dark h3,
+.bg-dark h4,
+.bg-dark h5,
+.bg-dark h6,
+.bg-dark h1 *,
+.bg-dark h2 *,
+.bg-dark h3 *,
+.bg-dark h4 *,
+.bg-dark h5 *,
+.bg-dark h6 * {
+    color: #fff !important;
+}
+
+.bg-dark a:not(.btn):not(.dropdown-item),
+.bg-dark a.text-yellow,
+.bg-dark .btn-link,
+.bg-dark .text-yellow,
+.bg-dark a:not(.btn):not(.dropdown-item) *,
+.bg-dark a.text-yellow *,
+.bg-dark .btn-link *,
+.bg-dark .text-yellow * {
+    color: #ffc42d !important;
+}
+
+.bg-dark a:not(.btn):not(.dropdown-item):hover,
+.bg-dark a:not(.btn):not(.dropdown-item):focus,
+.bg-dark a.text-yellow:hover,
+.bg-dark a.text-yellow:focus,
+.bg-dark .btn-link:hover,
+.bg-dark .btn-link:focus,
+.bg-dark .text-yellow:hover,
+.bg-dark .text-yellow:focus,
+.bg-dark a:not(.btn):not(.dropdown-item):hover *,
+.bg-dark a:not(.btn):not(.dropdown-item):focus *,
+.bg-dark a.text-yellow:hover *,
+.bg-dark a.text-yellow:focus *,
+.bg-dark .btn-link:hover *,
+.bg-dark .btn-link:focus *,
+.bg-dark .text-yellow:hover *,
+.bg-dark .text-yellow:focus * {
+    color: #ffe69c !important;
+    text-decoration: underline;
 }
 
 @media (min-width: 900px) {
@@ -61,6 +187,7 @@
 
     #header .container {
         height: 144px;
+        padding-top: 52px;
     }
 
     #header .container .nsf-logo {
