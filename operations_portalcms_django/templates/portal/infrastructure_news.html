@@ -12,7 +12,7 @@
         <div class="w-100 p-3 d-flex">
             {% if perms.operations_portalcms_django.add_systemstatusnews %}
             <div class="p-2 flex-wrap">
-                <a class="btn btn-access-primary" href="{% url 'infrastructure_news:add_system_status_news' %}">Publish new news</a>
+                <a class="btn btn-accent-primary" href="{% url 'infrastructure_news:add_system_status_news' %}">Publish new news</a>
             </div>
             <div class="p-2 flex-wrap"><b>OR</b> update existing news by clicking on the Subject below.</div>
             {% endif %}
@@ -57,7 +57,7 @@
                                 <div class="btn-group" role="group">
                                     {% if news.status == 'draft' %}
                                         {% if news.author == user or perms.operations_portalcms_django.change_systemstatusnews or user.is_superuser %}
-                                            <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-primary">Edit</a>
+                                            <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
                                         {% endif %}
                                         {% if news.author == user %}
                                             <form method="post" action="{% url 'infrastructure_news:submit_systemstatus_for_review' news.id %}" class="d-inline">
@@ -87,12 +87,12 @@
                                     {% endif %}
                                     
                                     {% if news.status == 'rejected' and news.author == user %}
-                                        <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-primary">Edit & Resubmit</a>
+                                        <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit & Resubmit</a>
                                     {% endif %}
                                     
                                     {% if news.status == 'published' %}
                                         {% if perms.operations_portalcms_django.change_systemstatusnews %}
-                                            <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-primary">Edit</a>
+                                            <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
                                         {% endif %}
                                         {% if news.author == user or user.is_superuser %}
                                             <form method="post" action="{% url 'infrastructure_news:unpublish_systemstatus_news' news.id %}" class="d-inline">

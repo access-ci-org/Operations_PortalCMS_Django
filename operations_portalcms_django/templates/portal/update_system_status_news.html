@@ -64,7 +64,7 @@
             {% if form.is_active.errors %}<div class="text-danger">{{ form.is_active.errors }}</div>{% endif %}
         </div>
         
-        <button type="submit" name="draft" class="btn btn-primary">Update</button>
+        <button type="submit" name="draft" class="btn btn-accent-primary">Update</button>
         {% if can_publish %}
         <button type="submit" name="publish" class="btn btn-success">Update and Publish</button>
         {% endif %}
