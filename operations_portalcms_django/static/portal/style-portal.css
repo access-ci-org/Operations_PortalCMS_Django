@@ -63,13 +63,14 @@
     white-space: nowrap;
 }
 
-.btn-primary {
+.btn-primary,
+.btn.btn-primary {
     --bs-btn-color: #000;
     --bs-btn-bg: #ffc42d;
     --bs-btn-border-color: #ffc42d;
-    --bs-btn-hover-color: #000;
+    --bs-btn-hover-color: #232323;
     --bs-btn-hover-bg: #fff;
-    --bs-btn-hover-border-color: #000;
+    --bs-btn-hover-border-color: #232323;
     --bs-btn-focus-shadow-rgb: 255, 196, 45;
     --bs-btn-active-color: #000;
     --bs-btn-active-bg: #e6ad00;
@@ -77,61 +78,225 @@
     --bs-btn-disabled-color: #000;
     --bs-btn-disabled-bg: #ffc42d;
     --bs-btn-disabled-border-color: #ffc42d;
+    color: #000 !important;
+    background-color: #ffc42d !important;
+    border-color: #ffc42d !important;
 }
 
-.btn-primary,
 .btn-primary:hover,
 .btn-primary:focus,
-.btn-primary:active,
-.btn-primary:disabled,
-.btn-primary.disabled,
-.btn-primary.active,
-.show > .btn-primary.dropdown-toggle,
-.btn-warning,
-.btn-warning:hover,
-.btn-warning:focus,
-.btn-warning:active,
-.btn-warning:disabled,
-.btn-warning.disabled,
-.btn-warning.active,
-.show > .btn-warning.dropdown-toggle,
-.btn-accent-primary,
-.btn-accent-primary:hover,
-.btn-accent-primary:focus,
-.btn-accent-primary:active,
-.btn-accent-primary:disabled,
-.btn-accent-primary.disabled,
-.btn-accent-primary.active,
-.show > .btn-accent-primary.dropdown-toggle {
-    color: #000 !important;
-}
-
-.btn-primary,
-.btn-primary:disabled,
-.btn-primary.disabled {
-    background-color: var(--bs-btn-bg) !important;
-    border-color: var(--bs-btn-border-color) !important;
-}
-
-.btn-primary:hover,
-.btn-primary:focus {
-    background-color: var(--bs-btn-hover-bg) !important;
-    border-color: var(--bs-btn-hover-border-color) !important;
-}
-
-.btn-warning:hover,
-.btn-warning:focus,
-.btn-accent-primary:hover,
-.btn-accent-primary:focus {
+.btn.btn-primary:hover,
+.btn.btn-primary:focus {
+    color: #232323 !important;
     background-color: #fff !important;
-    border-color: #000 !important;
+    border-color: #232323 !important;
 }
 
 .btn-primary:active,
 .btn-primary.active,
 .show > .btn-primary.dropdown-toggle {
-    background-color: var(--bs-btn-active-bg) !important;
-    border-color: var(--bs-btn-active-border-color) !important;
+    color: #000 !important;
+    background-color: #e6ad00 !important;
+    border-color: #e6ad00 !important;
+}
+
+.btn-primary:disabled,
+.btn-primary.disabled {
+    color: #000 !important;
+    background-color: #ffc42d !important;
+    border-color: #ffc42d !important;
+}
+
+a.btn-primary[href="https://access-ci.org/news/"],
+a.btn.btn-primary[href="https://access-ci.org/news/"] {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #138597;
+    --bs-btn-border-color: #138597;
+    --bs-btn-hover-color: #232323;
+    --bs-btn-hover-bg: #fff;
+    --bs-btn-hover-border-color: #232323;
+    --bs-btn-focus-shadow-rgb: 19, 133, 151;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #0f6b79;
+    --bs-btn-active-border-color: #0f6b79;
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: #138597;
+    --bs-btn-disabled-border-color: #138597;
+    color: #fff !important;
+    background-color: #138597 !important;
+    border-color: #138597 !important;
+}
+
+a.btn-primary[href="https://access-ci.org/news/"]:hover,
+a.btn-primary[href="https://access-ci.org/news/"]:focus,
+a.btn.btn-primary[href="https://access-ci.org/news/"]:hover,
+a.btn.btn-primary[href="https://access-ci.org/news/"]:focus {
+    color: #232323 !important;
+    background-color: #fff !important;
+    border-color: #232323 !important;
+}
+
+a.btn-primary[href="https://access-ci.org/news/"]:active,
+a.btn-primary[href="https://access-ci.org/news/"].active,
+a.btn.btn-primary[href="https://access-ci.org/news/"]:active,
+a.btn.btn-primary[href="https://access-ci.org/news/"].active {
+    color: #fff !important;
+    background-color: #0f6b79 !important;
+    border-color: #0f6b79 !important;
+}
+
+/* Community support icons */
+img[src*="community_support_icon_"] {
+    max-width: 75px !important;
+    height: auto !important;
+}
+
+.accordion-button::after {
+    order: -1;
+    margin-left: 0;
+    margin-right: 1rem;
+}
+
+/* Resources page accordions */
+.resource-actions-header {
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    border-bottom: 3px solid #138597;
+    border-radius: 0.25rem;
+}
+
+.resource-actions-header .btn-accent-primary,
+.resource-actions-header .btn-access-primary {
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.organization-section {
+    background-color: #fff;
+    border: 1px solid #d9d9d9;
+    border-radius: 0.375rem;
+    padding: 1.25rem;
+}
+
+.organization-header {
+    color: #232323;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #138597;
+}
+
+.accordion-flush .accordion-item {
+    border: none;
+    border-bottom: 1px solid #d9d9d9;
+}
+
+.accordion-flush .accordion-item:last-child {
+    border-bottom: none;
+}
+
+.organization-section .accordion-button {
+    background-color: #fff !important;
+    color: #138597 !important;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 1rem 1.25rem;
+}
+
+.organization-section .accordion-button:not(.collapsed) {
+    background-color: #e6f5f7 !important;
+    color: #1a5b6e !important;
+    font-weight: 700;
+    box-shadow: none;
+}
+
+.organization-section .accordion-button:focus {
+    box-shadow: none;
+    border-color: transparent;
+}
+
+.organization-section .accordion-button:hover {
+    background-color: #e6f5f7 !important;
+    color: #138597 !important;
+}
+
+.accordion-body {
+    padding: 1.25rem;
+}
+
+.description-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #232323;
+    margin-bottom: 0.75rem;
+}
+
+.description-content {
+    color: #495057;
+    line-height: 1.6;
+}
+
+.description-content p {
+    margin-bottom: 1rem;
+}
+
+.description-content p:last-child {
+    margin-bottom: 0;
+}
+
+.resource-link {
+    color: #138597;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0;
+}
+
+.resource-link:hover {
+    color: #1a5b6e;
+    text-decoration: underline;
+}
+
+/* CMS FAQ accordions */
+.accordion-button {
+    background-color: #f8f9fa;
+    color: #008597;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: #48c0b9;
+    color: #fff;
+}
+
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.25rem rgba(72, 192, 185, 0.25);
+    border-color: #48c0b9;
+}
+
+.accordion-button:not(.collapsed)::after {
+    filter: brightness(0) invert(1);
+}
+
+.accordion-body .btn-link {
+    color: #008597;
+    text-decoration: none;
+    padding: 0;
+    vertical-align: baseline;
+}
+
+.accordion-body .btn-link:hover {
+    color: #1a5b6e;
+    text-decoration: underline;
+}
+
+.accordion-body .resource-link {
+    color: #008597 !important;
+    text-decoration: none;
+}
+
+.accordion-body .resource-link:hover {
+    color: #1a5b6e !important;
+    text-decoration: underline;
 }
 
 .bg-dark h1,
