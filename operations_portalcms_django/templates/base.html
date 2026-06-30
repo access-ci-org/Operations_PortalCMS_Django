@@ -61,8 +61,10 @@
                     <a class="access" href="/"><img class="access-logo"
                                                     src="{% static 'portal/img/ACCESS-operations.svg' %}"
                                                     alt="ACCESS Operations" role="img"></a>
+                </div>
+                <div class="col">
                     {% if development_server_banner %}
-                        <div class="development-server-badge">
+                        <div class="development-server-badge width-fit-content">
                             {{ development_server_label|default:"Beta" }}
                         </div>
                     {% endif %}
