@@ -10,7 +10,7 @@
     </div>
     <div class="container">
         <div class="w-100 p-3 d-flex">
-            {% if perms.operations_portalcms_django.add_systemstatusnews %}
+            {% if perms.infrastructure_news.add_systemstatusnews %}
             <div class="p-2 flex-wrap">
                 <a class="btn btn-accent-primary" href="{% url 'infrastructure_news:add_system_status_news' %}">Publish new news</a>
             </div>
@@ -56,7 +56,7 @@
                             {% if user.is_authenticated %}
                                 <div class="btn-group" role="group">
                                     {% if news.status == 'draft' %}
-                                        {% if news.author == user or perms.operations_portalcms_django.change_systemstatusnews or user.is_superuser %}
+                                        {% if news.author == user or perms.infrastructure_news.change_systemstatusnews or user.is_superuser %}
                                             <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
                                         {% endif %}
                                         {% if news.author == user %}
@@ -91,7 +91,7 @@
                                     {% endif %}
                                     
                                     {% if news.status == 'published' %}
-                                        {% if perms.operations_portalcms_django.change_systemstatusnews %}
+                                        {% if perms.infrastructure_news.change_systemstatusnews %}
                                             <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
                                         {% endif %}
                                         {% if news.author == user or user.is_superuser %}

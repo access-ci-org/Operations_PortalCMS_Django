@@ -76,6 +76,7 @@ passwords-template.yml
 DEPLOYMENT.md
 QUICKREF.md
 portalcms_django_config
+integration_news_permission_followup.txt
 
 # Flask stuff:
 instance/

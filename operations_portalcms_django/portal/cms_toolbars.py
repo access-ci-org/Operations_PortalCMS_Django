@@ -4,27 +4,40 @@ from django.utils.translation import gettext_lazy as _
 
 from djangocms_versioning.cms_toolbars import LOCK_VERSIONS, VersioningToolbar, replace_toolbar
 from djangocms_versioning.constants import DRAFT
+from djangocms_versioning.helpers import get_object_preview_url
 from djangocms_versioning.models import Version
 
 
 class ReviewWorkflowVersioningToolbar(VersioningToolbar):
+    def post_template_populate(self):
+        super().post_template_populate()
+        # _add_unlock_button is called via add_edit_button for non-page versioned
+        # content, but page views use VersioningPageToolbar.populate() which does
+        # not call add_edit_button. Calling it here ensures it runs for all views.
+        self._add_unlock_button()
+
     def _add_unlock_button(self):
         if not LOCK_VERSIONS or not self._is_versioned():
             return
 
         version = Version.objects.filter_by_content_grouping_values(self.toolbar.obj).filter(state=DRAFT).first()
-        if not version or not version.check_unlock.as_bool(self.request.user):
+        if not version:
             return
 
-        can_unlock = self.request.user.has_perm(f"{version._meta.app_label}.delete_versionlock")
         owns_lock = version.locked_by_id == self.request.user.pk
         can_publish = version.check_publish.as_bool(self.request.user)
 
+        # Check Submit for Review before check_unlock: check_unlock returns False
+        # when the user owns the lock (version_is_unlocked_for_user is True for
+        # self-owned locks), so we must handle this case independently.
         if owns_lock and not can_publish:
             item = ButtonList(side=self.toolbar.RIGHT)
-            submit_url = reverse(
-                "portal:submit_page_draft_for_review",
-                args=(version.pk,),
+            submit_url = (
+                reverse(
+                    "portal:submit_page_draft_for_review",
+                    args=(version.pk,),
+                )
+                + f"?next={get_object_preview_url(version.content)}"
             )
             item.add_button(
                 _("Submit for Review"),
@@ -39,6 +52,11 @@ class ReviewWorkflowVersioningToolbar(VersioningToolbar):
             self.toolbar.add_item(item)
             return
 
+        # Unlock button: only for users who can unlock someone else's lock
+        if not version.check_unlock.as_bool(self.request.user):
+            return
+
+        can_unlock = self.request.user.has_perm(f"{version._meta.app_label}.delete_versionlock")
         if not can_unlock:
             return
 

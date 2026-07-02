@@ -5,7 +5,8 @@ Run with: python manage.py setup_groups
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from portal.models import SystemStatusNews, IntegrationNews
+from infrastructure_news.models import SystemStatusNews
+from integration_news.models import IntegrationNews
 from cms.models import Page
 
 
