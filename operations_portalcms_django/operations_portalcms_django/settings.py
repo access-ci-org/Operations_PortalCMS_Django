@@ -289,6 +289,7 @@ CMS_TEMPLATES = [
     ('feature.html', 'Page with Feature'),
     ('infrastructure.html', 'Infrastructure Integration'),
     ('focus_area.html', 'Focus Area Page'),
+    ('faq.html', 'FAQ Page'),
 ]
 CMS_PERMISSION = True
 CMS_PUBLIC_FOR = 'all'

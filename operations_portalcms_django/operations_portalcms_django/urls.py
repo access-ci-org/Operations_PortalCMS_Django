@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,6 +29,9 @@ urlpatterns = [
     path('', include('infrastructure_news.urls', namespace='infrastructure_news')),  # Infrastructure/system status news
     path('', include('integration_news.urls', namespace='integration_news')),  # Integration news
     path('', include('portal.urls')),  # Application views (portal core, etc.)
+    # Redirects for retired /pub/ FAQ pages -> new /faqs/ CMS pages
+    path('pub/identity-faqs/', RedirectView.as_view(url='/faqs/account-setup-and-management/', permanent=True)),
+    path('pub/ticketing-faqs/', RedirectView.as_view(url='/faqs/ticketing-system/', permanent=True)),
     path('', include('cms.urls')),  # CMS pages - keep this last as catch-all
 ]
 

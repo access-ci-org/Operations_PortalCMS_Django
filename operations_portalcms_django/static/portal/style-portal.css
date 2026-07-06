@@ -75,7 +75,7 @@ img[src*="community_support_icon_"] {
     margin-right: 1rem;
 }
 
-/* Resources page accordions */
+/* Resources page actions header */
 .resource-actions-header {
     padding: 1.5rem;
     background-color: #f8f9fa;
@@ -89,14 +89,16 @@ img[src*="community_support_icon_"] {
     white-space: nowrap;
 }
 
-.organization-section {
+/* Accordion section card — resources page, FAQ pages, and any future accordion sections */
+.accordion-section {
     background-color: #fff;
     border: 1px solid #d9d9d9;
     border-radius: 0.375rem;
     padding: 1.25rem;
 }
 
-.organization-header {
+/* Accordion section heading with teal underline */
+.accordion-section-header {
     color: #232323;
     font-size: 1.25rem;
     font-weight: 700;
@@ -112,31 +114,6 @@ img[src*="community_support_icon_"] {
 
 .accordion-flush .accordion-item:last-child {
     border-bottom: none;
-}
-
-.organization-section .accordion-button {
-    background-color: #fff !important;
-    color: #138597 !important;
-    font-weight: 600;
-    font-size: 1rem;
-    padding: 1rem 1.25rem;
-}
-
-.organization-section .accordion-button:not(.collapsed) {
-    background-color: #e6f5f7 !important;
-    color: #1a5b6e !important;
-    font-weight: 700;
-    box-shadow: none;
-}
-
-.organization-section .accordion-button:focus {
-    box-shadow: none;
-    border-color: transparent;
-}
-
-.organization-section .accordion-button:hover {
-    background-color: #e6f5f7 !important;
-    color: #138597 !important;
 }
 
 .accordion-body {
@@ -173,26 +150,6 @@ img[src*="community_support_icon_"] {
 .resource-link:hover {
     color: #1a5b6e;
     text-decoration: underline;
-}
-
-/* CMS FAQ accordions */
-.accordion-button {
-    background-color: #f8f9fa;
-    color: #008597;
-}
-
-.accordion-button:not(.collapsed) {
-    background-color: #48c0b9;
-    color: #fff;
-}
-
-.accordion-button:focus {
-    box-shadow: 0 0 0 0.25rem rgba(72, 192, 185, 0.25);
-    border-color: #48c0b9;
-}
-
-.accordion-button:not(.collapsed)::after {
-    filter: brightness(0) invert(1);
 }
 
 .accordion-body .btn-link {

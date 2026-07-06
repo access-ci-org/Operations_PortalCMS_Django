@@ -34,9 +34,9 @@
 
     {# Resources organized by organization #}
     {% for org_name, resources in resources_by_org.items %}
-    <div class="organization-section mb-4">
+    <div class="accordion-section mb-4">
         {# Organization Header - Always Visible #}
-        <h3 class="organization-header"><strong>{{ org_name }}</strong></h3>
+        <h3 class="accordion-section-header"><strong>{{ org_name }}</strong></h3>
         
         {# Resources Accordion for this Organization #}
         <div class="accordion accordion-flush" id="accordion-org-{{ forloop.counter }}">
