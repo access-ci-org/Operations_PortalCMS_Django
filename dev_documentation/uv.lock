@@ -544,7 +544,7 @@ wheels = [
 ]
 
 [[package]]
-name = "portalcms"
+name = "portal"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
@@ -573,7 +573,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "access-django-user-admin", specifier = "==1.6.3" },
-    { name = "cilogon-tokenauth", specifier = "==0.4.*" },
+    { name = "cilogon-tokenauth", specifier = "==0.4.0" },
     { name = "django", specifier = ">=5.2,<5.3" },
     { name = "django-allauth", extras = ["socialaccount"], specifier = ">=65.0,<66" },
     { name = "django-bootstrap5", specifier = ">=25.0,<26" },
