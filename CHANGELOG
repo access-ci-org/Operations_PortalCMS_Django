@@ -1,3 +1,5 @@
-v1.0.0 jlambertson Summer 2026
-
- - initial deployed version of Django CSM based Operations Portal
+v0.1.0 jlambertson 2026-07 
+- initial deployment testing
+- adding CHANGELOG
+- adding .gitignore
+- have added intraoductory data types and functional elements in draft form

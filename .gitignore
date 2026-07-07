@@ -162,6 +162,7 @@ env.bak/
 venv.bak/
 dumps/
 .codex
+operations_portalcms_django/PROD
 
 
 # Spyder project settings
