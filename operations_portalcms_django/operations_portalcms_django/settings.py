@@ -143,6 +143,8 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.cilogon',
     # access_django_users app
     'access_django_user_admin',
+
+    'djangocms_snippet'
 ]
 
 MIDDLEWARE = [
