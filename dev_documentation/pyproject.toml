@@ -25,4 +25,5 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "djangocms-versioning>=2.5.1,<3",
     "cilogon-tokenauth==0.4.0",
+    "djangocms-snippet==5.0.2"
 ]

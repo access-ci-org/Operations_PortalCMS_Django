@@ -373,6 +373,18 @@ wheels = [
 ]
 
 [[package]]
+name = "djangocms-snippet"
+version = "5.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django-cms" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/51/9c7f181024280920d5c1a347ad69c22c788fa9508b123992dbacacd64bfd/djangocms_snippet-5.0.2.tar.gz", hash = "sha256:d3b19abc62b8f665e104b7aa5489292b397e46d61fc4f3ee27b7f122d8b8bb65", size = 44141, upload-time = "2025-09-03T18:44:42.417Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/92/cf1c4714cec92683a0c7564ee268311faa4a8bb0a722af269e26998bcd92/djangocms_snippet-5.0.2-py3-none-any.whl", hash = "sha256:42fdf0a37a80175184197315fc20475a1e019b72d01cc1621c04f3cb7d0f797c", size = 156575, upload-time = "2025-09-03T18:44:40.996Z" },
+]
+
+[[package]]
 name = "djangocms-text-ckeditor"
 version = "5.1.7"
 source = { registry = "https://pypi.org/simple" }
@@ -559,6 +571,7 @@ dependencies = [
     { name = "djangocms-file" },
     { name = "djangocms-link" },
     { name = "djangocms-picture" },
+    { name = "djangocms-snippet" },
     { name = "djangocms-text-ckeditor" },
     { name = "djangocms-versioning" },
     { name = "djangocms-video" },
@@ -583,6 +596,7 @@ requires-dist = [
     { name = "djangocms-file", specifier = ">=3.0.0" },
     { name = "djangocms-link", specifier = ">=3.1.0" },
     { name = "djangocms-picture", specifier = ">=4.0.0" },
+    { name = "djangocms-snippet", specifier = "==5.0.2" },
     { name = "djangocms-text-ckeditor", specifier = ">=5.1.0" },
     { name = "djangocms-versioning", specifier = ">=2.5.1,<3" },
     { name = "djangocms-video", specifier = ">=3.0.0" },
