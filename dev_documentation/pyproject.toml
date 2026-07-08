@@ -7,7 +7,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "django>=5.2,<5.3",
     "django-cms>=5.0,<5.1",
-    "djangocms-admin-style>=3.3",
+    "django-groupadmin-users==0.3.4",
     "djangocms-text-ckeditor>=5.1.0",
     "djangocms-picture>=4.0.0",
     "djangocms-file>=3.0.0",

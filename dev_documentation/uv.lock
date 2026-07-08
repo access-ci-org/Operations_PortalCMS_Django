@@ -256,6 +256,12 @@ wheels = [
 ]
 
 [[package]]
+name = "django-groupadmin-users"
+version = "0.3.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/8e/c1c1af76ba05fceae7c2c076d845cf0f109cd63670fe373f7d1a1c496b62/django-groupadmin-users-0.3.4.tar.gz", hash = "sha256:50311c0362191664d9e27457d4014fe3126ec8e04702b10827433e45e650f0f5", size = 4226, upload-time = "2021-03-25T05:50:26.168Z" }
+
+[[package]]
 name = "django-polymorphic"
 version = "4.11.4"
 source = { registry = "https://pypi.org/simple" }
@@ -567,7 +573,7 @@ dependencies = [
     { name = "django-bootstrap5" },
     { name = "django-cms" },
     { name = "django-filer" },
-    { name = "djangocms-admin-style" },
+    { name = "django-groupadmin-users" },
     { name = "djangocms-file" },
     { name = "djangocms-link" },
     { name = "djangocms-picture" },
@@ -592,7 +598,7 @@ requires-dist = [
     { name = "django-bootstrap5", specifier = ">=25.0,<26" },
     { name = "django-cms", specifier = ">=5.0,<5.1" },
     { name = "django-filer", specifier = ">=3.1.0" },
-    { name = "djangocms-admin-style", specifier = ">=3.3" },
+    { name = "django-groupadmin-users", specifier = "==0.3.4" },
     { name = "djangocms-file", specifier = ">=3.0.0" },
     { name = "djangocms-link", specifier = ">=3.1.0" },
     { name = "djangocms-picture", specifier = ">=4.0.0" },
