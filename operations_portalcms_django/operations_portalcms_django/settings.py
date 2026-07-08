@@ -81,6 +81,12 @@ def _env_bool(name, default=False):
     return _bool_value(os.environ.get(name), default)
 
 
+def _split_csv(value):
+    if not value:
+        return []
+    return [item.strip() for item in str(value).split(',') if item.strip()]
+
+
 DEBUG = _bool_value(CONF.get('DEBUG'), False)
 
 _config_name = config_file.name.lower()
@@ -103,7 +109,18 @@ ENVIRONMENT_BANNER_ENABLED = _env_bool(
 DEVELOPMENT_SERVER_BANNER = ENVIRONMENT_BANNER_ENABLED
 DEVELOPMENT_SERVER_LABEL = ENVIRONMENT_LABEL
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else []
+ALLOWED_HOSTS = _split_csv(os.environ.get('ALLOWED_HOSTS'))
+
+CSRF_TRUSTED_ORIGINS = _split_csv(os.environ.get('CSRF_TRUSTED_ORIGINS'))
+if not CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = [
+        f'https://{host}'
+        for host in ALLOWED_HOSTS
+        if host not in {'*', 'localhost', '127.0.0.1', '::1'}
+    ]
+
+if _env_bool('SECURE_PROXY_SSL_HEADER_ENABLED', True):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
