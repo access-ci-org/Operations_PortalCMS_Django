@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     'djangocms_admin_style',
     'django.contrib.admin',
     'django.contrib.auth',
+    'groupadmin_users',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
