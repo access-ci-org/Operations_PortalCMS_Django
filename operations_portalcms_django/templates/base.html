@@ -122,22 +122,12 @@
         
         {# Main Content #}
         <main role="main" id="main-content" class="container">
-            <div class="w-100 my-4">
-                {# Messages #}
-                <div class="row g-0">
-                    <div class="order-1 order-lg-2">
-                        <div>
-                            
-                            {# Page Content #}
-                            {% block content %}
-                            <article>
-                                {% placeholder "content" %}
-                            </article>
-                            {% endblock %}
-                        </div>
-                    </div>
-                </div>
+            {# Page Content #}
+            {% block content %}
+            <div class="w-100">
+                {% placeholder "content" %}
             </div>
+            {% endblock %}
         </main>
 
         <div id="table-of-contents"></div>
