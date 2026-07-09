@@ -126,9 +126,9 @@ if _env_bool('SECURE_PROXY_SSL_HEADER_ENABLED', True):
 # Application definition
 
 INSTALLED_APPS = [
+    'groupadmin_users',
     'django.contrib.admin',
     'django.contrib.auth',
-    'groupadmin_users',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
@@ -150,6 +150,8 @@ INSTALLED_APPS = [
     'djangocms_file',
     'djangocms_link',
     'djangocms_video',
+    'djangocms_snippet',
+    'django_admin_logs',
     # Django Filer
     'filer',
     'easy_thumbnails',
@@ -160,8 +162,6 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.cilogon',
     # access_django_users app
     'access_django_user_admin',
-
-    'djangocms_snippet'
 ]
 
 MIDDLEWARE = [
