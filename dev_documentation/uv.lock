@@ -153,6 +153,18 @@ wheels = [
 ]
 
 [[package]]
+name = "django-admin-logs"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d2/ca/b40c038266582f6c5f68ea44e9e641e9c3400a09d0287491aefb570443ea/django_admin_logs-1.5.0.tar.gz", hash = "sha256:ce87010b09447ed6ce39ac5d5e7d5c7d19ca3363bf2518499ceb81b9c2ef45c9", size = 8259, upload-time = "2025-12-03T15:29:05.858Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/17/d27ee86afca1e6c39c77676302885106261fdabaaa1ef2876dcf22579818/django_admin_logs-1.5.0-py3-none-any.whl", hash = "sha256:2b9a19ee59b60712a5005a27c0a060b5280ac2192607aa34757edfa5b3abc1c5", size = 6603, upload-time = "2025-12-03T15:29:04.167Z" },
+]
+
+[[package]]
 name = "django-allauth"
 version = "65.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -563,12 +575,13 @@ wheels = [
 
 [[package]]
 name = "portal"
-version = "0.1.0"
+version = "0.4.0"
 source = { virtual = "." }
 dependencies = [
     { name = "access-django-user-admin" },
     { name = "cilogon-tokenauth" },
     { name = "django" },
+    { name = "django-admin-logs" },
     { name = "django-allauth", extra = ["socialaccount"] },
     { name = "django-bootstrap5" },
     { name = "django-cms" },
@@ -594,11 +607,12 @@ requires-dist = [
     { name = "access-django-user-admin", specifier = "==1.6.3" },
     { name = "cilogon-tokenauth", specifier = "==0.4.0" },
     { name = "django", specifier = ">=5.2,<5.3" },
+    { name = "django-admin-logs", specifier = "==1.5.0" },
     { name = "django-allauth", extras = ["socialaccount"], specifier = ">=65.0,<66" },
     { name = "django-bootstrap5", specifier = ">=25.0,<26" },
     { name = "django-cms", specifier = ">=5.0,<5.1" },
     { name = "django-filer", specifier = ">=3.1.0" },
-    { name = "django-groupadmin-users", specifier = "==0.3.4" },
+    { name = "django-groupadmin-users", specifier = ">=0.3.4" },
     { name = "djangocms-file", specifier = ">=3.0.0" },
     { name = "djangocms-link", specifier = ">=3.1.0" },
     { name = "djangocms-picture", specifier = ">=4.0.0" },
