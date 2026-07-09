@@ -80,6 +80,14 @@ class IntegrationNews(models.Model):
         related_name='published_integration_news',
     )
     published_at = models.DateTimeField(null=True, blank=True)
+    drupal_nid = models.CharField(
+        max_length=32, blank=True, null=True, db_index=True,
+        help_text='Original Drupal node ID, for items imported from the legacy portal',
+    )
+    drupal_vid = models.CharField(
+        max_length=32, blank=True, null=True,
+        help_text='Original Drupal revision ID, for items imported from the legacy portal',
+    )
 
     class Meta:
         ordering = ['-created_at']
