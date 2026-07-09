@@ -49,8 +49,7 @@
     {# Header #}
     <header id="header">
         <div class="container">
-            {% settings_value 'DEVELOPMENT_SERVER_BANNER' as development_server_banner %}
-            {% settings_value 'DEVELOPMENT_SERVER_LABEL' as development_server_label %}
+            {% environment_banner as environment_banner %}
 
             <div class="row">
                 <div class="col logo logo-header"><a class="nsf" href="https://www.nsf.gov"><img
@@ -61,9 +60,9 @@
                     <a class="access" href="/"><img class="access-logo"
                                                     src="{% static 'portal/img/ACCESS-operations.svg' %}"
                                                     alt="ACCESS Operations" role="img"></a>
-                    {% if development_server_banner %}
+                    {% if environment_banner.enabled %}
                         <div class="development-server-badge">
-                            {{ development_server_label|default:"Beta" }}
+                            {{ environment_banner.label|default:"Beta" }}
                         </div>
                     {% endif %}
                 </div>

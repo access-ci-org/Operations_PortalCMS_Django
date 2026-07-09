@@ -1,3 +1,6 @@
+v0.3.1 jlambertson 2026-07-09
+- testing dev server banner logic
+
 v0.3.0 dinukadesilva 2026-07
 - updating settings to handle CSRF_TRUSTED_ORIGINS
 
