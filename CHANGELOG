@@ -1,16 +1,21 @@
+
+v0.4.0 dinukadesilva 2026-07-09
+- Enabling the "Log Entries" for administrator audit purposes (CTT-967)
+
 v0.3.1 jlambertson 2026-07-09
 - testing dev server banner logic
 
-v0.3.0 dinukadesilva 2026-07
+v0.3.0 dinukadesilva 2026-07-8
 - updating settings to handle CSRF_TRUSTED_ORIGINS
+- Enabling `django-groupadmin-users` to improve group and user management interfaces (CTT-1036)
+- Removing `djangocms_admin_style` and reverting to default admin interfaces
 
-v0.2.0 dinukadesilva 2026-07
+v0.2.0 dinukadesilva 2026-07-07
 - Adding `djangocms-snippet` to enable javascript blocks on the pages (CTT-1008)
 - Upgrading `access-operations-custom-bootstrap` to `0.0.13`
-- replaces djangocms_admin_style' with 'groupadmin_users'
 - updated newer dev uv dependency list
 
-v0.1.0 jlambertson 2026-07
+v0.1.0 jlambertson 2026-07-07
 - initial deployment testing
 - adding CHANGELOG
 - adding .gitignore
