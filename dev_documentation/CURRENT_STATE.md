@@ -77,6 +77,10 @@ Optional runtime behavior comes from the same config/environment path,
 including `DEBUG`, the environment/development banner, allowed hosts, OAuth
 credentials, database settings, logging location, and API base URLs.
 
+For local development, copy `dev_documentation/portal.local.example.json` to
+`portal.conf.dev.json` at the repository root and fill in your local database
+password and secret key before running `uv run python manage.py`.
+
 ### Logging
 
 - With `DEBUG=True`, app and Django logs go to Gunicorn stdout/stderr and then

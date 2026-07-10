@@ -29,22 +29,22 @@ Interactive backup — prompts for dump type (custom format, SQL, data-only, sch
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/backup_db.sh
 ```
 
-### pg_dump_cms.sh
+### pg_dump_portal.sh
 Non-interactive dump script. Supports `--format sql`, `--source-db`, and `--dry-run`.
 
 ```bash
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --dry-run
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --format sql
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh --dry-run
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh --format sql
 ```
 
-### pg_restore_cms.sh
+### pg_restore_portal.sh
 Restore from a dump file. Refuses to restore into the live database unless `--allow-live-target` is set. Supports `--recreate-db` and `--dry-run`.
 
 ```bash
-./database/pg_restore_cms.sh \
+./database/pg_restore_portal.sh \
   --input database/dumps/portal1_<timestamp>.dump \
-  --target-db portalcms1_clone \
+  --target-db portal1_clone \
   --recreate-db
 ```
 

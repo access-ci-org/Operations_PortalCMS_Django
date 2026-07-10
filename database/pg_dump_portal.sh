@@ -40,7 +40,7 @@ PY
 }
 
 DB_NAME="${DB_DATABASE:-$(load_config_value DB_DATABASE)}"
-DB_NAME="${DB_NAME:-portalcms1}"
+DB_NAME="${DB_NAME:-portal1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
 DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
@@ -58,7 +58,7 @@ DRY_RUN=0
 
 usage() {
     cat <<EOF
-Usage: ./database/pg_dump_cms.sh [options]
+Usage: ./database/pg_dump_portal.sh [options]
 
 Create a safe PostgreSQL dump of the configured Portal CMS database.
 
@@ -70,10 +70,10 @@ Options:
   --help               Show this help
 
 Examples:
-  ./database/pg_dump_cms.sh
-  ./database/pg_dump_cms.sh --source-db portalcms1 --format sql
-  ./database/pg_dump_cms.sh --output database/dumps/portalcms1_clone_seed.dump
-  ./database/pg_dump_cms.sh --dry-run
+  ./database/pg_dump_portal.sh
+  ./database/pg_dump_portal.sh --source-db portal1 --format sql
+  ./database/pg_dump_portal.sh --output database/dumps/portal1_clone_seed.dump
+  ./database/pg_dump_portal.sh --dry-run
 EOF
 }
 

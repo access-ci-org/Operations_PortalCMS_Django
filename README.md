@@ -33,12 +33,9 @@ Operations_PortalCMS_Django/
 │   ├── tests/                        # Standalone integration/check scripts
 │   └── manage.py
 ├── database/                         # Backup, restore, clone, and DB verification scripts
-├── dev_documentation/                # Operational documentation (see CURRENT_STATE.md)
+├── dev_documentation/                # Operational docs and local dev config example (see CURRENT_STATE.md) (these files can be copied into the root dir to run locally for development or, preferreed, one should use the [Operations_Django_Development](https://github.com/access-ci-org/Operations_Django_Development) repo)
 ├── manage.py                     # Django management script
-├── pyproject.toml                # Python dependencies
-├── portal.service.j2             # Systemd service template
-├── manage.prod.sh.j2             # Manual manage.py wrapper template
-└── nginx-portal.conf             # Nginx configuration example
+└── pyproject.toml                # Python dependencies
 ```
 
 ## Technology Stack

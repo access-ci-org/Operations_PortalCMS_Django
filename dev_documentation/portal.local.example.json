@@ -5,7 +5,7 @@
   "ENVIRONMENT_BANNER_ENABLED": true,
   "ENVIRONMENT_LABEL": "LOCAL DEVELOPMENT",
   "ALLOWED_HOSTS": ["localhost", "127.0.0.1"],
-  "DB_DATABASE": "portal1_local",
+  "DB_DATABASE": "portal_dev",
   "DB_PORT": "5432",
   "DB_HOSTNAME_READ": "localhost",
   "DB_HOSTNAME_WRITE": "localhost",

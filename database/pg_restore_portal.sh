@@ -38,7 +38,7 @@ PY
 }
 
 SOURCE_DB="${DB_DATABASE:-$(load_config_value DB_DATABASE)}"
-SOURCE_DB="${SOURCE_DB:-portalcms1}"
+SOURCE_DB="${SOURCE_DB:-portal1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
 DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
@@ -71,7 +71,7 @@ trap cleanup EXIT
 
 usage() {
     cat <<EOF
-Usage: ./database/pg_restore_cms.sh --input FILE --target-db NAME [options]
+Usage: ./database/pg_restore_portal.sh --input FILE --target-db NAME [options]
 
 Restore a Portal CMS dump into an explicit target database.
 
@@ -87,12 +87,12 @@ Options:
 
 Safety:
   - Refuses to restore into the configured source database by default.
-  - Intended for clone-first workflows such as portalcms1_clone.
+  - Intended for clone-first workflows such as portal1_clone.
 
 Example:
-  ./database/pg_restore_cms.sh \\
+  ./database/pg_restore_portal.sh \\
     --input backups/portalcms1_pre_versioning_20260331T174604Z.dump \\
-    --target-db portalcms1_clone \\
+    --target-db portal1_clone \\
     --recreate-db
 EOF
 }

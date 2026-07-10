@@ -66,7 +66,7 @@ run_psql() {
 
 # Configuration
 DB_NAME="${DB_DATABASE:-$(load_config_value DB_DATABASE)}"
-DB_NAME="${DB_NAME:-portalcms1}"
+DB_NAME="${DB_NAME:-portal1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
 DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"

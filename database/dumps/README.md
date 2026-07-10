@@ -5,7 +5,7 @@ This directory contains historical deployment dump notes and is still the defaul
 ## Current Policy
 
 - The database of record is Amazon RDS `portal1`.
-- Use `APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh` from the repo root for current backups.
+- Use `APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh` from the repo root for current backups.
 - Current backups should not be committed to git.
 - Restore operations into `portal1` require an explicit `--allow-live-target` and should be treated as a maintenance-window action.
 
@@ -28,13 +28,13 @@ From the repo root:
 
 ```bash
 # Preview the RDS dump command
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --dry-run
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh --dry-run
 
 # Create a custom-format dump
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh
 
 # Create a SQL dump
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_cms.sh --format sql
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh --format sql
 ```
 
 The current helper names outputs like:
