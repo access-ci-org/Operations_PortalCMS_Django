@@ -1,3 +1,6 @@
+v0.4.1 jlambertson 2026-07-19
+- cleaning up some db management files
+- removing some leftover dev files
 
 v0.4.0 dinukadesilva 2026-07-09
 - Enabling the "Log Entries" for administrator audit purposes (CTT-967)
