@@ -112,4 +112,7 @@ def update_system_status_news(request, pk):
 def api_infrastructure_news(request):
     """Public JSON feed of published System Status News, matching the shape of the
     legacy Drupal /api/infrastructure_news endpoint for downstream consumers."""
+    if request.method not in ('GET', 'HEAD'):
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(['GET', 'HEAD'])
     return JsonResponse(services.get_public_news_feed(request), safe=False)
