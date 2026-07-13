@@ -1,13 +1,16 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
+from django.http import JsonResponse
 from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_safe
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.db.models import Prefetch
 from .models import SystemStatusNews
 from .forms import SystemStatusNewsForm
+from . import services
 
 
 def system_status_news(request):
@@ -104,3 +107,14 @@ def update_system_status_news(request, pk):
         'form': form,
         'can_publish': can_publish,
     })
+
+
+@require_safe
+@cache_page(60 * 15)
+def api_infrastructure_news(request):
+    """Public JSON feed of published System Status News, matching the shape of the
+    legacy Drupal /api/infrastructure_news endpoint for downstream consumers."""
+    if request.method not in ('GET', 'HEAD'):
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(['GET', 'HEAD'])
+    return JsonResponse(services.get_public_news_feed(request), safe=False)
