@@ -38,5 +38,5 @@ def _news_item_to_dict(news, request):
 def get_public_news_feed(request):
     news_items = SystemStatusNews.objects.filter(
         status='published', is_active=True
-    ).order_by('-start_datetime')
+    ).prefetch_related('affected_infrastructure_items').order_by('-start_datetime')
     return [_news_item_to_dict(news, request) for news in news_items]
