@@ -1,3 +1,6 @@
+v0.5.0 dbenham 2026-07-13
+- adding service status news api endpoint
+
 v0.4.1 jlambertson 2026-07-19
 - cleaning up some db management files
 - removing some leftover dev files
