@@ -105,7 +105,7 @@
                                 
                             {% endif %}
 
-                            {% if news.review_comments and '[drupal_nid:' not in news.review_comments %}
+                            {% if news.review_comments %}
                                 <div class="alert alert-warning mt-2 mb-0">
                                     <strong>Review Comments:</strong> {{ news.review_comments }}
                                 </div>

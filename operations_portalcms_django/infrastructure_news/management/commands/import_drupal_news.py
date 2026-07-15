@@ -81,12 +81,6 @@ def _nid(record: Dict[str, Any]) -> str:
     return str(meta.get("drupal_nid", "unknown"))
 
 
-def _provenance_tag(record: Dict[str, Any]) -> str:
-    nid = _nid(record)
-    vid = (record.get("source_metadata", {}) or {}).get("drupal_vid")
-    return f"[drupal_nid:{nid};drupal_vid:{vid}]"
-
-
 def _source_author(record: Dict[str, Any]) -> str:
     source_author = (record.get("source_metadata", {}) or {}).get("drupal_author") or {}
     if isinstance(source_author, dict):
@@ -143,6 +137,23 @@ class Command(BaseCommand):
             action="store_true",
             help="Treat warnings as errors and abort import.",
         )
+        parser.add_argument(
+            "--report-unresolved",
+            action="store_true",
+            help=(
+                "Re-check SystemStatusNews rows that have a drupal_nid but no resolved "
+                "infrastructure link against current CIDER data, and report what would "
+                "now resolve. Makes no writes. Skips the normal import."
+            ),
+        )
+        parser.add_argument(
+            "--relink-unresolved",
+            action="store_true",
+            help=(
+                "Like --report-unresolved, but saves any newly-resolvable infrastructure "
+                "links. Skips the normal import."
+            ),
+        )
 
     def handle(self, *args, **options):
         input_path = Path(options["input"])
@@ -156,6 +167,10 @@ class Command(BaseCommand):
         payload = json.loads(input_path.read_text(encoding="utf-8"))
         system_records = payload.get("SystemStatusNews", [])
         integration_records = payload.get("IntegrationNews", [])
+
+        if options["report_unresolved"] or options["relink_unresolved"]:
+            self._resolve_unresolved(payload=payload, relink=bool(options["relink_unresolved"]))
+            return
 
         self.stdout.write(f"Input: {input_path}")
         self.stdout.write(
@@ -273,10 +288,82 @@ class Command(BaseCommand):
             elements[code] = element
         return elements
 
+    def _resolve_unresolved(self, payload: Dict[str, Any], relink: bool) -> None:
+        """Re-check SystemStatusNews rows with a drupal_nid but no resolved
+        infrastructure link against current CIDER data. Useful after
+        sync_cider_from_api has since populated resource IDs that failed to
+        match at original import time. Only touches affected_infrastructure_items
+        and the denormalized affected_infrastructure field."""
+        system_records = payload.get("SystemStatusNews", [])
+        records_by_nid = {_nid(record): record for record in system_records}
+
+        unresolved = [
+            news
+            for news in SystemStatusNews.objects.exclude(drupal_nid__isnull=True).exclude(drupal_nid="")
+            if not news.affected_infrastructure_items.exists()
+        ]
+
+        mode = "RELINK" if relink else "REPORT (no writes)"
+        self.stdout.write(
+            f"[{mode}] Checking {len(unresolved)} SystemStatusNews row(s) with a drupal_nid "
+            "but no resolved infrastructure link..."
+        )
+        self.stdout.write("")
+
+        resolvable = 0
+        relinked = 0
+        still_unresolved = 0
+        not_in_input = 0
+
+        for news in unresolved:
+            record = records_by_nid.get(news.drupal_nid)
+            if record is None:
+                not_in_input += 1
+                self.stdout.write(f"  nid={news.drupal_nid} (pk={news.pk}): not present in --input file, skipped")
+                continue
+
+            related_nodes = (record.get("source_metadata", {}) or {}).get("affected_infrastructure_nodes") or []
+            resource_ids = [
+                str(node["resource_id"]) for node in related_nodes
+                if isinstance(node, dict) and node.get("resource_id")
+            ]
+
+            matched_infra = list(CiderInfrastructure.objects.filter(info_resourceid__in=resource_ids))
+            if not matched_infra:
+                still_unresolved += 1
+                self.stdout.write(f"  nid={news.drupal_nid} (pk={news.pk}): still unresolved (candidates={resource_ids})")
+                continue
+
+            matched_ids = sorted(infra.info_resourceid for infra in matched_infra)
+            resolvable += 1
+
+            if relink:
+                news.affected_infrastructure_items.set(matched_infra)
+                news.affected_infrastructure = ", ".join(matched_ids)
+                news.save(update_fields=["affected_infrastructure"])
+                relinked += 1
+                self.stdout.write(f"  nid={news.drupal_nid} (pk={news.pk}): RELINKED to {matched_ids}")
+            else:
+                self.stdout.write(
+                    f"  nid={news.drupal_nid} (pk={news.pk}): now resolvable to {matched_ids} "
+                    "(rerun with --relink-unresolved to save)"
+                )
+
+        self.stdout.write("")
+        self.stdout.write(self.style.SUCCESS(
+            f"Done. resolvable={resolvable}, relinked={relinked}, "
+            f"still_unresolved={still_unresolved}, not_in_input={not_in_input}"
+        ))
+
     def _find_existing_system(self, record: Dict[str, Any]) -> Optional[SystemStatusNews]:
-        # Backward compatibility for earlier imports that stored Drupal provenance
+        nid = _nid(record)
+        match = SystemStatusNews.objects.filter(drupal_nid=nid).first()
+        if match:
+            return match
+
+        # Backward compatibility for rows not yet backfilled with a real drupal_nid
         legacy = SystemStatusNews.objects.filter(
-            review_comments__contains=f"[drupal_nid:{_nid(record)};"
+            review_comments__contains=f"[drupal_nid:{nid};"
         ).first()
         if legacy:
             return legacy
@@ -290,9 +377,14 @@ class Command(BaseCommand):
         ).first()
 
     def _find_existing_integration(self, record: Dict[str, Any]) -> Optional[IntegrationNews]:
-        # Backward compatibility for earlier imports that stored Drupal provenance
+        nid = _nid(record)
+        match = IntegrationNews.objects.filter(drupal_nid=nid).first()
+        if match:
+            return match
+
+        # Backward compatibility for rows not yet backfilled with a real drupal_nid
         legacy = IntegrationNews.objects.filter(
-            review_comments__contains=f"[drupal_nid:{_nid(record)};"
+            review_comments__contains=f"[drupal_nid:{nid};"
         ).first()
         if legacy:
             return legacy
@@ -326,7 +418,9 @@ class Command(BaseCommand):
         obj.post_to_slack = bool(record.get("post_to_slack", False))
         obj.is_active = bool(record.get("is_active", True))
         obj.status = record.get("status") or "published"
-        obj.review_comments = _provenance_tag(record)
+        obj.drupal_nid = _nid(record)
+        drupal_vid = (record.get("source_metadata", {}) or {}).get("drupal_vid")
+        obj.drupal_vid = str(drupal_vid) if drupal_vid is not None else None
         if obj.status == "published":
             obj.published_at = _as_dt((record.get("source_metadata", {}) or {}).get("drupal_created_at"))
 
@@ -383,7 +477,9 @@ class Command(BaseCommand):
         obj.expiration_date = _as_date(record.get("expiration_date"))
         obj.is_active = bool(record.get("is_active", True))
         obj.status = record.get("status") or "published"
-        obj.review_comments = _provenance_tag(record)
+        obj.drupal_nid = _nid(record)
+        drupal_vid = (record.get("source_metadata", {}) or {}).get("drupal_vid")
+        obj.drupal_vid = str(drupal_vid) if drupal_vid is not None else None
         if obj.status == "published":
             obj.published_at = _as_dt((record.get("source_metadata", {}) or {}).get("drupal_created_at"))
 
