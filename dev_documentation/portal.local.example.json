@@ -20,6 +20,7 @@
   "APP_VERSION": "local-dev",
   "SYSLOG_SOCK": "",
   "API_BASE": "",
+  "OPERATIONS_API_BASE": "https://operations-api.access-ci.org/wh2",
   "API_KEY": "",
   "CILOGON_CLIENT_ID": "",
   "CILOGON_CLIENT_SECRET": ""

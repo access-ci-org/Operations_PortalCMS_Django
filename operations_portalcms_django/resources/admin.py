@@ -2,10 +2,27 @@ from django.contrib import admin
 from .models import CiderInfrastructure, CiderOrganizations, CiderFeatures, CiderGroups
 
 
+class _ReadOnlyAdmin(admin.ModelAdmin):
+    """Mixin that disables all write operations in the admin UI.
+
+    CIDER models are non-authoritative projections populated only by
+    sync_cider_from_api. They must not be edited through the admin.
+    """
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(CiderInfrastructure)
-class CiderInfrastructureAdmin(admin.ModelAdmin):
-    list_display = ['info_resourceid', 'resource_descriptive_name', 'cider_type', 'latest_status', 'provider_level']
-    list_filter = ['cider_type', 'latest_status', 'provider_level', 'project_affiliation']
+class CiderInfrastructureAdmin(_ReadOnlyAdmin):
+    list_display = ['info_resourceid', 'resource_descriptive_name', 'cider_type', 'latest_status', 'provider_level', 'is_active']
+    list_filter = ['is_active', 'cider_type', 'latest_status', 'provider_level', 'project_affiliation']
     search_fields = ['info_resourceid', 'resource_descriptive_name', 'resource_description', 'info_siteid']
     readonly_fields = ['cider_resource_id', 'updated_at']
 
@@ -34,7 +51,7 @@ class CiderInfrastructureAdmin(admin.ModelAdmin):
 
 
 @admin.register(CiderOrganizations)
-class CiderOrganizationsAdmin(admin.ModelAdmin):
+class CiderOrganizationsAdmin(_ReadOnlyAdmin):
     list_display = ['organization_name', 'organization_abbrev', 'organization_id']
     search_fields = ['organization_name', 'organization_abbrev']
     readonly_fields = ['organization_id']
@@ -43,7 +60,7 @@ class CiderOrganizationsAdmin(admin.ModelAdmin):
 
 
 @admin.register(CiderFeatures)
-class CiderFeaturesAdmin(admin.ModelAdmin):
+class CiderFeaturesAdmin(_ReadOnlyAdmin):
     list_display = ['feature_category_name', 'feature_category_id']
     search_fields = ['feature_category_name', 'feature_category_description']
     readonly_fields = ['feature_category_id']
@@ -52,7 +69,7 @@ class CiderFeaturesAdmin(admin.ModelAdmin):
 
 
 @admin.register(CiderGroups)
-class CiderGroupsAdmin(admin.ModelAdmin):
+class CiderGroupsAdmin(_ReadOnlyAdmin):
     list_display = ['info_groupid', 'group_descriptive_name', 'group_id']
     search_fields = ['info_groupid', 'group_descriptive_name', 'group_description']
     readonly_fields = ['group_id']

@@ -274,9 +274,18 @@ class Command(BaseCommand):
         return elements
 
     def _find_existing_system(self, record: Dict[str, Any]) -> Optional[SystemStatusNews]:
+        nid_raw = _nid(record)
+        if nid_raw != "unknown":
+            try:
+                by_id = SystemStatusNews.objects.filter(outage_id=int(nid_raw)).first()
+                if by_id:
+                    return by_id
+            except (ValueError, TypeError):
+                pass
+
         # Backward compatibility for earlier imports that stored Drupal provenance
         legacy = SystemStatusNews.objects.filter(
-            review_comments__contains=f"[drupal_nid:{_nid(record)};"
+            review_comments__contains=f"[drupal_nid:{nid_raw};"
         ).first()
         if legacy:
             return legacy
@@ -290,9 +299,18 @@ class Command(BaseCommand):
         ).first()
 
     def _find_existing_integration(self, record: Dict[str, Any]) -> Optional[IntegrationNews]:
+        nid_raw = _nid(record)
+        if nid_raw != "unknown":
+            try:
+                by_id = IntegrationNews.objects.filter(integration_news_id=int(nid_raw)).first()
+                if by_id:
+                    return by_id
+            except (ValueError, TypeError):
+                pass
+
         # Backward compatibility for earlier imports that stored Drupal provenance
         legacy = IntegrationNews.objects.filter(
-            review_comments__contains=f"[drupal_nid:{_nid(record)};"
+            review_comments__contains=f"[drupal_nid:{nid_raw};"
         ).first()
         if legacy:
             return legacy
@@ -329,6 +347,13 @@ class Command(BaseCommand):
         obj.review_comments = _provenance_tag(record)
         if obj.status == "published":
             obj.published_at = _as_dt((record.get("source_metadata", {}) or {}).get("drupal_created_at"))
+
+        nid_raw = _nid(record)
+        if nid_raw != "unknown" and obj.outage_id is None:
+            try:
+                obj.outage_id = int(nid_raw)
+            except (ValueError, TypeError):
+                pass
 
         if not dry_run:
             obj.save()
@@ -386,6 +411,13 @@ class Command(BaseCommand):
         obj.review_comments = _provenance_tag(record)
         if obj.status == "published":
             obj.published_at = _as_dt((record.get("source_metadata", {}) or {}).get("drupal_created_at"))
+
+        nid_raw = _nid(record)
+        if nid_raw != "unknown" and obj.integration_news_id is None:
+            try:
+                obj.integration_news_id = int(nid_raw)
+            except (ValueError, TypeError):
+                pass
 
         selected_codes: List[str] = []
         primary_code = record.get("affected_element")
