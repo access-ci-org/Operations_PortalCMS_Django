@@ -47,6 +47,11 @@ class SystemStatusNews(models.Model):
     )
     effective_date = models.DateField(null=True, blank=True)
     expiration_date = models.DateField(null=True, blank=True)
+    outage_id = models.PositiveIntegerField(
+        null=True, blank=True, unique=True, db_index=True,
+        verbose_name='Outage ID',
+        help_text='Stable external identifier used by API consumers. Carried from Drupal for imported records; auto-assigned for new records.',
+    )
     send_email = models.BooleanField(default=False, verbose_name='Send Email Notification')
     email_list = models.CharField(max_length=500, blank=True, verbose_name='Email Recipients')
     post_to_slack = models.BooleanField(default=False, verbose_name='Post to Slack')

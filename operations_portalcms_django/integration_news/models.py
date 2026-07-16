@@ -50,6 +50,11 @@ class IntegrationNews(models.Model):
         related_name='integration_news_items',
         verbose_name='Affected Elements',
     )
+    integration_news_id = models.PositiveIntegerField(
+        null=True, blank=True, unique=True, db_index=True,
+        verbose_name='Integration News ID',
+        help_text='Stable external identifier used by API consumers. Carried from Drupal for imported records; auto-assigned for new records.',
+    )
     effective_date = models.DateField(null=True, blank=True)
     expiration_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

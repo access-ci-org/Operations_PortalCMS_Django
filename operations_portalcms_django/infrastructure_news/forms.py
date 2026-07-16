@@ -1,5 +1,6 @@
 from django import forms
 from resources.models import CiderInfrastructure
+from resources.services import get_active_infrastructure_queryset
 from .models import SystemStatusNews
 
 
@@ -57,7 +58,7 @@ class SystemStatusNewsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['affected_infrastructure_items'].queryset = CiderInfrastructure.objects.order_by('resource_descriptive_name')
+        self.fields['affected_infrastructure_items'].queryset = get_active_infrastructure_queryset()
         self.fields['affected_infrastructure_items'].label_from_instance = (
             lambda item: f"{item.info_resourceid} - {item.resource_descriptive_name}"
         )

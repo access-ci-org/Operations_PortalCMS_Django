@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import requests
@@ -32,34 +31,9 @@ def fake_render(request, template_name, context):
     return response
 
 
-def fake_cider_resource(**overrides):
-    defaults = {
-        'cider_resource_id': 1,
-        'cider_type': 'Compute',
-        'info_resourceid': '',
-        'info_siteid': '',
-        'resource_descriptive_name': 'Cached Resource',
-        'resource_description': '',
-        'resource_status': 'active',
-        'current_statuses': [],
-        'latest_status': '',
-        'latest_status_begin': None,
-        'latest_status_end': None,
-        'recommended_use': '',
-        'access_description': '',
-        'project_affiliation': 'ACCESS',
-        'provider_level': '',
-        'other_attributes': {'organization_name': 'Local Org'},
-        'protected_attributes': {},
-    }
-    defaults.update(overrides)
-    return SimpleNamespace(**defaults)
-
-
 class ResourceServiceTests(SimpleTestCase):
-    @patch('resources.services._local_resource_dicts', return_value=[])
     @patch('resources.services.requests.get')
-    def test_remote_resource_listing_groups_by_organization(self, mock_get, _mock_local):
+    def test_remote_resource_listing_groups_by_organization(self, mock_get):
         mock_get.return_value = MockResponse(payload={
             'results': [
                 {
@@ -82,9 +56,8 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertEqual(resources_by_org['Org A'][0]['resource_descriptive_name'], 'Alpha')
         mock_get.assert_called_once()
 
-    @patch('resources.services._local_resource_dicts', return_value=[])
     @patch('resources.services.requests.get')
-    def test_empty_resource_api_response_returns_error(self, mock_get, _mock_local):
+    def test_empty_resource_api_response_returns_error(self, mock_get):
         mock_get.return_value = MockResponse(content=b'')
 
         resources_by_org, error_message = services.get_resource_listing('allocated')
@@ -92,9 +65,8 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertEqual(resources_by_org, {})
         self.assertEqual(error_message, 'API returned empty response')
 
-    @patch('resources.services._local_resource_dicts', return_value=[])
     @patch('resources.services.requests.get')
-    def test_upstream_resource_error_returns_error(self, mock_get, _mock_local):
+    def test_upstream_resource_error_returns_error(self, mock_get):
         mock_get.return_value = MockResponse(http_error=requests.HTTPError('503'))
 
         resources_by_org, error_message = services.get_resource_listing('allocated')
@@ -103,9 +75,19 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertIn('Unable to fetch resources', error_message)
         self.assertIn('503', error_message)
 
-    @patch('resources.services._local_resource_dicts', return_value=[])
     @patch('resources.services.requests.get')
-    def test_invalid_resource_json_returns_error(self, mock_get, _mock_local):
+    def test_api_failure_does_not_fall_back_to_local_data(self, mock_get):
+        """An unavailable API must produce an error, not silently serve local rows."""
+        mock_get.return_value = MockResponse(http_error=requests.HTTPError('503'))
+
+        resources_by_org, error_message = services.get_resource_listing('allocated')
+
+        self.assertEqual(resources_by_org, {})
+        self.assertIsNotNone(error_message)
+        mock_get.assert_called_once()
+
+    @patch('resources.services.requests.get')
+    def test_invalid_resource_json_returns_error(self, mock_get):
         mock_get.return_value = MockResponse(json_error=ValueError('bad json'))
 
         resources_by_org, error_message = services.get_resource_listing('allocated')
@@ -113,9 +95,8 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertEqual(resources_by_org, {})
         self.assertIn('Invalid JSON response', error_message)
 
-    @patch('resources.services._local_resource_dicts', return_value=[])
     @patch('resources.services.requests.get')
-    def test_remote_allocated_listing_filters_noncanonical_rows(self, mock_get, _mock_local):
+    def test_remote_allocated_listing_filters_noncanonical_rows(self, mock_get):
         mock_get.return_value = MockResponse(payload={
             'results': [
                 {
@@ -142,9 +123,8 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertEqual([item['resource_descriptive_name'] for item in resources_by_org['Known Org']], ['Canonical'])
         self.assertNotIn('Unknown Organization', resources_by_org)
 
-    @patch('resources.services._local_resource_dicts', return_value=[])
     @patch('resources.services.requests.get')
-    def test_remote_online_services_require_org_but_not_access_project(self, mock_get, _mock_local):
+    def test_remote_online_services_require_org_but_not_access_project(self, mock_get):
         mock_get.return_value = MockResponse(payload={
             'results': [
                 {
@@ -168,71 +148,6 @@ class ResourceServiceTests(SimpleTestCase):
             ['Online Service'],
         )
         self.assertNotIn('Unknown Organization', resources_by_org)
-
-    @patch('resources.services._local_resource_dicts')
-    @patch('resources.services.requests.get')
-    def test_local_resource_cache_prevents_remote_fetch(self, mock_get, mock_local):
-        mock_local.return_value = [{
-            'resource_descriptive_name': 'Cached',
-            'organization_name': 'Local Org',
-            'project_affiliation': 'ACCESS',
-        }]
-
-        resources_by_org, error_message = services.get_resource_listing('allocated')
-
-        self.assertIsNone(error_message)
-        self.assertEqual(resources_by_org['Local Org'][0]['resource_descriptive_name'], 'Cached')
-        mock_get.assert_not_called()
-
-    @patch('resources.services._local_resource_dicts')
-    @patch('resources.services.requests.get')
-    def test_local_allocated_listing_filters_noncanonical_rows(self, mock_get, mock_local):
-        mock_local.return_value = [
-            {
-                'resource_descriptive_name': 'Canonical',
-                'organization_name': 'Known Org',
-                'project_affiliation': 'ACCESS',
-            },
-            {
-                'resource_descriptive_name': 'Missing Org',
-                'organization_name': '',
-                'project_affiliation': 'ACCESS',
-            },
-            {
-                'resource_descriptive_name': 'Non ACCESS',
-                'organization_name': 'Known Org',
-                'project_affiliation': '',
-            },
-        ]
-
-        resources_by_org, error_message = services.get_resource_listing('allocated')
-
-        self.assertIsNone(error_message)
-        self.assertEqual([item['resource_descriptive_name'] for item in resources_by_org['Known Org']], ['Canonical'])
-        self.assertNotIn('Unknown Organization', resources_by_org)
-        mock_get.assert_not_called()
-
-    @patch('resources.services._local_resource_dicts', return_value=[{
-        'resource_descriptive_name': 'Orphan',
-        'organization_name': '',
-        'project_affiliation': '',
-    }])
-    @patch('resources.services.requests.get')
-    def test_local_orphans_do_not_block_remote_resource_fallback(self, mock_get, _mock_local):
-        mock_get.return_value = MockResponse(payload={
-            'results': [{
-                'resource_descriptive_name': 'Remote Canonical',
-                'organization_name': 'Remote Org',
-                'project_affiliation': 'ACCESS',
-            }],
-        })
-
-        resources_by_org, error_message = services.get_resource_listing('allocated')
-
-        self.assertIsNone(error_message)
-        self.assertEqual(resources_by_org['Remote Org'][0]['resource_descriptive_name'], 'Remote Canonical')
-        self.assertNotIn('Unknown Organization', resources_by_org)
-        mock_get.assert_called_once()
 
     @patch('resources.services.get_software_catalog')
     def test_software_listing_filters_and_counts_providers(self, mock_catalog):
@@ -278,56 +193,24 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertEqual(error_message, 'Software item not found')
 
     @patch('resources.services.fetch_json', return_value={'results': {}})
-    @patch.object(services.CiderInfrastructure.objects, 'get')
-    def test_missing_resource_detail_returns_not_found(self, mock_get, _mock_fetch):
-        mock_get.side_effect = services.CiderInfrastructure.DoesNotExist
-
+    def test_missing_resource_detail_returns_not_found(self, _mock_fetch):
         resource, error_message = services.get_resource_detail(404)
 
         self.assertIsNone(resource)
         self.assertEqual(error_message, 'Resource not found')
 
     @patch('resources.services.fetch_json')
-    @patch.object(services.CiderInfrastructure.objects, 'get')
-    def test_publishable_local_resource_detail_prevents_remote_fetch(self, mock_get, mock_fetch):
-        mock_get.return_value = fake_cider_resource(
-            resource_descriptive_name='Canonical Cached',
-            other_attributes={'organization_name': 'Known Org'},
-            project_affiliation='ACCESS',
-        )
+    def test_resource_detail_api_failure_returns_error(self, mock_fetch):
+        """An unavailable detail API must return an error, not silently serve local rows."""
+        mock_fetch.side_effect = services.ResourceDataError('Unable to fetch resource details: 503')
 
         resource, error_message = services.get_resource_detail(101)
 
-        self.assertIsNone(error_message)
-        self.assertEqual(resource['resource_descriptive_name'], 'Canonical Cached')
-        mock_fetch.assert_not_called()
+        self.assertIsNone(resource)
+        self.assertIn('Unable to fetch resource details', error_message)
 
     @patch('resources.services.fetch_json')
-    @patch.object(services.CiderInfrastructure.objects, 'get')
-    def test_unpublishable_local_resource_detail_falls_back_to_remote(self, mock_get, mock_fetch):
-        mock_get.return_value = fake_cider_resource(
-            resource_descriptive_name='Local Orphan',
-            other_attributes={'organization_name': ''},
-            project_affiliation='',
-        )
-        mock_fetch.return_value = {
-            'results': {
-                'resource_descriptive_name': 'Remote Canonical',
-                'organization_name': 'Remote Org',
-                'project_affiliation': 'ACCESS',
-            },
-        }
-
-        resource, error_message = services.get_resource_detail(102)
-
-        self.assertIsNone(error_message)
-        self.assertEqual(resource['resource_descriptive_name'], 'Remote Canonical')
-        mock_fetch.assert_called_once()
-
-    @patch('resources.services.fetch_json')
-    @patch.object(services.CiderInfrastructure.objects, 'get')
-    def test_unpublishable_remote_resource_detail_returns_not_found(self, mock_get, mock_fetch):
-        mock_get.side_effect = services.CiderInfrastructure.DoesNotExist
+    def test_unpublishable_remote_resource_detail_returns_not_found(self, mock_fetch):
         mock_fetch.return_value = {
             'results': {
                 'resource_descriptive_name': 'Remote Orphan',

@@ -28,6 +28,7 @@ def operations_api_base():
     configured_base = (
         getattr(settings, "OPERATIONS_API_BASE", "")
         or getattr(settings, "API_BASE", "")
+        or getattr(settings, "OPERATIONS_API_BASE_URL", "")
         or DEFAULT_OPERATIONS_API_BASE
     )
     return configured_base.rstrip("/")
@@ -181,30 +182,29 @@ def _remote_resource_listing(kind):
 
 
 def get_resource_listing(kind):
-    try:
-        local_resources = _publishable_resources(kind, _local_resource_dicts(kind))
-    except DatabaseError:
-        local_resources = []
+    """Return public resource listing grouped by organisation.
 
-    if local_resources:
-        return _group_resources_by_org(local_resources), None
-
+    Data comes exclusively from the Warehouse API. An unavailable API returns
+    an error message rather than silently serving stale local projection data.
+    """
     return _remote_resource_listing(kind)
 
 
+def get_active_infrastructure_queryset():
+    """Return the queryset of active local CIDER infrastructure rows.
+
+    Intended for use by news entry forms and admin selectors only.
+    Public resource pages must use the Warehouse API via get_resource_listing().
+    """
+    return CiderInfrastructure.objects.filter(is_active=True).order_by("resource_descriptive_name")
+
+
 def get_resource_detail(node_id):
-    try:
-        resource = CiderInfrastructure.objects.get(cider_resource_id=node_id)
-    except CiderInfrastructure.DoesNotExist:
-        resource = None
-    except DatabaseError:
-        resource = None
+    """Return a single publishable resource dict from the Warehouse API.
 
-    if resource is not None:
-        resource_dict = _resource_to_dict(resource)
-        if _is_publishable_resource(resource_dict):
-            return resource_dict, None
-
+    Data comes exclusively from the Warehouse API. An unavailable API returns
+    an error message rather than silently serving stale local projection data.
+    """
     try:
         data = fetch_json(
             f"/cider/v1/cider_resource_id/{node_id}/",

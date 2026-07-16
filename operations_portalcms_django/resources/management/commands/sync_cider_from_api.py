@@ -20,12 +20,17 @@ from resources.models import (
     CiderInfrastructure,
     CiderOrganizations,
 )
+from resources.services import operations_api_base
 
 
 class Command(BaseCommand):
     help = "Syncs CIDER data from Operations API (infrastructure, groups, organizations, features)"
 
-    API_BASE = "https://operations-api.access-ci.org/wh2/cider"
+    def _api_base(self, override: str | None) -> str:
+        """Return the API base URL: explicit --api-url > settings > built-in default."""
+        if override:
+            return override.rstrip("/")
+        return operations_api_base()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -74,8 +79,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        if options["api_url"]:
-            self.API_BASE = options["api_url"]
+        api_base = self._api_base(options["api_url"])
 
         timeout = int(options["timeout"])
         group_prefix = str(options["group_prefix"] or "")
@@ -87,7 +91,7 @@ class Command(BaseCommand):
         self.stdout.write("\n" + "=" * 70)
         self.stdout.write("SYNCING CIDER DATA FROM API")
         self.stdout.write("=" * 70)
-        self.stdout.write(f"Base URL: {self.API_BASE}")
+        self.stdout.write(f"Base URL: {api_base}")
         self.stdout.write(f"Mode: {'dry-run' if dry_run else 'write'}")
         self.stdout.write("")
 
@@ -96,9 +100,10 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 if not skip_infrastructure:
-                    self.sync_infrastructure(timeout=timeout, dry_run=dry_run, counts=counts)
+                    self.sync_infrastructure(api_base=api_base, timeout=timeout, dry_run=dry_run, counts=counts)
                 if not skip_groups_bundle:
                     self.sync_groups_bundle(
+                        api_base=api_base,
                         timeout=timeout,
                         dry_run=dry_run,
                         group_prefix=group_prefix,
@@ -130,18 +135,21 @@ class Command(BaseCommand):
         text = str(value)
         return text[:length]
 
-    def sync_infrastructure(self, timeout: int, dry_run: bool, counts) -> None:
+    def sync_infrastructure(self, api_base: str, timeout: int, dry_run: bool, counts) -> None:
         self.stdout.write("--- Syncing Infrastructure (/v2/access-active/) ---")
-        url = f"{self.API_BASE}/v2/access-active/"
+        url = f"{api_base}/cider/v2/access-active/"
         data = self.fetch_json(url, timeout=timeout)
         resources = data.get("results", [])
         self.stdout.write(f"Fetched resources: {len(resources)}")
+
+        seen_ids: set[int] = set()
 
         for resource in resources:
             resource_id = resource.get("cider_resource_id")
             if resource_id is None:
                 counts["infrastructure_skipped_missing_id"] += 1
                 continue
+            seen_ids.add(resource_id)
 
             updated_at_raw = resource.get("updated_at")
             updated_at = parse_datetime(updated_at_raw) if updated_at_raw else None
@@ -172,6 +180,7 @@ class Command(BaseCommand):
                     "cider_data_url": resource.get("cider_data_url"),
                 },
                 "updated_at": updated_at,
+                "is_active": True,
             }
 
             if dry_run:
@@ -191,8 +200,23 @@ class Command(BaseCommand):
             else:
                 counts["infrastructure_updated"] += 1
 
+        # Mark resources absent from this API payload as inactive.
+        # Rows are never deleted so historical news relationships remain readable.
+        if not dry_run and seen_ids:
+            deactivated = CiderInfrastructure.objects.filter(
+                is_active=True,
+            ).exclude(
+                cider_resource_id__in=seen_ids,
+            ).update(is_active=False)
+            if deactivated:
+                counts["infrastructure_deactivated"] += deactivated
+                self.stdout.write(
+                    self.style.WARNING(f"  Marked {deactivated} infrastructure resource(s) as inactive.")
+                )
+
     def sync_groups_bundle(
         self,
+        api_base: str,
         timeout: int,
         dry_run: bool,
         group_prefix: str,
@@ -200,7 +224,7 @@ class Command(BaseCommand):
         counts,
     ) -> None:
         self.stdout.write("--- Syncing Groups Bundle (/v2/access-active-groups/) ---")
-        url = f"{self.API_BASE}/v2/access-active-groups/"
+        url = f"{api_base}/cider/v2/access-active-groups/"
         data = self.fetch_json(url, timeout=timeout)
         results = data.get("results", {})
         active_groups = results.get("active_groups", [])

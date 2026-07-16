@@ -2,7 +2,22 @@ from django.db import models
 
 
 class CiderInfrastructure(models.Model):
-    """Infrastructure resources from CIDER - compute, storage, cloud, etc."""
+    """Local projection of CIDER infrastructure resources (compute, storage, cloud, etc.).
+
+    IMPORTANT: This model is a non-authoritative read-only cache.
+    Operations_Warehouse_Django/cider is the authoritative source. Data here is
+    populated exclusively by the sync_cider_from_api management command, which
+    pulls from the Warehouse-hosted Operations API. Do not edit rows via the admin
+    or application code — use the sync command instead.
+
+    These rows exist to support:
+    - infrastructure_news many-to-many relationships and selectors
+    - historical news record display
+    - Resource Provider permission setup (via CiderGroups)
+
+    Public resource listings and detail pages must use the Warehouse API directly,
+    not these local rows.
+    """
     cider_resource_id = models.IntegerField(primary_key=True)
     cider_type = models.CharField(max_length=16)
     info_resourceid = models.CharField(db_index=True, max_length=40)
@@ -22,6 +37,12 @@ class CiderInfrastructure(models.Model):
     protected_attributes = models.JSONField(null=True, blank=True)
     other_attributes = models.JSONField(null=True, blank=True)
     updated_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text='False when the resource is no longer present in the Warehouse API. '
+                  'Inactive rows are retained so historical news relationships remain readable.',
+    )
 
     class Meta:
         db_table = 'cider_infrastructure'
@@ -34,7 +55,11 @@ class CiderInfrastructure(models.Model):
 
 
 class CiderOrganizations(models.Model):
-    """Organizations (sites, institutions) from CIDER"""
+    """Local projection of CIDER organizations (sites, institutions).
+
+    Non-authoritative cache — see CiderInfrastructure docstring for details.
+    Populated exclusively by sync_cider_from_api.
+    """
     organization_id = models.IntegerField(primary_key=True)
     organization_name = models.CharField(max_length=120)
     organization_abbrev = models.CharField(max_length=20, blank=True)
@@ -52,7 +77,11 @@ class CiderOrganizations(models.Model):
 
 
 class CiderFeatures(models.Model):
-    """Feature categories (capabilities, specifications) from CIDER"""
+    """Local projection of CIDER feature categories (capabilities, specifications).
+
+    Non-authoritative cache — see CiderInfrastructure docstring for details.
+    Populated exclusively by sync_cider_from_api.
+    """
     feature_category_id = models.IntegerField(primary_key=True)
     feature_category_name = models.CharField(max_length=120)
     feature_category_description = models.CharField(max_length=4000, null=True, blank=True)
@@ -71,7 +100,12 @@ class CiderFeatures(models.Model):
 
 
 class CiderGroups(models.Model):
-    """Resource Provider groups from CIDER - used for permissions"""
+    """Local projection of CIDER Resource Provider groups.
+
+    Non-authoritative cache — see CiderInfrastructure docstring for details.
+    Populated exclusively by sync_cider_from_api. Used locally to drive
+    Django permission and auth group setup via setup_rp_permissions.
+    """
     group_id = models.IntegerField(primary_key=True)
     info_groupid = models.CharField(db_index=True, max_length=40, unique=True)
     group_descriptive_name = models.CharField(max_length=120)
