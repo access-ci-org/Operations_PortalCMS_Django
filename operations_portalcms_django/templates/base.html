@@ -29,7 +29,7 @@
 
     {# ACCESS Operations Bootstrap CSS#}
     <link type="text/css" rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/access-ci-org/access-operations-custom-bootstrap@0.0.13/dist/access-operations-custom-bootstrap.css"/>
+          href="https://cdn.jsdelivr.net/gh/access-ci-org/access-operations-custom-bootstrap@0.0.18/dist/access-operations-custom-bootstrap.css"/>
 
     {# ACCESS Operations Portal Custom Styles #}
     <link type="text/css" href="{% static 'portal/style-portal.css' %}" rel="stylesheet"/>
@@ -52,17 +52,21 @@
             {% environment_banner as environment_banner %}
 
             <div class="row">
-                <div class="col logo logo-header"><a class="nsf" href="https://www.nsf.gov"><img
-                        class="nsf-logo"
-                        src="{% static 'portal/img/nsf-logo.png' %}"
-                        alt="National Science Foundation"></a>
+                <div class="col logo logo-header">
+                    <a class="nsf" href="https://www.nsf.gov">
+                        <img class="nsf-logo"
+                             src="{% static 'portal/img/nsf-logo.png' %}"
+                             alt="National Science Foundation"/>
+                    </a>
                     <div class="divider"></div>
-                    <a class="access" href="/"><img class="access-logo"
-                                                    src="{% static 'portal/img/ACCESS-operations.svg' %}"
-                                                    alt="ACCESS Operations" role="img"></a>
+                    <a class="access" href="/">
+                        <img class="access-logo"
+                             src="{% static 'portal/img/ACCESS-operations.svg' %}"
+                             alt="ACCESS Operations" role="img"/>
+                    </a>
                     {% if environment_banner.enabled %}
-                        <div class="development-server-badge">
-                            {{ environment_banner.label|default:"Beta" }}
+                        <div>
+                            <span class="badge bg-secondary">{{ environment_banner.label|default:"Beta" }}</span>
                         </div>
                     {% endif %}
                 </div>
@@ -70,12 +74,12 @@
                     <ul class="list-unstyled list-inline">
                         <li class="d-inline">
                             <a href="{% url 'integration_news:integration_news' %}"
-                               class="btn btn-success m-1">
+                               class="btn btn-outline-primary m-1">
                                 Integration News</a>
                         </li>
                         <li class="d-inline">
                             <a href="{% url 'infrastructure_news:system_status_news' %}"
-                               class="btn btn-warning m-1">
+                               class="btn btn-outline-primary m-1">
                                 System Status News</a>
                         </li>
                     </ul>
