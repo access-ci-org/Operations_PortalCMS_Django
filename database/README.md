@@ -57,6 +57,26 @@ APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
   --clean-restore
 ```
 
+## Getting RDS backups from S3
+
+These commands assume that AWS credentials with access to the backup bucket are already configured for the `us-east-2` region.
+
+List the available RDS backup files:
+
+```bash
+aws s3 ls s3://backup.operations.access-ci.org/portal.operations.access-ci.org/rds.backup/
+```
+
+Copy the desired backup to the current directory, replacing the example filename with one from the listing:
+
+```bash
+aws s3 cp \
+  s3://backup.operations.access-ci.org/portal.operations.access-ci.org/rds.backup/django.portal1.dump.1777422601.gz \
+  ./django.portal1.dump.1777422601.gz
+```
+
+The database name will usually be `portal1` for a production backup. The timestamp in the filename identifies the individual backup; select the backup appropriate for the restore or inspection you intend to perform.
+
 ## See Also
 
 - [dev_documentation/CURRENT_STATE.md](../dev_documentation/CURRENT_STATE.md) - Current operational state, verification results, and APP_CONFIG reference
