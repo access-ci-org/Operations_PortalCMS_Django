@@ -21,10 +21,18 @@ CREATE DATABASE portal_beta WITH OWNER portal_owner encoding "UTF8" LC_COLLATE '
 CREATE DATABASE portal_dev WITH OWNER portal_owner encoding "UTF8" LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
 
 ### NEW SCHEMA
-# make sure to connect as opsdba to each database
+# Connect as opsdba (or portal_owner for databases it owns) to each database.
+# opsdba can use AUTHORIZATION portal_django directly:
 $ psql -p 5432 -U opsdba portal1
 
 CREATE SCHEMA portal_django AUTHORIZATION portal_django;
+
+# portal_owner cannot use AUTHORIZATION portal_django (not a role member).
+# Use CREATE + GRANT instead:
+$ psql -p 5432 -U portal_owner portal_dev
+
+CREATE SCHEMA IF NOT EXISTS portal_django;
+GRANT ALL ON SCHEMA portal_django TO portal_django;
 
 
 

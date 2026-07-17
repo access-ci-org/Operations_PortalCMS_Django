@@ -58,6 +58,7 @@ RECREATE_DB=0
 VERIFY_AFTER=1
 ALLOW_LIVE_TARGET=0
 SKIP_SCHEMA_CREATE=0
+CLEAN_RESTORE=0
 DRY_RUN=0
 TEMP_LIST_FILE=""
 
@@ -81,6 +82,9 @@ Options:
   --recreate-db        Drop and recreate target database before restore
   --allow-live-target  Allow target database to match source/live database
   --skip-schema-create Exclude CREATE SCHEMA for the app schema from custom-format restores
+  --clean-restore      Drop and recreate all objects within the target database
+                       before restore; implies --skip-schema-create (schema must
+                       already exist in the target database, created by an admin)
   --no-verify          Skip post-restore verification
   --dry-run            Print the resolved restore steps without executing them
   --help               Show this help
@@ -89,11 +93,16 @@ Safety:
   - Refuses to restore into the configured source database by default.
   - Intended for clone-first workflows such as portal1_clone.
 
-Example:
+Examples:
   ./database/pg_restore_portal.sh \\
     --input backups/portalcms1_pre_versioning_20260331T174604Z.dump \\
     --target-db portal1_clone \\
     --recreate-db
+
+  ./database/pg_restore_portal.sh \\
+    --input database/dumps/portal1_full_<timestamp>.dump \\
+    --target-db portal_dev \\
+    --clean-restore
 EOF
 }
 
@@ -117,6 +126,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-schema-create)
             SKIP_SCHEMA_CREATE=1
+            shift
+            ;;
+        --clean-restore)
+            CLEAN_RESTORE=1
             shift
             ;;
         --no-verify)
@@ -178,6 +191,7 @@ if [[ -n "${DB_SSLMODE}" ]]; then
 fi
 echo "  recreate:  ${RECREATE_DB}"
 echo "  skip schema create: ${SKIP_SCHEMA_CREATE}"
+echo "  clean restore: ${CLEAN_RESTORE}"
 echo "  verify:    ${VERIFY_AFTER}"
 
 DROP_CMD=(
@@ -191,7 +205,7 @@ CREATE_CMD=(
 
 RESTORE_SCHEMA="${DB_SCHEMA:-$DB_USER}"
 if [[ "$INPUT" == *.dump ]]; then
-    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 ]]; then
+    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 || "$CLEAN_RESTORE" -eq 1 ]]; then
         TEMP_LIST_FILE="$(mktemp)"
         pg_restore -l "$INPUT" | awk -v schema="$RESTORE_SCHEMA" '
             index($0, " SCHEMA - " schema " ") == 0 { print }
@@ -208,6 +222,9 @@ if [[ "$INPUT" == *.dump ]]; then
         --no-acl
         -v
     )
+    if [[ "$CLEAN_RESTORE" -eq 1 ]]; then
+        RESTORE_CMD+=(--clean --if-exists)
+    fi
     if [[ -n "$TEMP_LIST_FILE" ]]; then
         RESTORE_CMD+=(
             --use-list="$TEMP_LIST_FILE"
@@ -217,8 +234,8 @@ if [[ "$INPUT" == *.dump ]]; then
         "$INPUT"
     )
 else
-    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 ]]; then
-        echo "--skip-schema-create is only supported for custom-format .dump inputs" >&2
+    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 || "$CLEAN_RESTORE" -eq 1 ]]; then
+        echo "--skip-schema-create and --clean-restore are only supported for custom-format .dump inputs" >&2
         exit 1
     fi
     RESTORE_CMD=(
@@ -245,7 +262,11 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
         printf '\n'
     fi
     if [[ -n "$TEMP_LIST_FILE" ]]; then
-        printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --no-owner --no-acl -v --use-list="<generated temp list>" "$INPUT"
+        if [[ "$CLEAN_RESTORE" -eq 1 ]]; then
+            printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --clean --if-exists --no-owner --no-acl -v --use-list="<generated temp list>" "$INPUT"
+        else
+            printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --no-owner --no-acl -v --use-list="<generated temp list>" "$INPUT"
+        fi
         printf '\n'
     else
         printf '  %q' "${RESTORE_CMD[@]}"

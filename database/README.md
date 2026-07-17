@@ -39,15 +39,66 @@ APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_port
 ```
 
 ### pg_restore_portal.sh
-Restore from a dump file. Refuses to restore into the live database unless `--allow-live-target` is set. Supports `--recreate-db` and `--dry-run`.
+Restore from a dump file. Refuses to restore into the live database unless `--allow-live-target` is set. Supports `--recreate-db`, `--clean-restore`, and `--dry-run`.
 
 ```bash
+# Clone workflow: drop and recreate target database (requires CREATEDB privilege)
 ./database/pg_restore_portal.sh \
   --input database/dumps/portal1_<timestamp>.dump \
   --target-db portal1_clone \
   --recreate-db
+
+# Sync workflow: drop and repopulate objects within an existing database
+# (schema must already exist — see "One-time prerequisite" below)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+./database/pg_restore_portal.sh \
+  --input database/dumps/portal1_<timestamp>.dump \
+  --target-db portal_dev \
+  --clean-restore
 ```
 
 ## See Also
 
 - [dev_documentation/CURRENT_STATE.md](../dev_documentation/CURRENT_STATE.md) - Current operational state, verification results, and APP_CONFIG reference
+
+## Syncing portal_dev from portal1
+
+Use this workflow to overwrite `portal_dev` with a fresh copy of `portal1` data.
+
+### One-time prerequisite: schema setup in portal_dev
+
+The `portal_django` schema must exist in `portal_dev` and have been granted to the `portal_django` user. This is an admin-only step (requires `portal_owner` credentials, available from the infra repo):
+
+```bash
+PGPASSWORD='<portal_owner_password>' psql \
+  -h opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com \
+  -p 5432 -U portal_owner portal_dev \
+  -c "CREATE SCHEMA IF NOT EXISTS portal_django; GRANT ALL ON SCHEMA portal_django TO portal_django;"
+```
+
+This only needs to be done once. Subsequent syncs leave the schema in place.
+
+### Repeatable sync
+
+```bash
+# 1. Dump portal1
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  ./database/pg_dump_portal.sh
+
+# 2. Restore into portal_dev (drops and repopulates all objects, preserves schema)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  ./database/pg_restore_portal.sh \
+    --input database/dumps/portal1_full_<timestamp>.dump \
+    --target-db portal_dev \
+    --clean-restore
+
+# 3. Verify (run automatically by pg_restore_portal.sh, but can also run standalone)
+APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
+  DB_DATABASE=portal_dev ./database/verify_db.sh
+```
+
+### Notes
+
+- Stop any application processes pointing at `portal_dev` before running the restore — active connections will cause DROP statements to fail.
+- If `PGPASSWORD` is set in your shell from a previous `portal_django` session, unset it before running admin psql commands as `portal_owner`: `unset PGPASSWORD`.
+- `--clean-restore` uses `pg_restore --clean --if-exists` and automatically filters the schema creation out of the TOC. The `portal_django` schema is preserved; all tables and data are replaced.
