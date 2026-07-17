@@ -33,7 +33,7 @@ The database name will likely be portal1 in most cases since that is the product
 
 Copy the `filer_public`  and `filer_public_thumbnails` to:
 
-`{app_home}/{app_tag}/operations_portalcms_django/media/`
+`{app_home}/tags/{app_tag}/operations_portalcms_django/media/`
 
 OR 
 
