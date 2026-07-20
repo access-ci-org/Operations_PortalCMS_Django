@@ -59,23 +59,26 @@ APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json \
 
 ## Getting RDS backups from S3
 
-These commands assume that AWS credentials with access to the backup bucket are already configured for the `us-east-2` region.
-
-List the available RDS backup files:
+Use `database/portal_db_retrieve.py`. Requires the `opsbackupreader` AWS profile locally (or `--profile newbackup` on the production server). No `APP_CONFIG` needed for retrieval.
 
 ```bash
-aws s3 ls s3://backup.operations.access-ci.org/portal.operations.access-ci.org/rds.backup/
+# List available portal1 dumps (production default)
+uv run database/portal_db_retrieve.py -l
+
+# List dumps for a specific database
+uv run database/portal_db_retrieve.py -l django.portal_dev.dump
+
+# Download and decompress the most recent portal1 dump
+uv run database/portal_db_retrieve.py -r
+
+# Download and decompress the most recent portal_dev dump
+uv run database/portal_db_retrieve.py -r django.portal_dev.dump
+
+# Dry run — show what would be downloaded without fetching
+uv run database/portal_db_retrieve.py -r --dry-run
 ```
 
-Copy the desired backup to the current directory, replacing the example filename with one from the listing:
-
-```bash
-aws s3 cp \
-  s3://backup.operations.access-ci.org/portal.operations.access-ci.org/rds.backup/django.portal1.dump.1777422601.gz \
-  ./django.portal1.dump.1777422601.gz
-```
-
-The database name will usually be `portal1` for a production backup. The timestamp in the filename identifies the individual backup; select the backup appropriate for the restore or inspection you intend to perform.
+Downloads land in `database/dumps/` and are decompressed automatically from `.gz` to `.dump`. The script selects the most recently uploaded file by S3 `LastModified` date.
 
 ## See Also
 

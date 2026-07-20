@@ -15,26 +15,48 @@ Most media work will be images and potentially videos uploaded to the Django CMS
 **Inserting Files into Content**: When editing content in Django CMS, content editors can easily insert files (images, documents) stored in django-filer using plugins or specific placeholders designed to handle media elements. For instance, they might use a “File” or “Image” plugin that allows them to select files from the django-filer library and place them within the content area.
 "
 
-## Getting media backups from S3
-(Assumes you already have the proper us-east-2 credentials on your machine or can copy them to a remote server if needing to restore)
+## Retrieving and restoring media backups
 
-- To list all the dumps:
+Use the two scripts in `database/`. Requires the `opsbackupreader` AWS profile configured locally
+(or `newbackup` on the production server).
 
-`aws s3 ls s3://backup.operations.access-ci.org/portal.operations.access-ci.org/media.backup/`
+### Step 1 — List available backups
 
-Then:
-`aws s3 cp s3://backup.operations.access-ci.org/portal.operations.access-ci.org/media.backup/`
+```bash
+# Production (portal1, default)
+uv run database/media_retrieve.py -l
 
--- An Exammple of copying the most recent media dump to your device:
+# Specific database
+uv run database/media_retrieve.py -l media.portal_dev.
+```
 
-`aws s3 cp s3://backup.operations.access-ci.org/portal.operations.access-ci.org/media.backup/ media.portal_dev.2026-07-17T003001Z.tar ./media.portal_dev.2026-07-17T003001Z.tar`
+### Step 2 — Download the most recent backup
 
-The database name will likely be portal1 in most cases since that is the production naming location that connects them, but this is an example. 
+```bash
+# Production (portal1, default) — downloads to database/mediarestore/
+uv run database/media_retrieve.py -r
 
-Copy the `filer_public`  and `filer_public_thumbnails` to:
+# Specific database
+uv run database/media_retrieve.py -r media.portal_dev.
+```
 
-`{app_home}/tags/{app_tag}/operations_portalcms_django/media/`
+### Step 3 — Restore (dry run first, then full)
 
-OR 
+```bash
+# Preview what will be extracted
+bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar --dry-run
 
-`Operations_PortalCMS_Django/operations_portalcms_django/media/` if working locally on your machine.
+# Local dev (extracts to operations_portalcms_django/media/ by default)
+bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar
+
+# Production — Ansible-managed server
+bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar \
+  --target-dir /soft/django-cms-01/www/media
+
+# Production — pre-Ansible / manual deploy
+bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar \
+  --target-dir /soft/django-cms-01/tags/{app_tag}/operations_portalcms_django/media
+```
+
+The restore script verifies that `filer_public/` and `filer_public_thumbnails/` are present
+after extraction and prints file counts. No database connection or `APP_CONFIG` required.

@@ -66,7 +66,9 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 staticfiles/
+operations_portalcms_django/media/filer_public/
 operations_portalcms_django/media/filer_public_thumbnails/
+database/mediarestore/
 
 # Project Configuration
 portal.conf.dev.json

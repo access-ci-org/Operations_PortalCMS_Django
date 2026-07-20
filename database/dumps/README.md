@@ -27,20 +27,15 @@ These files are not the current production data source. Keep them only as histor
 From the repo root:
 
 ```bash
-# Preview the RDS dump command
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh --dry-run
+# List available S3 dumps (most recent first by upload time)
+uv run database/portal_db_retrieve.py -l
 
-# Create a custom-format dump
+# Download and decompress the most recent portal1 dump from S3
+uv run database/portal_db_retrieve.py -r
+
+# Or dump directly from RDS (requires APP_CONFIG)
 APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh
-
-# Create a SQL dump
-APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_portal.sh --format sql
 ```
-
-The current helper names outputs like:
-
-- `database/dumps/portal1_full_YYYYMMDDTHHMMSSZ.dump`
-- `database/dumps/portal1_full_YYYYMMDDTHHMMSSZ.sql`
 
 ## Media
 
