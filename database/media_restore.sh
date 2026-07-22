@@ -9,7 +9,7 @@
 #
 # Examples:
 #   # Local dev (default target: <repo_root>/operations_portalcms_django/media/)
-#   bash database/media_restore.sh database/mediarestore/media.portal1.2026-07-20T003001Z.tar
+#   bash database/media_restore.sh database/mediarestore/media.portal1.1784507401.tar
 #
 #   # Production: Ansible-managed server
 #   bash database/media_restore.sh media.portal1.tar --target-dir /soft/django-cms-01/www/media

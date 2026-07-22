@@ -1,4 +1,7 @@
-v0.6.2 jlambertson
+v0.6.3 jlambertson 2026-07-22
+- updating backup files naming for media to match database backup with epoch
+
+v0.6.2 jlambertson 2026-07-22
 - testing and moving groups around under the new structure and naming convention
 
 v0.6.1 jlambertson 2026-07-17

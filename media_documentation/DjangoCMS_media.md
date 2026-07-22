@@ -44,17 +44,17 @@ uv run database/media_retrieve.py -r media.portal_dev.
 
 ```bash
 # Preview what will be extracted
-bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar --dry-run
+bash database/media_restore.sh database/mediarestore/media.portal1.<epoch>.tar --dry-run
 
 # Local dev (extracts to operations_portalcms_django/media/ by default)
-bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar
+bash database/media_restore.sh database/mediarestore/media.portal1.<epoch>.tar
 
 # Production — Ansible-managed server
-bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar \
+bash database/media_restore.sh database/mediarestore/media.portal1.<epoch>.tar \
   --target-dir /soft/django-cms-01/www/media
 
 # Production — pre-Ansible / manual deploy
-bash database/media_restore.sh database/mediarestore/media.portal1.<timestamp>.tar \
+bash database/media_restore.sh database/mediarestore/media.portal1.<epoch>.tar \
   --target-dir /soft/django-cms-01/tags/{app_tag}/operations_portalcms_django/media
 ```
 
