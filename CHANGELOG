@@ -1,3 +1,6 @@
+v0.6.2 jlambertson
+- testing and moving groups around under the new structure and naming convention
+
 v0.6.1 jlambertson 2026-07-17
 - updating db management files to be local scripts rather than commands
 - updating media management files to be local scripts rather than commands
