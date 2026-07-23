@@ -80,6 +80,28 @@ uv run database/portal_db_retrieve.py -r --dry-run
 
 Downloads land in `database/dumps/` and are decompressed automatically from `.gz` to `.dump`. The script selects the most recently uploaded file by S3 `LastModified` date.
 
+## Retrieving a matched database and media recovery point
+
+When a database dump and media archive have a shared epoch in their S3 object names, use
+that epoch when retrieving a recovery pair instead of running both retrieval scripts with
+their independent "most recent" selection:
+
+```bash
+BACKUP_EPOCH=1784507401  # Replace with the epoch from the S3 object names.
+
+uv run database/portal_db_retrieve.py \
+  -r "django.portal1.dump.${BACKUP_EPOCH}"
+
+uv run database/media_retrieve.py \
+  -r "media.portal1.${BACKUP_EPOCH}."
+```
+
+Matching epochs let the tools select a candidate recovery pair. They do not by themselves
+prove that both uploads completed successfully, that either artifact is intact, that the
+artifacts came from the same scheduled run, or that the database and filesystem are
+transactionally consistent. Production backup validation, retention, scheduling,
+monitoring, and restore testing belong in `Operations_CMS_Infrastructure`.
+
 ## See Also
 
 - [dev_documentation/CURRENT_STATE.md](../dev_documentation/CURRENT_STATE.md) - Current operational state, verification results, and APP_CONFIG reference
