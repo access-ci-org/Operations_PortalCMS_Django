@@ -1,3 +1,6 @@
+v0.6.4 jlambertson 2026-07-24
+- testing updated db restore scripts
+
 v0.6.3 jlambertson 2026-07-22
 - updating backup files naming for media to match database backup with epoch
 
