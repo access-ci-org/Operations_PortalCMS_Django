@@ -42,11 +42,13 @@ APP_CONFIG=/soft/django-cms-01/conf/portal.conf.dev.json ./database/pg_dump_port
 Restore from a dump file. Refuses to restore into the live database unless `--allow-live-target` is set. Supports `--recreate-db`, `--clean-restore`, and `--dry-run`.
 
 ```bash
-# Clone workflow: drop and recreate target database (requires CREATEDB privilege)
+# Clone workflow: drop and recreate target database.
+# ADMIN_USER must have CREATEDB; provide credentials through libpq (prefer PGPASSFILE).
 ./database/pg_restore_portal.sh \
   --input database/dumps/portal1_<timestamp>.dump \
   --target-db portal1_clone \
-  --recreate-db
+  --recreate-db \
+  --admin-user ADMIN_USER
 
 # Sync workflow: drop and repopulate objects within an existing database
 # (schema must already exist — see "One-time prerequisite" below)
@@ -78,7 +80,29 @@ uv run database/portal_db_retrieve.py -r django.portal_dev.dump
 uv run database/portal_db_retrieve.py -r --dry-run
 ```
 
-Downloads land in `database/dumps/` and are decompressed automatically from `.gz` to `.dump`. The script selects the most recently uploaded file by S3 `LastModified` date.
+Downloads land in `database/dumps/` and are decompressed automatically. PostgreSQL
+custom archives receive a `.dump` suffix and plain SQL receives `.sql`, based on the
+decompressed content. The script selects the most recently uploaded file by S3
+`LastModified` date.
+
+For a conflict-free plain-SQL refresh, recreate an explicit non-source target. On a
+deployed release, `pg_restore_portal.sh` auto-discovers `../../conf/portal.conf`.
+The administrative role is used only for target preflight and recreation; the restore
+still runs as the configured application role.
+
+```bash
+PGPASSFILE=/path/to/operator-managed.pgpass \
+./database/pg_restore_portal.sh \
+  --input database/dumps/django.portal1.dump.<epoch>.sql \
+  --target-db portal_dev \
+  --recreate-db \
+  --admin-user ADMIN_USER
+```
+
+The script refuses to recreate the configured source database, refuses targets with
+active connections, preserves an existing target owner, and recreates the target from
+`template0` with the source database encoding and locale. If the target does not yet
+exist, also pass `--owner OWNER`.
 
 ## Retrieving a matched database and media recovery point
 

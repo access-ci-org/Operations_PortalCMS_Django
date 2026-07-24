@@ -26,15 +26,16 @@ Usage:
   uv run database/portal_db_retrieve.py -r --dry-run
 
   # production server (software user, newbackup profile)
-  uv run database/portal_db_retrieve.py -r --profile newbackup
+  uv run database/portal_db_retrieve.py -r --profile newbackup --target-db portal_dev
 
 Notes:
   - Downloads to database/dumps/ (same directory as pg_dump_portal.sh output).
-  - .gz archives are decompressed automatically to a .dump file.
-  - Pass the resulting .dump file to database/pg_restore_portal.sh to restore.
+  - .gz archives are decompressed automatically and classified by content.
+  - Pass the resulting .dump or .sql file to database/pg_restore_portal.sh.
   - Default AWS profile is opsbackupreader (local dev).
     On the production server use --profile newbackup.
-  - APP_CONFIG is NOT required for this script. It is required for pg_restore_portal.sh.
+  - APP_CONFIG is not required for retrieval. On deployed releases,
+    pg_restore_portal.sh auto-discovers ../../conf/portal.conf.
 """
 
 import argparse
@@ -148,27 +149,44 @@ def aws_cp(key, dest):
     return True
 
 
+def classify_dump_header(header):
+    """Return custom for a PostgreSQL archive or sql for plain text."""
+    if header.startswith(b"PGDMP"):
+        return "custom"
+    if header and b"\x00" not in header:
+        try:
+            header.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+        else:
+            return "sql"
+    raise ValueError("unsupported or unrecognized PostgreSQL dump format")
+
+
+def detect_dump_format(path):
+    with open(path, "rb") as dump_file:
+        return classify_dump_header(dump_file.read(8192))
+
+
 def decompress_gz(src_path):
-    """Decompress a .gz file to a .dump file in the same directory.
+    """Decompress a .gz file and give the output a content-based suffix.
 
-    Output is named <original_basename>.dump so it matches the database/dumps/*.dump
-    gitignore pattern and is recognisable by pg_restore_portal.sh.
-
-    Returns the decompressed path on success, None on failure.
+    Returns (decompressed_path, format) on success, None on failure.
     """
-    # Strip .gz, add .dump → e.g. django.portal1.dump.1777422601.dump
-    # Matches database/dumps/*.dump gitignore pattern and pg_restore convention.
     base = src_path[:-3] if src_path.endswith(".gz") else src_path
-    dst_path = base + ".dump"
     try:
+        with gzip.open(src_path, "rb") as f_in:
+            dump_format = classify_dump_header(f_in.read(8192))
+        suffix = ".dump" if dump_format == "custom" else ".sql"
+        dst_path = base + suffix
         with gzip.open(src_path, "rb") as f_in, open(dst_path, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
         size = os.path.getsize(dst_path)
         print(f"Decompressed {size} bytes => {dst_path}", file=sys.stderr)
-    except OSError as e:
+    except (OSError, ValueError) as e:
         print(f"ERROR: Failed to decompress {src_path}: {e}", file=sys.stderr)
         return None
-    return dst_path
+    return dst_path, dump_format
 
 
 def write_log(msg: str):
@@ -220,6 +238,10 @@ def parse_args():
         "--log-dir",
         default=LOG_DIR,
         help="Directory to write logs into (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--target-db",
+        help="Target database to include in the printed restore command",
     )
     parser.add_argument(
         "--dry-run",
@@ -291,7 +313,7 @@ def main():
         print(f"         destination: {dest}")
         if chosen.endswith(".gz"):
             base = dest[:-3] if dest.endswith(".gz") else dest
-            print(f"         decompressed: {base}.dump")
+            print(f"         decompressed: {base}.<sql-or-dump> (selected from content)")
         write_log(f"{ME} Dry-run: {chosen}")
         return
 
@@ -300,19 +322,34 @@ def main():
         sys.exit(1)
 
     dump_path = dest
+    dump_format = None
     if chosen.endswith(".gz"):
-        dump_path = decompress_gz(dest)
-        if dump_path is None:
+        decompressed = decompress_gz(dest)
+        if decompressed is None:
             write_log(f"{ME} Failed to decompress {dest}")
+            sys.exit(1)
+        dump_path, dump_format = decompressed
+    else:
+        try:
+            dump_format = detect_dump_format(dest)
+        except (OSError, ValueError) as e:
+            print(f"ERROR: Failed to classify {dest}: {e}", file=sys.stderr)
+            write_log(f"{ME} Failed to classify {dest}")
             sys.exit(1)
 
     print(f"\nDump ready: {dump_path}", file=sys.stderr)
-    print(f"\nNext step — restore into a target database (requires APP_CONFIG):")
-    print(f"  APP_CONFIG=<path/to/portal.conf> \\")
+    target_db = args.target_db or "TARGET_DB"
+    print(f"\nNext step — restore into an explicit non-source target database:")
     print(f"  ./database/pg_restore_portal.sh \\")
     print(f"    --input {dump_path} \\")
-    print(f"    --target-db portal_beta \\")
-    print(f"    --clean-restore")
+    if dump_format == "custom":
+        print(f"    --target-db {target_db} \\")
+        print(f"    --clean-restore")
+    else:
+        print(f"    --target-db {target_db} \\")
+        print(f"    --recreate-db \\")
+        print(f"    --admin-user ADMIN_USER")
+        print("  Plain SQL detected: the explicit target will be dropped and recreated.")
     write_log(f"{ME} Done: {chosen}")
 
 

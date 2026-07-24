@@ -3,6 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if [[ -z "${APP_CONFIG:-}" ]]; then
+    DEPLOYED_APP_CONFIG="${ROOT_DIR}/../../conf/portal.conf"
+    if [[ -f "$DEPLOYED_APP_CONFIG" ]]; then
+        APP_CONFIG="$DEPLOYED_APP_CONFIG"
+        export APP_CONFIG
+    fi
+fi
+
 load_config_value() {
     local key="$1"
     local config_file="${APP_CONFIG:-}"
@@ -42,7 +50,6 @@ SOURCE_DB="${SOURCE_DB:-portal1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
 DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
-DB_OWNER="${DB_OWNER:-$(load_config_value DB_OWNER)}"
 DB_SCHEMA="${DB_SCHEMA:-$(load_config_value DB_SCHEMA)}"
 DB_HOST="${DB_HOSTNAME_WRITE:-${DB_HOSTNAME_READ:-$(load_config_value DB_HOSTNAME_WRITE)}}"
 DB_HOST="${DB_HOST:-localhost}"
@@ -61,6 +68,9 @@ SKIP_SCHEMA_CREATE=0
 CLEAN_RESTORE=0
 DRY_RUN=0
 TEMP_LIST_FILE=""
+INPUT_FORMAT=""
+ADMIN_USER="${DB_ADMIN_USER:-}"
+TARGET_OWNER_OVERRIDE=""
 
 cleanup() {
     if [[ -n "$TEMP_LIST_FILE" && -f "$TEMP_LIST_FILE" ]]; then
@@ -69,6 +79,164 @@ cleanup() {
 }
 
 trap cleanup EXIT
+
+detect_input_format() {
+    local input_file="$1"
+    local magic
+
+    magic=$(LC_ALL=C head -c 5 "$input_file")
+    if [[ "$magic" == "PGDMP" ]]; then
+        printf 'custom\n'
+        return
+    fi
+
+    if LC_ALL=C grep -Iq '' "$input_file"; then
+        printf 'sql\n'
+        return
+    fi
+
+    echo "Unsupported or unrecognized dump format: $input_file" >&2
+    return 1
+}
+
+validate_plain_sql_target_safety() {
+    local input_file="$1"
+
+    if LC_ALL=C grep -Eiq '^[[:space:]]*\\(connect|c)([[:space:]]|$)' "$input_file"; then
+        echo "Refusing plain SQL dump containing a psql database connection command." >&2
+        echo "It could switch away from the explicit target database '${TARGET_DB}'." >&2
+        return 1
+    fi
+
+    if LC_ALL=C grep -Eiq '^[[:space:]]*(CREATE|DROP|ALTER)[[:space:]]+DATABASE([[:space:]]|;)' "$input_file"; then
+        echo "Refusing plain SQL dump containing database-level DDL." >&2
+        echo "It could create, drop, or alter a database other than '${TARGET_DB}'." >&2
+        return 1
+    fi
+}
+
+validate_identifier() {
+    local value="$1"
+    local label="$2"
+
+    if [[ ! "$value" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        echo "Invalid ${label}: '${value}'" >&2
+        echo "Use only letters, numbers, and underscores, beginning with a letter or underscore." >&2
+        return 1
+    fi
+}
+
+run_admin_command() {
+    if [[ -n "${PGPASSFILE:-}" ]]; then
+        env -u PGPASSWORD "$@"
+    else
+        "$@"
+    fi
+}
+
+admin_query() {
+    run_admin_command \
+        psql -X -h "$DB_HOST" -p "$DB_PORT" -U "$ADMIN_USER" -d postgres \
+        -w -v ON_ERROR_STOP=1 -t -A "$@"
+}
+
+recreate_target_database() {
+    local admin_can_create
+    local source_metadata
+    local source_encoding
+    local source_collate
+    local source_ctype
+    local existing_owner
+    local target_owner
+    local owner_exists
+    local active_connections
+
+    admin_can_create=$(admin_query -c "
+SELECT CASE WHEN rolcreatedb OR rolsuper THEN 't' ELSE 'f' END
+FROM pg_roles
+WHERE rolname = current_user;
+")
+    if [[ "$admin_can_create" != "t" ]]; then
+        echo "Administrative role '${ADMIN_USER}' does not have CREATEDB privilege." >&2
+        return 1
+    fi
+
+    source_metadata=$(admin_query -F '|' -c "
+SELECT pg_encoding_to_char(encoding), datcollate, datctype
+FROM pg_database
+WHERE datname = '${SOURCE_DB}';
+")
+    if [[ -z "$source_metadata" ]]; then
+        echo "Source database metadata not found for '${SOURCE_DB}'." >&2
+        return 1
+    fi
+    IFS='|' read -r source_encoding source_collate source_ctype <<< "$source_metadata"
+    if [[ -z "$source_encoding" || -z "$source_collate" || -z "$source_ctype" ]]; then
+        echo "Source database metadata is incomplete for '${SOURCE_DB}'." >&2
+        return 1
+    fi
+
+    existing_owner=$(admin_query -c "
+SELECT pg_get_userbyid(datdba)
+FROM pg_database
+WHERE datname = '${TARGET_DB}';
+")
+    if [[ -n "$existing_owner" ]]; then
+        target_owner="$existing_owner"
+        active_connections=$(admin_query -c "
+SELECT count(*)
+FROM pg_stat_activity
+WHERE datname = '${TARGET_DB}'
+  AND backend_type = 'client backend';
+")
+        if [[ "$active_connections" != "0" ]]; then
+            echo "Target database '${TARGET_DB}' has ${active_connections} active connection(s)." >&2
+            echo "Stop its applications and disconnect users before retrying." >&2
+            return 1
+        fi
+    else
+        target_owner="$TARGET_OWNER_OVERRIDE"
+        if [[ -z "$target_owner" ]]; then
+            echo "Target database '${TARGET_DB}' does not exist; --owner is required." >&2
+            return 1
+        fi
+    fi
+
+    validate_identifier "$target_owner" "target database owner"
+    owner_exists=$(admin_query -c "
+SELECT count(*)
+FROM pg_roles
+WHERE rolname = '${target_owner}';
+")
+    if [[ "$owner_exists" != "1" ]]; then
+        echo "Target database owner role '${target_owner}' does not exist." >&2
+        return 1
+    fi
+
+    echo "Recreating target database '${TARGET_DB}'"
+    echo "  admin user: ${ADMIN_USER}"
+    echo "  owner:      ${target_owner}"
+    echo "  encoding:   ${source_encoding}"
+    echo "  collation:  ${source_collate}"
+    echo "  ctype:      ${source_ctype}"
+
+    if [[ -n "$existing_owner" ]]; then
+        run_admin_command \
+            dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$ADMIN_USER" \
+            -w --maintenance-db=postgres "$TARGET_DB"
+    fi
+
+    run_admin_command \
+        createdb -h "$DB_HOST" -p "$DB_PORT" -U "$ADMIN_USER" \
+        -w \
+        --maintenance-db=postgres \
+        --template=template0 \
+        --owner="$target_owner" \
+        --encoding="$source_encoding" \
+        --lc-collate="$source_collate" \
+        --lc-ctype="$source_ctype" \
+        "$TARGET_DB"
+}
 
 usage() {
     cat <<EOF
@@ -80,6 +248,10 @@ Options:
   --input FILE         Dump file to restore (.dump custom format or .sql)
   --target-db NAME     Target database name
   --recreate-db        Drop and recreate target database before restore
+  --admin-user NAME    Administrative role used only with --recreate-db
+                       Credentials are resolved by libpq; prefer PGPASSFILE
+  --owner NAME         Owner for a newly created target; ignored when an
+                       existing target owner can be preserved
   --allow-live-target  Allow target database to match source/live database
   --skip-schema-create Exclude CREATE SCHEMA for the app schema from custom-format restores
   --clean-restore      Drop and recreate all objects within the target database
@@ -91,13 +263,16 @@ Options:
 
 Safety:
   - Refuses to restore into the configured source database by default.
+  - Never permits --recreate-db when target and source database names match.
+  - Plain SQL requires --recreate-db to avoid existing-object conflicts.
   - Intended for clone-first workflows such as portal1_clone.
 
 Examples:
   ./database/pg_restore_portal.sh \\
-    --input backups/portalcms1_pre_versioning_20260331T174604Z.dump \\
-    --target-db portal1_clone \\
-    --recreate-db
+    --input database/dumps/django.portal1.dump.<epoch>.sql \\
+    --target-db portal_dev \\
+    --recreate-db \\
+    --admin-user ADMIN_USER
 
   ./database/pg_restore_portal.sh \\
     --input database/dumps/portal1_full_<timestamp>.dump \\
@@ -119,6 +294,14 @@ while [[ $# -gt 0 ]]; do
         --recreate-db)
             RECREATE_DB=1
             shift
+            ;;
+        --admin-user)
+            ADMIN_USER="$2"
+            shift 2
+            ;;
+        --owner)
+            TARGET_OWNER_OVERRIDE="$2"
+            shift 2
             ;;
         --allow-live-target)
             ALLOW_LIVE_TARGET=1
@@ -162,12 +345,50 @@ if [[ ! -r "$INPUT" ]]; then
     exit 1
 fi
 
-if [[ "$TARGET_DB" == "$SOURCE_DB" && "$ALLOW_LIVE_TARGET" -ne 1 ]]; then
-    echo "Refusing to restore into source/live database '${SOURCE_DB}' without --allow-live-target" >&2
+validate_identifier "$SOURCE_DB" "source database name"
+validate_identifier "$TARGET_DB" "target database name"
+validate_identifier "$DB_USER" "application database user"
+
+if [[ "$TARGET_DB" == "$SOURCE_DB" ]]; then
+    if [[ "$RECREATE_DB" -eq 1 ]]; then
+        echo "Refusing to recreate source/live database '${SOURCE_DB}'." >&2
+        exit 1
+    elif [[ "$ALLOW_LIVE_TARGET" -ne 1 ]]; then
+        echo "Refusing to restore into source/live database '${SOURCE_DB}' without --allow-live-target" >&2
+        exit 1
+    fi
+fi
+
+if [[ "$RECREATE_DB" -eq 1 ]]; then
+    if [[ -z "$ADMIN_USER" ]]; then
+        echo "--admin-user is required with --recreate-db." >&2
+        echo "Supply its credentials through libpq, preferably with PGPASSFILE." >&2
+        exit 1
+    fi
+    validate_identifier "$ADMIN_USER" "administrative database user"
+    if [[ -n "$TARGET_OWNER_OVERRIDE" ]]; then
+        validate_identifier "$TARGET_OWNER_OVERRIDE" "target database owner"
+    fi
+elif [[ -n "$ADMIN_USER" || -n "$TARGET_OWNER_OVERRIDE" ]]; then
+    echo "--admin-user and --owner are only valid with --recreate-db." >&2
     exit 1
 fi
 
-export PGPASSWORD="${DB_PASS}"
+INPUT_FORMAT="$(detect_input_format "$INPUT")"
+
+if [[ "$INPUT_FORMAT" == "sql" ]]; then
+    if [[ "$RECREATE_DB" -ne 1 ]]; then
+        echo "Plain SQL restores require --recreate-db to prevent existing-object conflicts." >&2
+        exit 1
+    fi
+    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 || "$CLEAN_RESTORE" -eq 1 ]]; then
+        echo "--skip-schema-create and --clean-restore are only supported for custom-format dumps" >&2
+        echo "Use --recreate-db for a conflict-free plain SQL restore." >&2
+        exit 1
+    fi
+    validate_plain_sql_target_safety "$INPUT"
+fi
+
 if [[ -n "${DB_SSLMODE}" ]]; then
     export PGSSLMODE="${DB_SSLMODE}"
 fi
@@ -185,26 +406,21 @@ echo "Preparing restore"
 echo "  input:     ${INPUT}"
 echo "  source db: ${SOURCE_DB}"
 echo "  target db: ${TARGET_DB}"
+echo "  format:    ${INPUT_FORMAT}"
 echo "  host:      ${DB_HOST}:${DB_PORT}"
 if [[ -n "${DB_SSLMODE}" ]]; then
     echo "  sslmode:   ${DB_SSLMODE}"
 fi
 echo "  recreate:  ${RECREATE_DB}"
+if [[ "$RECREATE_DB" -eq 1 ]]; then
+    echo "  admin user: ${ADMIN_USER}"
+fi
 echo "  skip schema create: ${SKIP_SCHEMA_CREATE}"
 echo "  clean restore: ${CLEAN_RESTORE}"
 echo "  verify:    ${VERIFY_AFTER}"
 
-DROP_CMD=(
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1
-    -c "DROP DATABASE IF EXISTS ${TARGET_DB};"
-)
-CREATE_CMD=(
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1
-    -c "CREATE DATABASE ${TARGET_DB} OWNER ${DB_OWNER:-$DB_USER};"
-)
-
 RESTORE_SCHEMA="${DB_SCHEMA:-$DB_USER}"
-if [[ "$INPUT" == *.dump ]]; then
+if [[ "$INPUT_FORMAT" == "custom" ]]; then
     if [[ "$SKIP_SCHEMA_CREATE" -eq 1 || "$CLEAN_RESTORE" -eq 1 ]]; then
         TEMP_LIST_FILE="$(mktemp)"
         pg_restore -l "$INPUT" | awk -v schema="$RESTORE_SCHEMA" '
@@ -234,10 +450,6 @@ if [[ "$INPUT" == *.dump ]]; then
         "$INPUT"
     )
 else
-    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 || "$CLEAN_RESTORE" -eq 1 ]]; then
-        echo "--skip-schema-create and --clean-restore are only supported for custom-format .dump inputs" >&2
-        exit 1
-    fi
     RESTORE_CMD=(
         psql
         -h "$DB_HOST"
@@ -245,6 +457,7 @@ else
         -U "$DB_USER"
         -d "$TARGET_DB"
         -v ON_ERROR_STOP=1
+        --single-transaction
         -f "$INPUT"
     )
 fi
@@ -256,10 +469,9 @@ VERIFY_CMD=(
 if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "Dry run only. Planned steps:"
     if [[ "$RECREATE_DB" -eq 1 ]]; then
-        printf '  %q' "${DROP_CMD[@]}"
-        printf '\n'
-        printf '  %q' "${CREATE_CMD[@]}"
-        printf '\n'
+        echo "  Preflight as ${ADMIN_USER}: CREATEDB, source encoding/locale, target owner, active connections"
+        echo "  Drop ${TARGET_DB} only if it exists and has no active connections"
+        echo "  Recreate ${TARGET_DB} from template0 with source encoding/locale and preserved or explicit owner"
     fi
     if [[ -n "$TEMP_LIST_FILE" ]]; then
         if [[ "$CLEAN_RESTORE" -eq 1 ]]; then
@@ -279,17 +491,24 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 if [[ "$RECREATE_DB" -eq 1 ]]; then
-    echo "Dropping and recreating target database '${TARGET_DB}'"
-    "${DROP_CMD[@]}"
-    "${CREATE_CMD[@]}"
+    recreate_target_database
 fi
 
-"${RESTORE_CMD[@]}"
+if [[ -n "$DB_PASS" ]]; then
+    PGPASSWORD="$DB_PASS" "${RESTORE_CMD[@]}"
+else
+    env -u PGPASSWORD "${RESTORE_CMD[@]}"
+fi
 
 echo "Restore complete into ${TARGET_DB}"
 
 if [[ "$VERIFY_AFTER" -eq 1 ]]; then
     echo "Running verification against ${TARGET_DB}"
-    DB_DATABASE="$TARGET_DB" DB_HOSTNAME_READ="$DB_HOST" DB_PORT="$DB_PORT" DJANGO_USER="$DB_USER" DB_SCHEMA="$DB_SCHEMA" DB_SSLMODE="$DB_SSLMODE" \
-        "${ROOT_DIR}/database/verify_db.sh"
+    if [[ -n "$DB_PASS" ]]; then
+        PGPASSWORD="$DB_PASS" DB_DATABASE="$TARGET_DB" DB_HOSTNAME_READ="$DB_HOST" DB_PORT="$DB_PORT" DJANGO_USER="$DB_USER" DB_SCHEMA="$DB_SCHEMA" DB_SSLMODE="$DB_SSLMODE" \
+            "${ROOT_DIR}/database/verify_db.sh"
+    else
+        env -u PGPASSWORD DB_DATABASE="$TARGET_DB" DB_HOSTNAME_READ="$DB_HOST" DB_PORT="$DB_PORT" DJANGO_USER="$DB_USER" DB_SCHEMA="$DB_SCHEMA" DB_SSLMODE="$DB_SSLMODE" \
+            "${ROOT_DIR}/database/verify_db.sh"
+    fi
 fi
