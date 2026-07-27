@@ -45,12 +45,13 @@ PY
     fi
 }
 
-SOURCE_DB="${DB_DATABASE:-$(load_config_value DB_DATABASE)}"
-SOURCE_DB="${SOURCE_DB:-portal1}"
+SOURCE_DB="${RESTORE_SOURCE_DB:-portal1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
 DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
 DB_SCHEMA="${DB_SCHEMA:-$(load_config_value DB_SCHEMA)}"
+DB_OWNER="${DB_OWNER:-$(load_config_value DB_OWNER)}"
+DB_OWNER="${DB_OWNER:-portal_owner}"
 DB_HOST="${DB_HOSTNAME_WRITE:-${DB_HOSTNAME_READ:-$(load_config_value DB_HOSTNAME_WRITE)}}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-$(load_config_value DB_PORT)}"
@@ -71,11 +72,33 @@ TEMP_LIST_FILE=""
 INPUT_FORMAT=""
 ADMIN_USER="${DB_ADMIN_USER:-}"
 TARGET_OWNER_OVERRIDE=""
+MAINTENANCE_USER="${DB_MAINTENANCE_USER:-$DB_OWNER}"
+MAINTENANCE_USER_EXPLICIT=0
+MAINTENANCE_GRANT_ADDED=0
+RESTORE_SCHEMA="${DB_SCHEMA:-$DB_USER}"
 
 cleanup() {
+    local exit_code=$?
+    local cleanup_failed=0
+
+    trap - EXIT
+    if [[ "$MAINTENANCE_GRANT_ADDED" -eq 1 ]]; then
+        if ! run_maintenance_command \
+            psql -X -h "$DB_HOST" -p "$DB_PORT" -U "$MAINTENANCE_USER" \
+            -d "$TARGET_DB" -w -v ON_ERROR_STOP=1 \
+            -c "REVOKE CREATE ON DATABASE \"${TARGET_DB}\" FROM \"${DB_USER}\";"; then
+            echo "WARNING: failed to revoke temporary CREATE privilege from '${DB_USER}' on '${TARGET_DB}'." >&2
+            echo "An authorized operator must review and revoke it manually." >&2
+            cleanup_failed=1
+        fi
+    fi
     if [[ -n "$TEMP_LIST_FILE" && -f "$TEMP_LIST_FILE" ]]; then
         rm -f "$TEMP_LIST_FILE"
     fi
+    if [[ "$exit_code" -eq 0 && "$cleanup_failed" -eq 1 ]]; then
+        exit_code=1
+    fi
+    exit "$exit_code"
 }
 
 trap cleanup EXIT
@@ -115,6 +138,18 @@ validate_plain_sql_target_safety() {
     fi
 }
 
+validate_plain_sql_schema_restore() {
+    local input_file="$1"
+    local schema_pattern
+
+    schema_pattern="^[[:space:]]*CREATE[[:space:]]+SCHEMA([[:space:]]+IF[[:space:]]+NOT[[:space:]]+EXISTS)?[[:space:]]+\"?${RESTORE_SCHEMA}\"?([[:space:]]|;)"
+    if ! LC_ALL=C grep -Eiq "$schema_pattern" "$input_file"; then
+        echo "Plain SQL clean restore requires the dump to create schema '${RESTORE_SCHEMA}'." >&2
+        echo "The existing schema is removed before restore, so a schema-complete dump is required." >&2
+        return 1
+    fi
+}
+
 validate_identifier() {
     local value="$1"
     local label="$2"
@@ -134,10 +169,98 @@ run_admin_command() {
     fi
 }
 
+run_maintenance_command() {
+    if [[ -n "${PGPASSFILE:-}" ]]; then
+        env -u PGPASSWORD "$@"
+    else
+        "$@"
+    fi
+}
+
 admin_query() {
     run_admin_command \
         psql -X -h "$DB_HOST" -p "$DB_PORT" -U "$ADMIN_USER" -d postgres \
         -w -v ON_ERROR_STOP=1 -t -A "$@"
+}
+
+maintenance_query() {
+    run_maintenance_command \
+        psql -X -h "$DB_HOST" -p "$DB_PORT" -U "$MAINTENANCE_USER" -d "$TARGET_DB" \
+        -w -v ON_ERROR_STOP=1 -t -A "$@"
+}
+
+prepare_plain_sql_clean_restore() {
+    local database_owner
+    local schema_owner
+    local application_role_exists
+    local active_connections
+    local application_can_create
+
+    database_owner=$(maintenance_query -c "
+SELECT pg_get_userbyid(datdba)
+FROM pg_database
+WHERE datname = current_database();
+")
+    if [[ "$database_owner" != "$MAINTENANCE_USER" ]]; then
+        echo "Maintenance role '${MAINTENANCE_USER}' does not own target database '${TARGET_DB}'." >&2
+        echo "Use the target database owner for the existing-database clean restore." >&2
+        return 1
+    fi
+
+    application_role_exists=$(maintenance_query -c "
+SELECT count(*)
+FROM pg_roles
+WHERE rolname = '${DB_USER}';
+")
+    if [[ "$application_role_exists" != "1" ]]; then
+        echo "Application database role '${DB_USER}' does not exist." >&2
+        return 1
+    fi
+
+    active_connections=$(maintenance_query -c "
+SELECT count(*)
+FROM pg_stat_activity
+WHERE datname = current_database()
+  AND backend_type = 'client backend'
+  AND pid <> pg_backend_pid();
+")
+    if [[ "$active_connections" != "0" ]]; then
+        echo "Target database '${TARGET_DB}' has ${active_connections} active connection(s)." >&2
+        echo "Stop its applications and disconnect users before retrying." >&2
+        return 1
+    fi
+
+    schema_owner=$(maintenance_query -c "
+SELECT pg_get_userbyid(nspowner)
+FROM pg_namespace
+WHERE nspname = '${RESTORE_SCHEMA}';
+")
+    if [[ -n "$schema_owner" && "$schema_owner" != "$MAINTENANCE_USER" && "$schema_owner" != "$DB_USER" ]]; then
+        echo "Schema '${RESTORE_SCHEMA}' is owned by unexpected role '${schema_owner}'." >&2
+        echo "Expected '${MAINTENANCE_USER}' or '${DB_USER}'; refusing destructive cleanup." >&2
+        return 1
+    fi
+
+    application_can_create=$(maintenance_query -c "
+SELECT CASE
+    WHEN has_database_privilege('${DB_USER}', current_database(), 'CREATE') THEN 't'
+    ELSE 'f'
+END;
+")
+    if [[ "$application_can_create" != "t" ]]; then
+        maintenance_query -c "
+GRANT CREATE ON DATABASE \"${TARGET_DB}\" TO \"${DB_USER}\";
+" >/dev/null
+        MAINTENANCE_GRANT_ADDED=1
+    fi
+
+    if [[ "$schema_owner" == "$MAINTENANCE_USER" ]]; then
+        echo "Removing maintenance-owned schema '${RESTORE_SCHEMA}' from '${TARGET_DB}'"
+        echo "  A restore failure after this point can leave the non-production target without this schema."
+        maintenance_query -c "
+DROP SCHEMA \"${RESTORE_SCHEMA}\" CASCADE;
+" >/dev/null
+    fi
 }
 
 recreate_target_database() {
@@ -246,33 +369,40 @@ Restore a Portal CMS dump into an explicit target database.
 
 Options:
   --input FILE         Dump file to restore (.dump custom format or .sql)
+  --source-db NAME     Database represented by the dump (default: portal1)
   --target-db NAME     Target database name
   --recreate-db        Drop and recreate target database before restore
   --admin-user NAME    Administrative role used only with --recreate-db
                        Credentials are resolved by libpq; prefer PGPASSFILE
   --owner NAME         Owner for a newly created target; ignored when an
                        existing target owner can be preserved
+  --maintenance-user NAME
+                       Target database owner used to prepare an existing
+                       database for a plain-SQL --clean-restore
+                       (default: DB_OWNER from config, then portal_owner)
   --allow-live-target  Allow target database to match source/live database
   --skip-schema-create Exclude CREATE SCHEMA for the app schema from custom-format restores
   --clean-restore      Drop and recreate all objects within the target database
-                       before restore; implies --skip-schema-create (schema must
-                       already exist in the target database, created by an admin)
+                       before restore. Custom archives preserve the existing
+                       schema; plain SQL replaces the application schema.
   --no-verify          Skip post-restore verification
   --dry-run            Print the resolved restore steps without executing them
   --help               Show this help
 
 Safety:
-  - Refuses to restore into the configured source database by default.
+  - Refuses to restore into the explicit source database by default.
   - Never permits --recreate-db when target and source database names match.
-  - Plain SQL requires --recreate-db to avoid existing-object conflicts.
-  - Intended for clone-first workflows such as portal1_clone.
+  - Plain SQL requires --clean-restore or --recreate-db to avoid conflicts.
+  - Plain-SQL clean restore keeps the target database but replaces its
+    application schema; it rejects database DDL and psql reconnect commands.
 
 Examples:
+  PGPASSFILE=/path/to/operator-managed.pgpass \\
   ./database/pg_restore_portal.sh \\
     --input database/dumps/django.portal1.dump.<epoch>.sql \\
+    --source-db portal1 \\
     --target-db portal_dev \\
-    --recreate-db \\
-    --admin-user ADMIN_USER
+    --clean-restore
 
   ./database/pg_restore_portal.sh \\
     --input database/dumps/portal1_full_<timestamp>.dump \\
@@ -285,6 +415,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --input)
             INPUT="$2"
+            shift 2
+            ;;
+        --source-db)
+            SOURCE_DB="$2"
             shift 2
             ;;
         --target-db)
@@ -301,6 +435,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         --owner)
             TARGET_OWNER_OVERRIDE="$2"
+            shift 2
+            ;;
+        --maintenance-user)
+            MAINTENANCE_USER="$2"
+            MAINTENANCE_USER_EXPLICIT=1
             shift 2
             ;;
         --allow-live-target)
@@ -348,6 +487,8 @@ fi
 validate_identifier "$SOURCE_DB" "source database name"
 validate_identifier "$TARGET_DB" "target database name"
 validate_identifier "$DB_USER" "application database user"
+validate_identifier "$DB_OWNER" "configured database owner"
+validate_identifier "$RESTORE_SCHEMA" "application database schema"
 
 if [[ "$TARGET_DB" == "$SOURCE_DB" ]]; then
     if [[ "$RECREATE_DB" -eq 1 ]]; then
@@ -357,6 +498,11 @@ if [[ "$TARGET_DB" == "$SOURCE_DB" ]]; then
         echo "Refusing to restore into source/live database '${SOURCE_DB}' without --allow-live-target" >&2
         exit 1
     fi
+fi
+
+if [[ "$RECREATE_DB" -eq 1 && "$CLEAN_RESTORE" -eq 1 ]]; then
+    echo "--recreate-db and --clean-restore cannot be combined." >&2
+    exit 1
 fi
 
 if [[ "$RECREATE_DB" -eq 1 ]]; then
@@ -377,16 +523,25 @@ fi
 INPUT_FORMAT="$(detect_input_format "$INPUT")"
 
 if [[ "$INPUT_FORMAT" == "sql" ]]; then
-    if [[ "$RECREATE_DB" -ne 1 ]]; then
-        echo "Plain SQL restores require --recreate-db to prevent existing-object conflicts." >&2
-        exit 1
-    fi
-    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 || "$CLEAN_RESTORE" -eq 1 ]]; then
-        echo "--skip-schema-create and --clean-restore are only supported for custom-format dumps" >&2
-        echo "Use --recreate-db for a conflict-free plain SQL restore." >&2
-        exit 1
-    fi
     validate_plain_sql_target_safety "$INPUT"
+    if [[ "$RECREATE_DB" -ne 1 && "$CLEAN_RESTORE" -ne 1 ]]; then
+        echo "Plain SQL restores require --clean-restore or --recreate-db to prevent conflicts." >&2
+        exit 1
+    fi
+    if [[ "$SKIP_SCHEMA_CREATE" -eq 1 ]]; then
+        echo "--skip-schema-create is only supported for custom-format dumps." >&2
+        exit 1
+    fi
+    if [[ "$CLEAN_RESTORE" -eq 1 ]]; then
+        validate_identifier "$MAINTENANCE_USER" "maintenance database user"
+        validate_plain_sql_schema_restore "$INPUT"
+    elif [[ "$MAINTENANCE_USER_EXPLICIT" -eq 1 ]]; then
+        echo "--maintenance-user is only used for a plain-SQL --clean-restore." >&2
+        exit 1
+    fi
+elif [[ "$MAINTENANCE_USER_EXPLICIT" -eq 1 ]]; then
+    echo "--maintenance-user is only used for a plain-SQL --clean-restore." >&2
+    exit 1
 fi
 
 if [[ -n "${DB_SSLMODE}" ]]; then
@@ -415,11 +570,13 @@ echo "  recreate:  ${RECREATE_DB}"
 if [[ "$RECREATE_DB" -eq 1 ]]; then
     echo "  admin user: ${ADMIN_USER}"
 fi
+if [[ "$INPUT_FORMAT" == "sql" && "$CLEAN_RESTORE" -eq 1 ]]; then
+    echo "  maintenance user: ${MAINTENANCE_USER}"
+fi
 echo "  skip schema create: ${SKIP_SCHEMA_CREATE}"
 echo "  clean restore: ${CLEAN_RESTORE}"
 echo "  verify:    ${VERIFY_AFTER}"
 
-RESTORE_SCHEMA="${DB_SCHEMA:-$DB_USER}"
 if [[ "$INPUT_FORMAT" == "custom" ]]; then
     if [[ "$SKIP_SCHEMA_CREATE" -eq 1 || "$CLEAN_RESTORE" -eq 1 ]]; then
         TEMP_LIST_FILE="$(mktemp)"
@@ -435,7 +592,7 @@ if [[ "$INPUT_FORMAT" == "custom" ]]; then
         -U "$DB_USER"
         -d "$TARGET_DB"
         --no-owner
-        --no-acl
+        --no-privileges
         -v
     )
     if [[ "$CLEAN_RESTORE" -eq 1 ]]; then
@@ -452,12 +609,14 @@ if [[ "$INPUT_FORMAT" == "custom" ]]; then
 else
     RESTORE_CMD=(
         psql
+        -X
         -h "$DB_HOST"
         -p "$DB_PORT"
         -U "$DB_USER"
         -d "$TARGET_DB"
         -v ON_ERROR_STOP=1
         --single-transaction
+        -c "DROP SCHEMA IF EXISTS \"${RESTORE_SCHEMA}\" CASCADE;"
         -f "$INPUT"
     )
 fi
@@ -473,11 +632,18 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  Drop ${TARGET_DB} only if it exists and has no active connections"
         echo "  Recreate ${TARGET_DB} from template0 with source encoding/locale and preserved or explicit owner"
     fi
+    if [[ "$INPUT_FORMAT" == "sql" && "$CLEAN_RESTORE" -eq 1 ]]; then
+        echo "  Preflight as ${MAINTENANCE_USER}: target ownership, application role, schema ownership, active connections"
+        echo "  Grant ${DB_USER} temporary CREATE on ${TARGET_DB} only if needed"
+        echo "  Remove ${RESTORE_SCHEMA} as ${MAINTENANCE_USER} first only when that role owns it"
+        echo "  Replace ${RESTORE_SCHEMA} transactionally as ${DB_USER}; the database itself is preserved"
+        echo "  Revoke any temporary CREATE privilege after restore or failure"
+    fi
     if [[ -n "$TEMP_LIST_FILE" ]]; then
         if [[ "$CLEAN_RESTORE" -eq 1 ]]; then
-            printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --clean --if-exists --no-owner --no-acl -v --use-list="<generated temp list>" "$INPUT"
+            printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --clean --if-exists --no-owner --no-privileges -v --use-list="<generated temp list>" "$INPUT"
         else
-            printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --no-owner --no-acl -v --use-list="<generated temp list>" "$INPUT"
+            printf '  %q' pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TARGET_DB" --no-owner --no-privileges -v --use-list="<generated temp list>" "$INPUT"
         fi
         printf '\n'
     else
@@ -492,6 +658,8 @@ fi
 
 if [[ "$RECREATE_DB" -eq 1 ]]; then
     recreate_target_database
+elif [[ "$INPUT_FORMAT" == "sql" && "$CLEAN_RESTORE" -eq 1 ]]; then
+    prepare_plain_sql_clean_restore
 fi
 
 if [[ -n "$DB_PASS" ]]; then

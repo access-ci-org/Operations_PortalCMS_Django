@@ -1,3 +1,6 @@
+v0.6.5 jlambertson 2026-07-27
+- upgrading db restore and docs for testing
+
 v0.6.4 jlambertson 2026-07-24
 - testing updated db restore scripts
 

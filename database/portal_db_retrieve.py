@@ -42,6 +42,7 @@ import argparse
 import datetime
 import gzip
 import os
+import re
 import shutil
 import sys
 
@@ -131,6 +132,17 @@ def filter_keys(objects, pattern=None):
     if not pattern:
         return objects
     return [(k, ts) for k, ts in objects if pattern in k]
+
+
+def source_database_from_key(key):
+    """Return the database encoded in a django.<database>.dump backup key."""
+    match = re.search(
+        r"(?:^|/)django\.([A-Za-z_][A-Za-z0-9_]*)\.dump(?:\.|$)",
+        key,
+    )
+    if not match:
+        raise ValueError(f"cannot determine source database from backup key: {key}")
+    return match.group(1)
 
 
 def aws_cp(key, dest):
@@ -304,6 +316,15 @@ def main():
         sys.exit(1)
 
     chosen, chosen_ts = matching[-1]  # last = most recently modified
+    try:
+        source_db = source_database_from_key(chosen)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        print(
+            "Use a django.<database>.dump backup key so restore safety can identify its source.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     print(f"Selecting most recent: {chosen}  ({chosen_ts.strftime('%Y-%m-%d %H:%M UTC')})", file=sys.stderr)
     dest = os.path.join(DUMP_DIR, chosen)
 
@@ -340,16 +361,18 @@ def main():
     print(f"\nDump ready: {dump_path}", file=sys.stderr)
     target_db = args.target_db or "TARGET_DB"
     print(f"\nNext step — restore into an explicit non-source target database:")
+    if dump_format == "sql":
+        print("  # Export PGPASSFILE for the configured database owner before running this command.")
     print(f"  ./database/pg_restore_portal.sh \\")
     print(f"    --input {dump_path} \\")
+    print(f"    --source-db {source_db} \\")
     if dump_format == "custom":
         print(f"    --target-db {target_db} \\")
         print(f"    --clean-restore")
     else:
         print(f"    --target-db {target_db} \\")
-        print(f"    --recreate-db \\")
-        print(f"    --admin-user ADMIN_USER")
-        print("  Plain SQL detected: the explicit target will be dropped and recreated.")
+        print(f"    --clean-restore")
+        print("  Plain SQL detected: the target database is preserved and its application schema is replaced.")
     write_log(f"{ME} Done: {chosen}")
 
 

@@ -44,6 +44,8 @@ DB_NAME="${DB_NAME:-portal1}"
 DB_USER="${DJANGO_USER:-$(load_config_value DJANGO_USER)}"
 DB_USER="${DB_USER:-portal_django}"
 DB_PASS="${DJANGO_PASS:-$(load_config_value DJANGO_PASS)}"
+DB_SCHEMA="${DB_SCHEMA:-$(load_config_value DB_SCHEMA)}"
+DB_SCHEMA="${DB_SCHEMA:-$DB_USER}"
 DB_HOST="${DB_HOSTNAME_READ:-$(load_config_value DB_HOSTNAME_READ)}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-$(load_config_value DB_PORT)}"
@@ -65,7 +67,10 @@ Create a safe PostgreSQL dump of the configured Portal CMS database.
 Options:
   --source-db NAME     Source database name (default: ${DB_NAME})
   --output PATH        Explicit output path
-  --format TYPE        Dump format: custom or sql (default: custom)
+  --format TYPE        Dump format: custom or sql (default: custom).
+                       SQL output is safe for restoring into an existing database:
+                       it is scoped to the application schema and omits database
+                       creation, ownership, and privilege commands.
   --dry-run            Print the resolved dump command without executing it
   --help               Show this help
 
@@ -162,9 +167,11 @@ else
         -p "$DB_PORT"
         -U "$DB_USER"
         -d "$DB_NAME"
+        --schema "$DB_SCHEMA"
         --clean
         --if-exists
-        --create
+        --no-owner
+        --no-privileges
         -v
         -f "$OUTPUT"
     )

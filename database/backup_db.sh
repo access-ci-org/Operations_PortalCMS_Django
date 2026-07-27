@@ -160,7 +160,7 @@ echo ""
 # Prompt for dump type
 echo "Select dump type:"
 echo "  1) Full dump (schema + data) - Custom format"
-echo "  2) Full dump (schema + data) - SQL format"
+echo "  2) Full dump (schema + data) - SQL format, existing-database restore"
 echo "  3) Data only dump"
 echo "  4) Schema only dump"
 read -p "Choice [1-4]: " CHOICE
@@ -176,7 +176,8 @@ case $CHOICE in
         FILENAME="${DUMP_DIR}/${DB_NAME}_full_${DATE}.sql"
         echo -e "${YELLOW}Creating SQL dump...${NC}"
         pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-            --clean --if-exists --create -v -f "$FILENAME"
+            --schema "$TARGET_SCHEMA" --clean --if-exists \
+            --no-owner --no-privileges -v -f "$FILENAME"
         ;;
     3)
         FILENAME="${DUMP_DIR}/${DB_NAME}_data_${DATE}.sql"
