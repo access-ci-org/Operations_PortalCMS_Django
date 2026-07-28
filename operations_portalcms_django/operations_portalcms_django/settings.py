@@ -409,9 +409,13 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Allauth Account Settings
+ACCOUNT_ADAPTER = 'portal.adapters.ClosedLocalSignupAdapter'
+SOCIALACCOUNT_ADAPTER = 'portal.adapters.CILogonSignupAdapter'
+SOCIALACCOUNT_ONLY = True
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
+ACCOUNT_EMAIL_VERIFICATION = 'none'
 SOCIALACCOUNT_EMAIL_REQUIRED = True
-SOCIALACCOUNT_EMAIL_VERIFICATION = 'optional'
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_STORE_TOKENS = True
 SOCIALACCOUNT_PROFILE_FIELDS = ['email', 'first_name', 'last_name']
