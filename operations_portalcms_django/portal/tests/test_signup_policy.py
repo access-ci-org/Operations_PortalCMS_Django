@@ -1,12 +1,11 @@
 from types import SimpleNamespace
-from unittest.mock import patch
 
+from allauth import app_settings as allauth_app_settings
 from allauth.account.adapter import get_adapter as get_account_adapter
-from allauth.account.views import SignupView, signup
 from allauth.socialaccount.adapter import get_adapter as get_socialaccount_adapter
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, SimpleTestCase
-from django.urls import resolve, reverse
+from django.urls import NoReverseMatch, resolve, reverse
 
 
 class SignupPolicyTests(SimpleTestCase):
@@ -15,37 +14,17 @@ class SignupPolicyTests(SimpleTestCase):
         self.request.user = AnonymousUser()
         self.request.session = {}
 
-    def test_local_signup_get_shows_closed_page_without_form(self):
-        response = signup(self.request)
+    def test_local_signup_route_is_not_registered(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("account_signup")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.template_name, "account/signup_closed.html")
-        self.assertIsNone(response.context_data)
+    def test_allauth_is_social_account_only(self):
+        self.assertTrue(allauth_app_settings.SOCIALACCOUNT_ONLY)
 
-    def test_local_signup_post_does_not_create_user(self):
-        request = RequestFactory().post(
-            "/accounts/signup/",
-            {
-                "username": "new-local-user",
-                "email": "new-local-user@example.org",
-                "password1": "not-a-real-password-123",
-                "password2": "not-a-real-password-123",
-            },
-        )
-        request.user = AnonymousUser()
-        request.session = {}
+    def test_django_admin_login_route_remains_available(self):
+        match = resolve(reverse("admin:login"))
 
-        with patch.object(SignupView, "get_form") as get_form:
-            response = signup(request)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.template_name, "account/signup_closed.html")
-        get_form.assert_not_called()
-
-    def test_existing_local_account_login_route_remains_available(self):
-        match = resolve(reverse("account_login"))
-
-        self.assertEqual(match.url_name, "account_login")
+        self.assertEqual(match.url_name, "login")
 
     def test_local_signup_policy_is_closed(self):
         self.assertFalse(
