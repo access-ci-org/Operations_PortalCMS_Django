@@ -1,3 +1,6 @@
+v0.6.7 jlambertson 2026-08-04
+- updating health check and deployment linearity
+
 v0.6.6 jlambertson 2026-07-28
 - removing all default signup pathways
 - leaving default cilogon auth and direct admin login through admin/ if needed

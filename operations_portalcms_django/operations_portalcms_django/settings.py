@@ -11,10 +11,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import os
 import json
-import sys
+import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,42 +23,120 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ##### ACCESS-CI CUSTOMIZATIONS #####
 # `APP_CONFIG` is the single supported runtime config entry point for this app.
 if 'APP_CONFIG' not in os.environ:
-    print('Missing APP_CONFIG environment variable')
-    sys.exit(1)
+    raise ImproperlyConfigured('Missing APP_CONFIG environment variable')
 
 config_file = Path(os.environ['APP_CONFIG'])
 
 try:
     with open(config_file, 'r', encoding='utf-8') as f:
         CONF = json.load(f)
-except (ValueError, OSError):
-    print(f'Failed to load APP_CONFIG={config_file}')
-    raise
+except (ValueError, OSError) as exc:
+    raise ImproperlyConfigured(f'Failed to load APP_CONFIG={config_file}') from exc
 
-# Keep the required-key contract explicit so sample configs and deployment
-# automation can stay aligned as the runtime moves toward infra management.
-required_config_keys = [
-    'DJANGO_SECRET_KEY',
-    'APP_LOG',
-]
-missing_required_keys = [key for key in required_config_keys if key not in CONF or CONF[key] in ('', None)]
-if missing_required_keys:
-    print(f'Missing required APP_CONFIG keys: {", ".join(missing_required_keys)}')
-    sys.exit(1)
+if not isinstance(CONF, dict):
+    raise ImproperlyConfigured('APP_CONFIG must contain a JSON object')
 
-# APP_CONFIG values are authoritative for Django runtime settings. Environment
-# variables remain useful as compatibility fallbacks only when a key is absent
-# from the JSON config.
-for key, value in CONF.items():
-    if isinstance(value, list):
-        os.environ[key] = ','.join(str(v) for v in value)
-    elif isinstance(value, bool):
-        os.environ[key] = 'True' if value else 'False'
-    elif value is None:
-        os.environ[key] = ''
-    else:
-        os.environ[key] = str(value)
 
+def _bool_value(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _config_value(name, default=None):
+    """Return an APP_CONFIG value, retaining environment fallback compatibility."""
+    return CONF.get(name, os.environ.get(name, default))
+
+
+RUNTIME_DEBUG = _bool_value(_config_value('DEBUG'), False)
+
+
+def _validate_runtime_config():
+    """Validate types and required values without including values in errors."""
+    required_keys = {'DJANGO_SECRET_KEY', 'APP_LOG'}
+
+    # A non-debug configuration is a deployed runtime. Fail during startup
+    # instead of silently falling back to localhost or empty credentials.
+    if not RUNTIME_DEBUG:
+        required_keys.update({
+            'APP_ENV',
+            'PUBLIC_HOSTNAME',
+            'ALLOWED_HOSTS',
+            'CSRF_TRUSTED_ORIGINS',
+            'DB_DATABASE',
+            'DB_PORT',
+            'DB_HOSTNAME_READ',
+            'DB_HOSTNAME_WRITE',
+            'DJANGO_USER',
+            'DJANGO_PASS',
+            'DB_SEARCH_PATH',
+            'DB_SSLMODE',
+            'STATIC_ROOT',
+            'MEDIA_ROOT',
+            'APP_VERSION',
+            'API_KEY',
+            'CILOGON_CLIENT_ID',
+            'CILOGON_CLIENT_SECRET',
+        })
+
+    missing_keys = sorted(
+        key for key in required_keys
+        if key not in CONF or CONF[key] in ('', None, [])
+    )
+    if missing_keys:
+        raise ImproperlyConfigured(
+            f'Missing required APP_CONFIG keys: {", ".join(missing_keys)}'
+        )
+
+    expected_types = {
+        'DEBUG': bool,
+        'ENVIRONMENT_BANNER_ENABLED': bool,
+        'ALLOWED_HOSTS': list,
+        'CSRF_TRUSTED_ORIGINS': list,
+    }
+    invalid_types = sorted(
+        key for key, expected_type in expected_types.items()
+        if key in CONF and not isinstance(CONF[key], expected_type)
+    )
+    invalid_types.extend(
+        sorted(
+            key for key in required_keys - {'ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS', 'DB_PORT'}
+            if key in CONF and not isinstance(CONF[key], str)
+        )
+    )
+    if 'DB_PORT' in CONF and not isinstance(CONF['DB_PORT'], (str, int)):
+        invalid_types.append('DB_PORT')
+    invalid_types = sorted(set(invalid_types))
+    if invalid_types:
+        raise ImproperlyConfigured(
+            f'Invalid APP_CONFIG value types: {", ".join(invalid_types)}'
+        )
+
+    if not RUNTIME_DEBUG:
+        app_env = str(CONF['APP_ENV']).strip().lower()
+        if app_env not in {'development', 'beta', 'production'}:
+            raise ImproperlyConfigured('APP_CONFIG APP_ENV is not a deployed environment')
+
+        hostname = str(CONF['PUBLIC_HOSTNAME']).strip()
+        if not hostname or any(character.isspace() for character in hostname):
+            raise ImproperlyConfigured('APP_CONFIG PUBLIC_HOSTNAME is invalid')
+
+        db_port = str(CONF['DB_PORT'])
+        if not db_port.isdigit() or not 1 <= int(db_port) <= 65535:
+            raise ImproperlyConfigured('APP_CONFIG DB_PORT is invalid')
+
+        for key in ('ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS'):
+            if any(not isinstance(item, str) or not item.strip() for item in CONF[key]):
+                raise ImproperlyConfigured(f'APP_CONFIG {key} contains an invalid entry')
+
+
+_validate_runtime_config()
+
+# access_django_user_admin currently consumes API_KEY from the process
+# environment. Keep only that compatibility export instead of copying every
+# config value, including credentials, into the environment.
 if CONF.get('API_KEY'):
     os.environ['API_KEY'] = str(CONF['API_KEY'])
 
@@ -68,37 +147,31 @@ if CONF.get('API_KEY'):
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = CONF['DJANGO_SECRET_KEY']
 
-# SECURITY WARNING: don't run with debug turned on in production!
-def _bool_value(value, default=False):
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
-
 
 def _env_bool(name, default=False):
-    return _bool_value(os.environ.get(name), default)
+    return _bool_value(_config_value(name), default)
 
 
 def _split_csv(value):
     if not value:
         return []
+    if isinstance(value, (list, tuple)):
+        return [str(item).strip() for item in value if str(item).strip()]
     return [item.strip() for item in str(value).split(',') if item.strip()]
 
 
-DEBUG = _bool_value(CONF.get('DEBUG'), False)
+DEBUG = RUNTIME_DEBUG
 
 _config_name = config_file.name.lower()
 _default_development_banner = DEBUG or '.dev.' in _config_name or _config_name.endswith('.dev.json')
 
 # Explicit environment identity. These keys are optional for backward
 # compatibility; APP_CONFIG remains the required path to the JSON config file.
-APP_ENV = os.environ.get('APP_ENV', '').strip().lower()
-PUBLIC_HOSTNAME = os.environ.get('PUBLIC_HOSTNAME', '').strip()
-ENVIRONMENT_LABEL = os.environ.get(
+APP_ENV = str(_config_value('APP_ENV', '')).strip().lower()
+PUBLIC_HOSTNAME = str(_config_value('PUBLIC_HOSTNAME', '')).strip()
+ENVIRONMENT_LABEL = _config_value(
     'ENVIRONMENT_LABEL',
-    os.environ.get('DEVELOPMENT_SERVER_LABEL', 'DEVELOPMENT SERVER'),
+    _config_value('DEVELOPMENT_SERVER_LABEL', 'DEVELOPMENT SERVER'),
 )
 ENVIRONMENT_BANNER_ENABLED = _env_bool(
     'ENVIRONMENT_BANNER_ENABLED',
@@ -109,9 +182,9 @@ ENVIRONMENT_BANNER_ENABLED = _env_bool(
 DEVELOPMENT_SERVER_BANNER = ENVIRONMENT_BANNER_ENABLED
 DEVELOPMENT_SERVER_LABEL = ENVIRONMENT_LABEL
 
-ALLOWED_HOSTS = _split_csv(os.environ.get('ALLOWED_HOSTS'))
+ALLOWED_HOSTS = _split_csv(_config_value('ALLOWED_HOSTS'))
 
-CSRF_TRUSTED_ORIGINS = _split_csv(os.environ.get('CSRF_TRUSTED_ORIGINS'))
+CSRF_TRUSTED_ORIGINS = _split_csv(_config_value('CSRF_TRUSTED_ORIGINS'))
 if not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = [
         f'https://{host}'
@@ -209,11 +282,11 @@ WSGI_APPLICATION = 'operations_portalcms_django.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DB_SEARCH_PATH = os.environ.get('DB_SEARCH_PATH', '"$user",public')
-DB_SSLMODE = os.environ.get('DB_SSLMODE', '')
-DB_SSLROOTCERT = os.environ.get('DB_SSLROOTCERT', '')
-DB_SSLCERT = os.environ.get('DB_SSLCERT', '')
-DB_SSLKEY = os.environ.get('DB_SSLKEY', '')
+DB_SEARCH_PATH = _config_value('DB_SEARCH_PATH', '"$user",public')
+DB_SSLMODE = _config_value('DB_SSLMODE', '')
+DB_SSLROOTCERT = _config_value('DB_SSLROOTCERT', '')
+DB_SSLCERT = _config_value('DB_SSLCERT', '')
+DB_SSLKEY = _config_value('DB_SSLKEY', '')
 
 DB_OPTIONS = {
     # Keep schema resolution explicit during the role/schema cutover.
@@ -232,11 +305,11 @@ if DB_SSLKEY:
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_DATABASE', 'portalcms1'),
-        'USER': os.environ.get('DJANGO_USER', 'portal_django'),
-        'PASSWORD': os.environ.get('DJANGO_PASS', ''),
-        'HOST': os.environ.get('DB_HOSTNAME_WRITE', os.environ.get('DB_HOSTNAME_READ', 'localhost')),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': _config_value('DB_DATABASE', 'portalcms1'),
+        'USER': _config_value('DJANGO_USER', 'portal_django'),
+        'PASSWORD': _config_value('DJANGO_PASS', ''),
+        'HOST': _config_value('DB_HOSTNAME_WRITE', _config_value('DB_HOSTNAME_READ', 'localhost')),
+        'PORT': _config_value('DB_PORT', '5432'),
         'OPTIONS': DB_OPTIONS,
     }
 }
@@ -343,13 +416,13 @@ TEXT_ADDITIONAL_ATTRIBUTES = ('scrolling', 'allowfullscreen', 'frameborder')
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.environ.get('STATIC_ROOT', str(BASE_DIR / 'staticfiles'))
+STATIC_ROOT = _config_value('STATIC_ROOT', str(BASE_DIR / 'staticfiles'))
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
-MEDIA_ROOT = os.environ.get('MEDIA_ROOT', str(BASE_DIR / 'media'))
+MEDIA_URL = _config_value('MEDIA_URL', '/media/')
+MEDIA_ROOT = _config_value('MEDIA_ROOT', str(BASE_DIR / 'media'))
 
 # Authentication URLs
 LOGIN_URL = '/accounts/login/'
@@ -358,18 +431,17 @@ LOGOUT_REDIRECT_URL = '/'
 
 # Admin Interface Settings
 # Force dark mode in Django admin
-import os
 if 'DJANGO_COLORS' not in os.environ:
     os.environ['DJANGO_COLORS'] = 'dark'
 
 # Application Logging
 APP_LOG       = CONF['APP_LOG']  # required in runtime .conf; points to operator-managed log dir
 APP_ERROR_LOG = str(Path(APP_LOG).parent / 'portal.error.log')  # co-located with APP_LOG, derived
-APP_VERSION = os.environ.get('APP_VERSION', 'dev')
-SYSLOG_SOCK = os.environ.get('SYSLOG_SOCK', '/var/run/syslog')
+APP_VERSION = _config_value('APP_VERSION', 'dev')
+SYSLOG_SOCK = _config_value('SYSLOG_SOCK', '/var/run/syslog')
 
 # API Configuration
-API_BASE = os.environ.get('API_BASE', '')
+API_BASE = _config_value('API_BASE', '')
 
 # ==================== ALLAUTH SOCIALACCOUNT CONFIGURATION ====================
 # CILogon OAuth2 Configuration - matches Service Index functionality
@@ -393,8 +465,8 @@ SOCIALACCOUNT_PROVIDERS = {
             'eppn': 'eppn',
         },
         'APP': {
-            'client_id': os.environ.get('CILOGON_CLIENT_ID', ''),
-            'secret': os.environ.get('CILOGON_CLIENT_SECRET', ''),
+            'client_id': _config_value('CILOGON_CLIENT_ID', ''),
+            'secret': _config_value('CILOGON_CLIENT_SECRET', ''),
             'key': '',
         },
     },

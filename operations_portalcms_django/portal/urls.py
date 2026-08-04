@@ -2,11 +2,12 @@
 News and resource views are served from their own apps (infrastructure_news, integration_news, resources).
 """
 from django.urls import path
-from . import views
+from . import health, views
 
 app_name = 'portal'
 
 urlpatterns = [
+    path('healthz/', health.readiness, name='healthz'),
     path('unprivileged/', views.unprivileged, name='unprivileged'),
     path(
         'cms-versioning/version/<int:version_id>/submit-for-review/',

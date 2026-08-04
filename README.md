@@ -51,6 +51,19 @@ Operations_PortalCMS_Django/
 - **Package Manager:** uv
 - **Runtime Config:** required `APP_CONFIG` JSON file
 
+## Deployment readiness contract
+
+`GET /healthz/` returns the configured `APP_VERSION` and performs a lightweight
+query against the default database. It returns HTTP 200 with `status: ok` only
+when the database is usable, otherwise HTTP 503 without exposing exception
+details. Production infrastructure restricts this route to loopback and uses it
+after activating a prepared release.
+
+For non-debug deployments, startup validates the required database, hostname,
+static/media, API, OAuth, version, and secret-bearing configuration keys and
+their JSON types. Deployment configuration remains owned by
+`Operations_CMS_Infrastructure`.
+
 
 ---
 
