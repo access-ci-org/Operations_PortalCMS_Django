@@ -27,7 +27,12 @@ Current Verification Snapshot.
   at the last verification.
 - Known remaining work is production hardening, careful RP permission sync
   review, and the runtime handoff from the manual `portal_django` workflow to
-  the planned `software` user / infra-managed model.
+  the planned `software` user / infra-managed model. This refers specifically
+  to the Django systemd service running as `software` (checklist items 4-6
+  below) — the `software` OS account itself already exists and already runs
+  backup/retrieval/restore operations today (see
+  `../database/README.md`), independent of that still-pending service
+  cutover.
 
 ## Runtime & Deployment
 
@@ -443,7 +448,11 @@ Steps 1-3 are complete. Steps 4-6 remain:
 - [x] 2. Shared repository ownership (`appdev` group, `g+w`)
 - [x] 3. Align manual Django management commands (`manage.prod.sh.j2`)
 - [ ] 4. Prepare `software` user handoff: create `software` OS user and
-  transfer ownership of `/soft/django-cms-01/`
+  transfer ownership of `/soft/django-cms-01/`. As of 2026-08-14, `/soft/django-cms-01/`
+  is already `software`-owned and `software` already runs backup, retrieval, and
+  restore operations there (see `../database/README.md`); confirm whether this item
+  should now be checked off, or whether it still tracks unfinished work beyond OS
+  ownership (e.g. a formal handoff sign-off).
 - [ ] 5. Introduce infra-managed model: Ansible renders `portal.conf` from
   vaulted deployment variables, and systemd `APP_CONFIG` points at the rendered
   file

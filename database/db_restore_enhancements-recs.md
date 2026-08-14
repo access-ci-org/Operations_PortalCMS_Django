@@ -104,6 +104,14 @@ The preflight should:
   temporary privilege the real restore would need;
 - show the exact source, target, format, restore strategy, verification setting,
   and credential source type without exposing credential values;
+- print the absolute path of the `APP_CONFIG` source actually loaded (deployed
+  auto-discovery, a dev-only fallback file, or an explicit `APP_CONFIG`), or report
+  that none was found, before any other check runs. Today `load_config_value`
+  silently tries `../../conf/portal.conf` then four fallback JSON files in
+  `database/` in order; a run from the wrong user or directory can silently land on
+  a different config than intended with no indication which (if any) was used —
+  this is the most likely source of restores that appear to work inconsistently
+  between operators or sessions;
 - return nonzero when the target is not ready.
 
 Preflight logic should reuse the checks used by execution so the two paths cannot
@@ -125,6 +133,15 @@ Differentiate, where possible:
 Continue to prefer an operator-managed `PGPASSFILE`; do not accept passwords as new
 command-line arguments.
 
+`portal_owner`'s password is never read from `APP_CONFIG` (only `DB_OWNER`'s name is),
+so a `.pgpass` entry is always required for `--clean-restore` against an existing
+target — this is expected, not a gap to code around. The remaining friction was
+operators re-exporting `PGPASSFILE` every session; that has a zero-code fix already
+available: libpq checks the default `~/.pgpass` path automatically when `PGPASSFILE`
+is unset, so installing the file once at that default path (e.g. `/home/software/.pgpass`
+for the `software` account used on deployed hosts) removes the need to export
+anything, on every run, without any script change. See `database/README.md`.
+
 ### Add committed regression tests
 
 Add tests before expanding the command surface. Use command stubs or mocks so the
@@ -142,7 +159,12 @@ At minimum, cover:
 - active-connection and ownership refusal paths;
 - cleanup of temporary privileges on success and failure;
 - propagation of restore and verification failures;
-- retrieval next-step output for both plain SQL and custom archives.
+- retrieval next-step output for both plain SQL and custom archives;
+- preflight/dry-run config-source reporting: run from a directory where
+  `../../conf/portal.conf` resolves and assert the reported source is that path; run
+  from a directory where it does not and assert the reported source is the correct
+  dev-only fallback file, or an explicit "no config found" result — never a silent
+  guess.
 
 Tests must assert that destructive commands are not invoked in dry-run, preflight,
 or rejected-input cases.

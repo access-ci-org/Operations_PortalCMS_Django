@@ -14,6 +14,17 @@ from Ansible.
 Never print or commit an application config, password file, database dump, or other
 credential-bearing material.
 
+## Credentials by script
+
+| Script | Connects as | Credential source |
+| --- | --- | --- |
+| `pg_dump_portal.sh`, `backup_db.sh` | `portal_django` (`DJANGO_USER`/`DJANGO_PASS`) | `APP_CONFIG` — pointed at the **production** config to dump live `portal1`. This is a production-data-access action: treat it with the same human-approval expectation as any other live-`portal1` access, distinct from the S3-backup-based retrieve/restore flow below. |
+| `pg_restore_portal.sh` data-load step | `portal_django` (`DJANGO_USER`/`DJANGO_PASS`) | `APP_CONFIG` (auto-discovered as `software`, or explicit) |
+| `pg_restore_portal.sh` plain-SQL `--clean-restore` prep | `portal_owner` (`--maintenance-user`, default `DB_OWNER`) | libpq password file only (`.pgpass`/`PGPASSFILE`) — never read from `APP_CONFIG` |
+| `pg_restore_portal.sh --recreate-db` only | An explicit `--admin-user` with `CREATEDB` (e.g. `opsdba`); not used in the normal existing-target refresh | libpq password file |
+| `portal_db_retrieve.py`, `media_retrieve.py` | N/A — AWS/S3 only, never connects to Postgres | AWS profile (`newbackup` on deployed hosts, `opsbackupreader` locally) |
+| `verify_db.sh` | `portal_django` | `APP_CONFIG` |
+
 ## Configuration used by each script
 
 | Script | Configuration |
@@ -50,9 +61,50 @@ Retrieval and restoration are separate operations:
 - `pg_restore_portal.sh` performs the destructive restore. It always requires an
   explicit `--target-db`.
 
+### Run as `software` on a deployed host (recommended)
+
+`software` is the OS account that already performs backup and retrieval operations on
+deployed hosts (it runs the daily media-to-S3 cron job and already has AWS credentials
+provisioned). Use it for restores too. One-time setup, done once per host by an
+authorized operator:
+
+- Confirm `/soft/django-cms-01/PROD` points at the active release (already true on a
+  normally deployed host; it is infra-managed).
+- Confirm `/home/software/.aws/{config,credentials}` exists (already infra-managed).
+- Install `/home/software/.pgpass` (mode `0600`, owned by `software`) with entries for
+  both `portal_owner` and `portal_django` against `portal_dev`/`portal_beta`. This is
+  the one credential file that is not yet automated anywhere; see
+  [Supply portal_owner authentication](#2-supply-portal_owner-authentication) below.
+
+With that in place, every restore is:
+
+```bash
+sudo -i -u software                      # or: alias software="sudo -i -u software"
+cd /soft/django-cms-01/PROD
+
+uv run database/portal_db_retrieve.py -r --profile newbackup --target-db portal_dev
+
+./database/pg_restore_portal.sh \
+  --input database/dumps/<path printed above> \
+  --source-db portal1 --target-db portal_dev --clean-restore --dry-run
+
+./database/pg_restore_portal.sh \
+  --input database/dumps/<path printed above> \
+  --source-db portal1 --target-db portal_dev --clean-restore
+```
+
+No `APP_CONFIG=` and no `PGPASSFILE=` prefix is needed anywhere in that sequence:
+`pg_restore_portal.sh` auto-discovers `APP_CONFIG` at `/soft/django-cms-01/conf/portal.conf`
+whenever it is run from inside the deployed release (`ROOT_DIR/../../conf/portal.conf`),
+and libpq auto-discovers `/home/software/.pgpass` whenever `PGPASSFILE` is unset. Swap
+`portal_beta` for `portal_dev` throughout as needed.
+
+The steps below explain what each of those commands does and why, and cover the
+off-host/local case where the auto-discovery above does not apply.
+
 ### 1. Retrieve the latest portal1 dump
 
-On the deployed server:
+On the deployed server, as `software`:
 
 ```bash
 uv run database/portal_db_retrieve.py \
@@ -86,8 +138,20 @@ Local operators normally omit `--profile newbackup`; the default local profile i
 Plain-SQL clean restore preserves the existing target database but may need
 `portal_owner` to remove an owner-controlled schema and temporarily grant
 `portal_django` permission to recreate it. `portal_owner` does not need `CREATEDB`.
+Its password is never read from `APP_CONFIG` (only `DB_OWNER`'s *name* is), so it must
+always come from libpq's password-file mechanism.
 
-Use an operator-managed libpq password file:
+On a deployed host running as `software`, install this once at the default lookup path
+so no `PGPASSFILE` export is ever needed:
+
+```bash
+# as software, mode 0600
+/home/software/.pgpass
+```
+
+with entries covering both `portal_owner` and `portal_django` for `portal_dev` and
+`portal_beta`. Off-host or when testing under a different account, point at an
+operator-managed file explicitly instead:
 
 ```bash
 export PGPASSFILE=/path/to/operator-managed.pgpass
@@ -155,6 +219,12 @@ Plain SQL is restored with `psql`. PostgreSQL custom archives are restored with
 `pg_restore`; the script selects the tool from the file contents rather than its name.
 
 ## Creating a compatible plain-SQL dump locally
+
+Unlike the S3-backup-based retrieve/restore flow above, this connects directly to the
+live database named by `APP_CONFIG` (`portal1` by default) as `portal_django`, using
+that role's real password. Pointing it at the production config is a
+production-data-access action and needs the same human approval as any other live
+`portal1` access — see [Credentials by script](#credentials-by-script).
 
 `pg_dump_portal.sh --format sql` now produces a schema-complete, existing-database
 restore:
@@ -303,9 +373,12 @@ files.
 ## Safety checklist
 
 - Keep `--source-db portal1` and `--target-db portal_dev` explicit.
+- On a deployed host, run as `software` from `/soft/django-cms-01/PROD`; see
+  [Run as `software` on a deployed host](#run-as-software-on-a-deployed-host-recommended).
 - Stop any application connected to `portal_dev` before clean restore.
 - Inspect `--dry-run` before the real restore.
-- Use `PGPASSFILE` for `portal_owner`; do not expose passwords in commands or logs.
+- Use `portal_owner`'s password file (`/home/software/.pgpass`, or `PGPASSFILE`
+  off-host); do not expose passwords in commands or logs.
 - Do not commit files under `database/dumps/` or `database/mediarestore/`.
 - Treat `portal1` as the protected source. The restore script refuses to target it
   unless the separate high-risk `--allow-live-target` override is deliberately used.
