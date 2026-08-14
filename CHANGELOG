@@ -1,3 +1,6 @@
+v0.7.0 dinukadesilva 2026-08-04
+- Enabling `django.contrib.redirects` (CTT-1010)
+
 v0.6.7 jlambertson 2026-08-04
 - updating health check and deployment linearity
 
