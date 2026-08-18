@@ -45,9 +45,7 @@
                             <p class="card-text">{{ news.content }}</p>
                             <p class="text-muted">
                                 <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
-                                {% if news.status != 'published' %}
-                                    <small class="ms-2">• Author: {{ news.author.get_full_name|default:news.author.username }}</small>
-                                {% endif %}
+                                <small class="ms-2">• Author: {{ news.author.get_full_name|default:news.author.username }}</small>
                                 {% if news.reviewer %}
                                     <small class="ms-2">• Reviewed by: {{ news.reviewer.get_full_name|default:news.reviewer.username }}</small>
                                 {% endif %}
