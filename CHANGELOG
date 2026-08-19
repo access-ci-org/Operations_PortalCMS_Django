@@ -1,3 +1,6 @@
+v0.7.1 jlambertson 2026-08-19
+- Enabling files for news importing and testing
+
 v0.7.0 dinukadesilva 2026-08-04
 - Enabling `django.contrib.redirects` (CTT-1010)
 
