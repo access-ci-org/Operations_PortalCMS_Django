@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -37,6 +38,8 @@ class ImportResult:
     updated_system: int = 0
     created_integration: int = 0
     updated_integration: int = 0
+    deleted_system: int = 0
+    deleted_integration: int = 0
     system_na_infrastructure: int = 0
     integration_na_element: int = 0
     unresolved_allowed_na: int = 0
@@ -143,12 +146,54 @@ class Command(BaseCommand):
             action="store_true",
             help="Treat warnings as errors and abort import.",
         )
+        parser.add_argument(
+            "--replace",
+            action="store_true",
+            help=(
+                "Replace both news feeds atomically. Requires --confirm-database and "
+                "--confirm-host; writes also require --apply."
+            ),
+        )
+        parser.add_argument(
+            "--apply",
+            action="store_true",
+            help="Permit a --replace operation to write. Omit for normal dry-run planning.",
+        )
+        parser.add_argument(
+            "--confirm-database",
+            help="Expected configured PostgreSQL database name for --replace.",
+        )
+        parser.add_argument(
+            "--confirm-host",
+            help="Expected configured PostgreSQL write host for --replace.",
+        )
+        parser.add_argument(
+            "--suppress-notifications",
+            action="store_true",
+            help="Force imported infrastructure-news email and Slack flags off.",
+        )
 
     def handle(self, *args, **options):
         input_path = Path(options["input"])
         report_path = Path(options["report_file"])
         dry_run = bool(options["dry_run"])
         strict = bool(options["strict"])
+        replace = bool(options["replace"])
+        apply = bool(options["apply"])
+
+        if apply and not replace:
+            raise CommandError("--apply is only valid with --replace.")
+        if replace:
+            self._validate_replace_target(
+                confirm_database=options.get("confirm_database"),
+                confirm_host=options.get("confirm_host"),
+            )
+            if dry_run and apply:
+                raise CommandError("Choose either --dry-run or --apply, not both.")
+            if not dry_run and not apply:
+                raise CommandError(
+                    "A replacement write requires --apply. Use --dry-run to review the plan first."
+                )
 
         if not input_path.exists():
             raise CommandError(f"Input file does not exist: {input_path}")
@@ -156,6 +201,18 @@ class Command(BaseCommand):
         payload = json.loads(input_path.read_text(encoding="utf-8"))
         system_records = payload.get("SystemStatusNews", [])
         integration_records = payload.get("IntegrationNews", [])
+
+        expected_system_ids: set[int] = set()
+        expected_integration_ids: set[int] = set()
+        if replace:
+            expected_system_ids = self._validated_source_ids(
+                records=system_records,
+                feed_name="SystemStatusNews",
+            )
+            expected_integration_ids = self._validated_source_ids(
+                records=integration_records,
+                feed_name="IntegrationNews",
+            )
 
         self.stdout.write(f"Input: {input_path}")
         self.stdout.write(
@@ -168,22 +225,31 @@ class Command(BaseCommand):
             integration_records=len(integration_records),
         )
 
-        import_user = self._resolve_import_user(
-            username=options["import_user"],
-            create_missing=bool(options["create_import_user"]),
-            dry_run=dry_run,
-            result=result,
-        )
-        integration_elements = self._ensure_integration_elements(dry_run=dry_run)
-
         try:
             with transaction.atomic():
+                import_user = self._resolve_import_user(
+                    username=options["import_user"],
+                    create_missing=bool(options["create_import_user"]),
+                    dry_run=dry_run,
+                    result=result,
+                )
+                integration_elements = self._ensure_integration_elements(dry_run=dry_run)
+
+                if replace:
+                    result.deleted_system = SystemStatusNews.objects.count()
+                    result.deleted_integration = IntegrationNews.objects.count()
+                    if not dry_run:
+                        SystemStatusNews.objects.all().delete()
+                        IntegrationNews.objects.all().delete()
+
                 for record in system_records:
                     self._import_system_record(
                         record=record,
                         import_user=import_user,
                         dry_run=dry_run,
                         result=result,
+                        force_create=replace,
+                        suppress_notifications=bool(options["suppress_notifications"]),
                     )
                 for record in integration_records:
                     self._import_integration_record(
@@ -193,17 +259,24 @@ class Command(BaseCommand):
                         allow_na_affected_element=bool(options["allow_na_affected_element"]),
                         dry_run=dry_run,
                         result=result,
+                        force_create=replace,
+                    )
+
+                if replace and not dry_run:
+                    self._validate_replacement(
+                        expected_system_ids=expected_system_ids,
+                        expected_integration_ids=expected_integration_ids,
+                    )
+
+                if strict and result.warnings:
+                    raise CommandError(
+                        f"Strict mode enabled and warnings found ({len(result.warnings)}). "
+                        "See report for details."
                     )
 
                 if dry_run:
                     # Ensure absolutely no writes in dry-run mode.
                     transaction.set_rollback(True)
-
-            if strict and result.warnings:
-                raise CommandError(
-                    f"Strict mode enabled and warnings found ({len(result.warnings)}). "
-                    "See report for details."
-                )
 
         except Exception as exc:
             result.add_error(str(exc))
@@ -222,6 +295,90 @@ class Command(BaseCommand):
             input_path=input_path,
         )
         self._emit_summary(result=result, dry_run=dry_run, report_path=report_path)
+
+    def _validate_replace_target(
+        self,
+        confirm_database: Optional[str],
+        confirm_host: Optional[str],
+    ) -> None:
+        if not confirm_database or not confirm_host:
+            raise CommandError(
+                "--replace requires both --confirm-database and --confirm-host."
+            )
+
+        configured = settings.DATABASES["default"]
+        actual_database = str(configured.get("NAME") or "")
+        actual_host = str(configured.get("HOST") or "")
+
+        if str(confirm_database) != actual_database:
+            raise CommandError(
+                "Refusing replacement: configured database does not match "
+                f"--confirm-database ({actual_database!r} != {confirm_database!r})."
+            )
+        if str(confirm_host) != actual_host:
+            raise CommandError(
+                "Refusing replacement: configured write host does not match "
+                f"--confirm-host ({actual_host!r} != {confirm_host!r})."
+            )
+
+    def _validated_source_ids(
+        self,
+        records: Any,
+        feed_name: str,
+    ) -> set[int]:
+        if not isinstance(records, list) or not records:
+            raise CommandError(
+                f"Replacement requires a nonempty {feed_name} list."
+            )
+
+        ids: set[int] = set()
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                raise CommandError(
+                    f"{feed_name} record {index} must be a JSON object."
+                )
+            raw_id = (record.get("source_metadata", {}) or {}).get("drupal_nid")
+            if isinstance(raw_id, bool):
+                raise CommandError(
+                    f"{feed_name} record {index} has invalid Drupal nid {raw_id!r}."
+                )
+            try:
+                stable_id = int(raw_id)
+            except (TypeError, ValueError):
+                raise CommandError(
+                    f"{feed_name} record {index} has invalid Drupal nid {raw_id!r}."
+                )
+            if stable_id <= 0:
+                raise CommandError(
+                    f"{feed_name} record {index} has nonpositive Drupal nid {stable_id}."
+                )
+            if stable_id in ids:
+                raise CommandError(
+                    f"{feed_name} contains duplicate Drupal nid {stable_id}."
+                )
+            ids.add(stable_id)
+        return ids
+
+    def _validate_replacement(
+        self,
+        expected_system_ids: set[int],
+        expected_integration_ids: set[int],
+    ) -> None:
+        actual_system_ids = set(
+            SystemStatusNews.objects.values_list("outage_id", flat=True)
+        )
+        actual_integration_ids = set(
+            IntegrationNews.objects.values_list("integration_news_id", flat=True)
+        )
+
+        if actual_system_ids != expected_system_ids:
+            raise CommandError(
+                "Replacement validation failed for SystemStatusNews stable IDs."
+            )
+        if actual_integration_ids != expected_integration_ids:
+            raise CommandError(
+                "Replacement validation failed for IntegrationNews stable IDs."
+            )
 
     def _resolve_import_user(
         self,
@@ -329,8 +486,10 @@ class Command(BaseCommand):
         import_user: User,
         dry_run: bool,
         result: ImportResult,
+        force_create: bool = False,
+        suppress_notifications: bool = False,
     ) -> None:
-        existing = self._find_existing_system(record)
+        existing = None if force_create else self._find_existing_system(record)
         creating = existing is None
         obj = existing or SystemStatusNews(author=import_user)
 
@@ -340,8 +499,8 @@ class Command(BaseCommand):
         obj.affected_infrastructure = record.get("affected_infrastructure") or ""
         obj.start_datetime = _as_dt(record.get("start_datetime"))
         obj.end_datetime = _as_dt(record.get("end_datetime"))
-        obj.send_email = bool(record.get("send_email", False))
-        obj.post_to_slack = bool(record.get("post_to_slack", False))
+        obj.send_email = False if suppress_notifications else bool(record.get("send_email", False))
+        obj.post_to_slack = False if suppress_notifications else bool(record.get("post_to_slack", False))
         obj.is_active = bool(record.get("is_active", True))
         obj.status = record.get("status") or "published"
         obj.review_comments = _provenance_tag(record)
@@ -396,8 +555,9 @@ class Command(BaseCommand):
         allow_na_affected_element: bool,
         dry_run: bool,
         result: ImportResult,
+        force_create: bool = False,
     ) -> None:
-        existing = self._find_existing_integration(record)
+        existing = None if force_create else self._find_existing_integration(record)
         creating = existing is None
         obj = existing or IntegrationNews(author=import_user)
 
@@ -488,6 +648,8 @@ class Command(BaseCommand):
             "",
             "## Planned/Applied Changes",
             "",
+            f"- `SystemStatusNews` deleted: `{result.deleted_system}`",
+            f"- `IntegrationNews` deleted: `{result.deleted_integration}`",
             f"- `SystemStatusNews` created: `{result.created_system}`",
             f"- `SystemStatusNews` updated: `{result.updated_system}`",
             f"- `IntegrationNews` created: `{result.created_integration}`",
@@ -521,6 +683,10 @@ class Command(BaseCommand):
         mode = "DRY RUN" if dry_run else "IMPORT"
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS(f"{mode} COMPLETE"))
+        self.stdout.write(
+            f"Deleted -> System: {result.deleted_system}, "
+            f"Integration: {result.deleted_integration}"
+        )
         self.stdout.write(
             f"Created/Updated -> System: {result.created_system}/{result.updated_system}, "
             f"Integration: {result.created_integration}/{result.updated_integration}"
