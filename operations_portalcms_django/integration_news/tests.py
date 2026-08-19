@@ -1,6 +1,8 @@
-from django.test import RequestFactory, SimpleTestCase
+from django.contrib.auth.models import User
+from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from . import workflow
+from .models import IntegrationNews
 
 
 class AuthenticatedReviewer:
@@ -36,3 +38,27 @@ class IntegrationWorkflowMethodTests(SimpleTestCase):
                 response = view(request, pk=1)
 
                 self.assertEqual(response.status_code, 405)
+
+
+class IntegrationNewsAuthorDisplayTests(TestCase):
+    def test_anonymous_page_shows_published_author_name_without_email(self):
+        author = User.objects.create_user(
+            username='integration_test_author',
+            first_name='Integration Test',
+            last_name='Author',
+            email='private-integration-author@example.test',
+        )
+        IntegrationNews.objects.create(
+            title='Published integration item',
+            content='Published integration content',
+            news_type='software_release',
+            author=author,
+            status='published',
+            is_active=True,
+        )
+
+        response = self.client.get('/integration-news/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Author: Integration Test Author')
+        self.assertNotContains(response, author.email)

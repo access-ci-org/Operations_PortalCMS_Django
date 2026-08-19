@@ -29,7 +29,7 @@ def system_status_news(request):
     ):
         news_items = SystemStatusNews.objects.filter(is_active=True)
     else:
-        news_items = SystemStatusNews.objects.filter(is_active=True, status='published')
+        news_items = services.get_public_news_queryset()
 
     news_items = news_items.select_related('author', 'reviewer').prefetch_related(infrastructure_prefetch)
     paginator = Paginator(news_items, 20)
