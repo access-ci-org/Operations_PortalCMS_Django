@@ -13,5 +13,5 @@ urlpatterns = [
     path('infrastructure-news/<int:pk>/reject/', workflow.reject_systemstatus_news, name='reject_systemstatus_news'),
     path('infrastructure-news/<int:pk>/publish/', workflow.publish_systemstatus_news, name='publish_systemstatus_news'),
     path('infrastructure-news/<int:pk>/unpublish/', workflow.unpublish_systemstatus_news, name='unpublish_systemstatus_news'),
-    path('api/infrastructure_news', views.api_infrastructure_news, name='api_infrastructure_news'),
+    path('api/infrastructure_news_v1', views.api_infrastructure_news, name='api_infrastructure_news'),
 ]

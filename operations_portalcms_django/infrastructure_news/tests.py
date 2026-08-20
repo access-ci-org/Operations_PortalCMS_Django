@@ -4,6 +4,7 @@ from datetime import datetime, timezone as datetime_timezone
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.urls import reverse
 
 from . import workflow
 from .models import SystemStatusNews
@@ -112,7 +113,7 @@ class ApiInfrastructureNewsTests(TestCase):
         )
 
     def test_only_published_active_items_included(self):
-        response = self.client.get('/api/infrastructure_news')
+        response = self.client.get('/api/infrastructure_news_v1')
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.content)
@@ -122,8 +123,14 @@ class ApiInfrastructureNewsTests(TestCase):
         self.assertNotIn(str(self.draft.outage_id), outage_ids)
         self.assertNotIn(str(self.inactive.outage_id), outage_ids)
 
+    def test_api_url_name_resolves_to_versioned_path(self):
+        self.assertEqual(
+            reverse('infrastructure_news:api_infrastructure_news'),
+            '/api/infrastructure_news_v1',
+        )
+
     def test_published_item_field_shape(self):
-        response = self.client.get('/api/infrastructure_news')
+        response = self.client.get('/api/infrastructure_news_v1')
         data = json.loads(response.content)
         item = next(i for i in data if i['outage_id'] == str(self.published.outage_id))
 
@@ -161,7 +168,7 @@ class ApiInfrastructureNewsTests(TestCase):
             is_active=True,
         )
 
-        response = self.client.get('/api/infrastructure_news')
+        response = self.client.get('/api/infrastructure_news_v1')
         data = json.loads(response.content)
 
         self.assertEqual([item['outage_id'] for item in data], ['100', '900', None])
@@ -173,7 +180,7 @@ class ApiInfrastructureNewsTests(TestCase):
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
         page_response = self.client.get('/infrastructure-news/')
-        api_response = self.client.get('/api/infrastructure_news')
+        api_response = self.client.get('/api/infrastructure_news_v1')
 
         page_outage_ids = {
             str(item.outage_id) if item.outage_id is not None else None
@@ -184,6 +191,11 @@ class ApiInfrastructureNewsTests(TestCase):
         }
 
         self.assertEqual(page_outage_ids, api_outage_ids)
+
+    def test_unversioned_api_url_is_not_exposed(self):
+        response = self.client.get('/api/infrastructure_news')
+
+        self.assertEqual(response.status_code, 404)
 
     def test_anonymous_page_shows_published_author_name_without_email(self):
         response = self.client.get('/infrastructure-news/')

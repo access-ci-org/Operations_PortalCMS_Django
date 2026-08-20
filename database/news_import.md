@@ -232,7 +232,7 @@ The current API does not expose author or updater fields.
 
 ```bash
 curl -fsSL \
-  "https://beta-operations.access-ci.org/api/infrastructure_news?verify=$(date +%s)" \
+  "https://beta-operations.access-ci.org/api/infrastructure_news_v1?verify=$(date +%s)" \
   -o "$WORK/infrastructure_api.json"
 
 .venv/bin/python - "$WORK/infrastructure_api.json" <<'PY'

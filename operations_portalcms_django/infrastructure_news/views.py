@@ -112,8 +112,11 @@ def update_system_status_news(request, pk):
 @require_safe
 @cache_page(60 * 15)
 def api_infrastructure_news(request):
-    """Public JSON feed of published System Status News, matching the shape of the
-    legacy Drupal /api/infrastructure_news endpoint for downstream consumers."""
+    """Public JSON feed served at /api/infrastructure_news_v1.
+
+    The payload matches the legacy Drupal /api/infrastructure_news endpoint for
+    downstream consumers.
+    """
     if request.method not in ('GET', 'HEAD'):
         from django.http import HttpResponseNotAllowed
         return HttpResponseNotAllowed(['GET', 'HEAD'])
