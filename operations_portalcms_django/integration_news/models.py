@@ -38,6 +38,8 @@ class IntegrationNews(models.Model):
         ('aws_registry', 'ACCESS Public AWS Container Registry'),
         ('cider', 'CiDeR - CyberInfrastructure Description Repository'),
         ('ipf', 'Information Publishing Framework (IPF) tool for publishing compute resource information'),
+        ('accessusage', 'accessusage - command line allocation usage lookup'),
+        ('access_oauth_mapfile', 'access-oauth-mapfile - ACCESS OAuth identity to local account mapping'),
     ]
 
     title = models.CharField(max_length=200)

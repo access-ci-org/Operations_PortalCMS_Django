@@ -1,12 +1,16 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
+from django.http import JsonResponse
+from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_safe
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.db.models import Prefetch
 from .models import IntegrationNews
 from .forms import IntegrationNewsForm
+from . import services
 
 
 def integration_news(request):
@@ -112,3 +116,15 @@ def update_integration_news(request, pk):
         'form': form,
         'can_publish': can_publish,
     })
+
+
+@require_safe
+@cache_page(60 * 15)
+def api_integration_news(request):
+    """Public JSON feed served at /api/integration_news.
+
+    Kept unversioned (unlike /api/infrastructure_news_v1) because an existing
+    external consumer already polls the legacy Drupal /api/integration_news
+    path and expects it to stay stable through the cutover to Django.
+    """
+    return JsonResponse(services.get_public_news_feed(request), safe=False)

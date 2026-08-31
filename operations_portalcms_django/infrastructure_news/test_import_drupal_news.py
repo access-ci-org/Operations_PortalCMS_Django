@@ -1,3 +1,4 @@
+import hashlib
 import json
 from io import StringIO
 from pathlib import Path
@@ -9,16 +10,19 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase
-
 from integration_news.models import IntegrationNews
+from resources.models import CiderInfrastructure
 
 from .management.commands.import_drupal_news import Command as CanonicalCommand
 from .models import SystemStatusNews
+from .test_drupal_mysql import _dump_text
 
 
 class ImportCommandResolutionTests(SimpleTestCase):
     def test_portal_command_is_the_canonical_importer(self):
-        from portal.management.commands.import_drupal_news import Command as PortalCommand
+        from portal.management.commands.import_drupal_news import (
+            Command as PortalCommand,
+        )
 
         self.assertIs(PortalCommand, CanonicalCommand)
 
@@ -95,6 +99,16 @@ class AtomicReplaceCommandTests(TestCase):
         )
 
     def _run_replace(self, *mode):
+        source_confirmation = []
+        if "--apply" in mode:
+            source_confirmation = [
+                "--confirm-source-sha256",
+                hashlib.sha256(self.input_path.read_bytes()).hexdigest(),
+                "--confirm-system-count",
+                "1",
+                "--confirm-integration-count",
+                "1",
+            ]
         return call_command(
             "import_drupal_news",
             "--input",
@@ -109,6 +123,7 @@ class AtomicReplaceCommandTests(TestCase):
             "--confirm-host",
             self.database_host,
             "--suppress-notifications",
+            *source_confirmation,
             *mode,
             stdout=StringIO(),
         )
@@ -143,6 +158,96 @@ class AtomicReplaceCommandTests(TestCase):
             list(integration.affected_elements.values_list("code", flat=True)),
             ["nagios"],
         )
+
+    def test_replace_apply_preserves_multiple_integration_elements(self):
+        payload = self._payload()
+        payload["IntegrationNews"][0]["affected_elements"] = ["nagios", "cider"]
+        payload["IntegrationNews"][0]["affected_element"] = ""
+        self._write_payload(payload)
+
+        self._run_replace("--apply")
+
+        integration = IntegrationNews.objects.get(integration_news_id=201)
+        self.assertEqual(
+            set(integration.affected_elements.values_list("code", flat=True)),
+            {"nagios", "cider"},
+        )
+
+    def test_replace_apply_requires_matching_source_checksum(self):
+        self._write_payload()
+
+        with self.assertRaisesMessage(CommandError, "source SHA-256 does not match"):
+            call_command(
+                "import_drupal_news",
+                "--input",
+                str(self.input_path),
+                "--replace",
+                "--apply",
+                "--confirm-database",
+                self.database_name,
+                "--confirm-host",
+                self.database_host,
+                "--confirm-source-sha256",
+                "0" * 64,
+                "--confirm-system-count",
+                "1",
+                "--confirm-integration-count",
+                "1",
+                stdout=StringIO(),
+            )
+
+    def test_raw_dump_apply_replaces_both_feeds_with_all_relationships(self):
+        raw_path = Path(self.temp_dir.name) / "news.mysql"
+        raw_path.write_text(_dump_text(), encoding="utf-8")
+        CiderInfrastructure.objects.create(
+            cider_resource_id=301,
+            cider_type="compute",
+            info_resourceid="resource.example",
+            info_siteid="example",
+            resource_descriptive_name="Example resource",
+        )
+
+        call_command(
+            "import_drupal_news",
+            "--mysql-dump",
+            str(raw_path),
+            "--replace",
+            "--apply",
+            "--strict",
+            "--confirm-database",
+            self.database_name,
+            "--confirm-host",
+            self.database_host,
+            "--confirm-source-sha256",
+            hashlib.sha256(raw_path.read_bytes()).hexdigest(),
+            "--confirm-system-count",
+            "1",
+            "--confirm-integration-count",
+            "1",
+            "--suppress-notifications",
+            "--report-file",
+            str(self.report_path),
+            "--import-user",
+            self.author.username,
+            stdout=StringIO(),
+        )
+
+        system = SystemStatusNews.objects.get(outage_id=101)
+        integration = IntegrationNews.objects.get(integration_news_id=201)
+        self.assertEqual(
+            set(
+                system.affected_infrastructure_items.values_list(
+                    "info_resourceid", flat=True
+                )
+            ),
+            {"resource.example"},
+        )
+        self.assertEqual(
+            set(integration.affected_elements.values_list("code", flat=True)),
+            {"compute_roadmap", "accessusage"},
+        )
+        self.assertFalse(system.send_email)
+        self.assertFalse(system.post_to_slack)
 
     def test_replace_rolls_back_deletion_and_import_on_final_validation_failure(self):
         self._write_payload()

@@ -1,423 +1,300 @@
-# Drupal News Import Runbook
+# Drupal News Cutover Import Runbook
 
-Targeted data-only import of both Drupal feeds into the current Django schema.
+This runbook covers the one-time replacement of both Drupal news feeds in Django:
 
-- Infrastructure News -> `portal_systemstatusnews`
-- Integration News -> `portal_integrationnews`
-- No model changes, migrations, deployments, or full database restores.
+- Drupal `infrastructure_news_v2` -> Django `SystemStatusNews`
+- Drupal `integration_news_v1` -> Django `IntegrationNews`
 
-## Operator
+The same command is rehearsed repeatedly with recent MySQL dumps on a nonproduction
+host. The final run uses the frozen cutover dump. This is not a synchronization service.
+After acceptance and the rollback window, the importer and this runbook can be removed in
+a later reviewed release.
 
-Run as `software`:
+No migration, deployment, service restart, or database restore is performed by the import
+command. Those remain separate human-approved actions.
+
+## Runtime and operator contract
+
+Run deployed rehearsals and cutover commands as the `software` operating-system user.
+Ansible builds an immutable `.venv` inside every release from the host-selected, locked uv
+profile. Invoke that interpreter directly; do not create a second environment for the
+importer.
+
+`/soft/django-cms-01/sbin/manage.prod.sh` is host-specific. On beta it selects beta's active
+`PROD` release and stable beta config; on production it selects production's active release
+and stable production config. It is acceptable only when the active release is exactly the
+approved importer release. The explicit release commands below are preferred for the
+change record because they pin the code and `.venv` visibly.
+
+The identities involved are different:
+
+| Purpose | Identity |
+|---|---|
+| OS process owner | `software` |
+| Python runtime | `<approved-release>/.venv/bin/python` |
+| PostgreSQL role | Loaded by Django from the host-specific `APP_CONFIG` |
+| Django author for imported rows | Existing user supplied with `--import-user` |
+
+Never print the configuration file or credentials. The importer reports only the database
+name, write host, source path and checksum, Python executable, counts, warnings and errors.
+
+## Import safety contract
+
+Raw-dump imports enforce all of the following:
+
+1. The source is an explicit plain SQL or `.gz` MySQL dump.
+2. Both Drupal bundles must be present and nonempty.
+3. Raw dumps can only use atomic `--replace`; additive raw-dump imports are refused.
+4. `--confirm-database` and `--confirm-host` must match resolved Django settings.
+5. `--dry-run` and `--apply` are mutually exclusive; replacement without either is refused.
+6. A write requires the exact reviewed source SHA-256 and operator-confirmed feed counts.
+7. A raw-dump write requires `--strict`, an existing import user, and
+   `--suppress-notifications`.
+8. Drupal node IDs and revisions, field-table revisions, types, dates, references and
+   choice mappings are validated before PostgreSQL replacement begins.
+9. Every affected infrastructure and integration-element reference is retained. Unknown,
+   missing or duplicate relationships fail validation or become strict-mode failures.
+10. Delete, import, stable-ID assignment, relationship creation, full field/relationship
+    verification and final stable-ID-set verification share one PostgreSQL transaction.
+11. Any failure rolls back the complete replacement.
+12. Every run writes a Markdown report. Parser failures are also recorded.
+
+The parser reads only current Drupal field tables and ignores unrelated dump tables. It
+uses no live MySQL or Drupal API connection.
+
+## Source data that must be corrected or explicitly resolved
+
+The August 28 rehearsal dump exposes two source issues:
+
+- Infrastructure News node `928` has start value `0026-01-07T12:50:36`. The importer
+  refuses to guess that this means 2026. Correct it in Drupal before producing the next
+  rehearsal/final dump, or document a separately reviewed explicit source correction.
+- Infrastructure News node `404` has empty content. This is reported by the parser and
+  rejected by model validation. Correct the source or deliberately review and change the
+  handling policy before any write.
+
+Do not patch the dump silently. The final dump should be a reproducible export of the
+approved Drupal source state.
+
+## Rehearsal on beta
+
+### 1. Human prerequisites
+
+Before running anything:
+
+- Deploy or prepare the approved application release on the beta host through the normal
+  infrastructure workflow.
+- Obtain separate approval for modifying the beta PostgreSQL database.
+- Place a recent MySQL dump in an operator-approved location outside Git.
+- Create a durable, `software`-writable change-record directory for reports and checksums.
+- Know the exact beta database name and write host.
+- Confirm the selected Django import user already exists. Do not create it in the importer.
+
+### 2. Start a `software` login shell and pin the release
 
 ```bash
 sudo -i -u software
-cd /soft/django-cms-01/releases/api-syncing-changes-e1163643f845-19d6e816f90f-1787087656
-#OR
-cd /soft/django-cms-01/PROD
+
+APP_HOME=/soft/django-cms-01
+RELEASE=/soft/django-cms-01/releases/<approved-release>
+PYTHON="$RELEASE/.venv/bin/python"
+MANAGE="$RELEASE/operations_portalcms_django/manage.py"
+APP_CONFIG="$APP_HOME/conf/portal.conf"
+SOURCE_DUMP=/path/to/recent/backup_database.mysql.gz
+CHANGE_RECORD=/path/to/durable/change-record/rehearsal-N
+IMPORT_USER=jlambertson
+EXPECTED_DATABASE=portal_beta
+EXPECTED_WRITE_HOST=<approved-beta-write-host>
+
+export APP_CONFIG
+
+test "$(id -un)" = software
+test -x "$PYTHON"
+test -r "$MANAGE"
+test -r "$APP_CONFIG"
+test -s "$SOURCE_DUMP"
+test -d "$CHANGE_RECORD"
+test -n "$EXPECTED_WRITE_HOST"
 ```
 
-The PostgreSQL role is `portal_django`. The fallback Django content author is `jlambertson`.
+Do not continue if any check fails. Do not use a release path inferred from an old report.
 
-## 1. Create the beta config
-
-Do not use `/soft/django-cms-01/conf/portal.conf`; it is the production config.
+### 3. Confirm the interpreter and target without exposing credentials
 
 ```bash
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
-export WORK
-
-.venv/bin/python - "$WORK" <<'PY'
-import json
-import pathlib
+"$PYTHON" "$MANAGE" shell -c "
 import sys
-
-source = pathlib.Path("/soft/django-cms-01/conf/portal.conf.dev.json")
-target = pathlib.Path(sys.argv[1]) / "portal_beta.json"
-
-config = json.loads(source.read_text())
-config["DB_DATABASE"] = "portal_beta"
-target.write_text(json.dumps(config))
-target.chmod(0o600)
-
-print(target)
-PY
-
-export APP_CONFIG="$WORK/portal_beta.json"
-export INPUT="$WORK/drupal_news_normalized_for_django.json"
-
-grep -o '"DB_DATABASE"[[:space:]]*:[[:space:]]*"[^"]*"' "$APP_CONFIG"
-```
-
-The output must show:
-
-```text
-DB_DATABASE: portal_beta
-```
-
-## 2. Generate staging data
-
-```bash
-TAG=/soft/django-cms-01/tags/Operations_PortalCMS_Django
-BACKUP=/soft/django-cms-01/releases/api-syncing-changes-e1163643f845-19d6e816f90f-1787087656/database/backup_database-2026-08-18T22:00:03-05:00.mysql.gz
-#OR
-BACKUP=/soft/django-cms-01/PROD/database/backup_database-2026-08-18T22:00:03-05:00.mysql.gz
-
-sed \
-  -e "s|DUMP_PATH = ROOT / .*|DUMP_PATH = Path(\"$BACKUP\")|" \
-  -e "s|OUTPUT_DIR = ROOT / \"generated\"|OUTPUT_DIR = Path(\"$WORK\")|" \
-  "$TAG/database/drupal_backups/analyze_news_migration.py" \
-  > "$WORK/analyze_news_migration.py"
-
-.venv/bin/python "$WORK/analyze_news_migration.py"
-
-sed \
-  -e "s|OUTPUT_DIR = ROOT / \"generated\"|OUTPUT_DIR = Path(\"$WORK\")|" \
-  "$TAG/database/drupal_backups/normalize_news_for_django.py" \
-  > "$WORK/normalize_news_for_django.py"
-
-.venv/bin/python "$WORK/normalize_news_for_django.py"
-```
-
-Validate the payload:
-
-```bash
-.venv/bin/python - "$INPUT" <<'PY'
-import json
-import sys
-
-payload = json.load(open(sys.argv[1]))
-system = payload["SystemStatusNews"]
-integration = payload["IntegrationNews"]
-
-print("SystemStatusNews:", len(system))
-print("IntegrationNews:", len(integration))
-print("Unique system IDs:", len({
-    str(row["source_metadata"].get("drupal_nid"))
-    for row in system
-}))
-print("Unique integration IDs:", len({
-    str(row["source_metadata"].get("drupal_nid"))
-    for row in integration
-}))
-PY
-```
-
-Expected for the August 18 backup:
-
-```text
-SystemStatusNews: 244
-IntegrationNews: 17
-```
-
-## 3. Dry-run both feeds
-
-```bash
-.venv/bin/python operations_portalcms_django/manage.py \
-  import_drupal_news \
-  --input "$INPUT" \
-  --dry-run \
-  --report-file "$WORK/news_import_dry_run.md" \
-  --import-user jlambertson
-
-sed -n '/## Summary/,/## Errors/p' \
-  "$WORK/news_import_dry_run.md"
-```
-
-Review all warnings before writing.
-
-Known warnings include:
-
-- CIDER infrastructure IDs absent from the local cache
-- Ambiguous integration-element mappings
-- Unmatched Drupal authors
-
-Unresolved integration elements become blank/N/A unless:
-
-```text
---disallow-na-affected-element
-```
-
-is supplied.
-
-## 4. Back up the beta database
-
-This is a targeted import. Do not use `pg_restore_portal.sh`.
-
-```bash
-APP_CONFIG="$APP_CONFIG" ./database/pg_dump_portal.sh \
-  --source-db portal_beta \
-  --format sql \
-  --output "$WORK/portal_beta_before_news_import.sql"
-
-ls -lh "$WORK/portal_beta_before_news_import.sql"
-```
-
-Do not continue if the backup is missing or empty.
-
-## 5. Import both feeds
-
-```bash
-.venv/bin/python operations_portalcms_django/manage.py \
-  import_drupal_news \
-  --input "$INPUT" \
-  --report-file "$WORK/news_import_run.md" \
-  --import-user jlambertson
-```
-
-Expected source counts:
-
-```text
-SystemStatusNews: 244
-IntegrationNews: 17
-Errors: 0
-```
-
-## 6. Verify stable IDs
-
-Drupal `nid` is the stable external identifier.
-
-The importer assigns stable IDs directly from `source_metadata.drupal_nid`. Do not run a
-separate SQL backfill; replacement, ID assignment, relationship creation, and final ID
-validation belong to the same importer transaction.
-
-Verify the database:
-
-```bash
-.venv/bin/python operations_portalcms_django/manage.py shell -c "
 from django.conf import settings
+database = settings.DATABASES['default']
+print('python:', sys.executable)
+print('database:', database.get('NAME'))
+print('write host:', database.get('HOST'))
+print('port:', database.get('PORT'))
+"
+```
+
+Stop unless the Python path is under `$RELEASE/.venv` and the database and host exactly
+match `EXPECTED_DATABASE` and `EXPECTED_WRITE_HOST`.
+
+### 4. Record the source checksum
+
+```bash
+sha256sum "$SOURCE_DUMP" | tee "$CHANGE_RECORD/source.sha256"
+```
+
+Any source-file change invalidates every previous dry-run and report.
+
+### 5. Run the strict atomic replacement dry-run
+
+```bash
+"$PYTHON" "$MANAGE" import_drupal_news \
+  --mysql-dump "$SOURCE_DUMP" \
+  --replace \
+  --dry-run \
+  --strict \
+  --confirm-database "$EXPECTED_DATABASE" \
+  --confirm-host "$EXPECTED_WRITE_HOST" \
+  --suppress-notifications \
+  --report-file "$CHANGE_RECORD/import-dry-run.md" \
+  --import-user "$IMPORT_USER"
+```
+
+Review the complete report. It must show:
+
+- the pinned release Python executable;
+- the intended database and write host;
+- the same SHA-256 recorded in `source.sha256`;
+- nonzero and expected record counts for both feeds;
+- expected infrastructure and integration-element relationship counts;
+- zero errors and zero warnings under strict mode.
+
+A dry-run performs ORM work inside a transaction and then forces rollback. Confirm that
+the beta row counts are unchanged after the dry-run.
+
+### 6. Back up the beta target
+
+Use the repository's targeted PostgreSQL backup procedure with the beta `APP_CONFIG` and
+the same confirmed write host. Store the backup in the durable change-record location.
+This is a separate production-data-style operation and requires its own human approval.
+Do not continue unless the backup exists and is nonempty.
+
+### 7. Apply the reviewed dump
+
+Copy the 64-character checksum and the two source counts from the reviewed dry-run report.
+Then run:
+
+```bash
+SOURCE_SHA256=<reviewed-64-character-sha256>
+CONFIRM_SYSTEM_COUNT=<reviewed-system-count>
+CONFIRM_INTEGRATION_COUNT=<reviewed-integration-count>
+
+sha256sum --check "$CHANGE_RECORD/source.sha256"
+
+"$PYTHON" "$MANAGE" import_drupal_news \
+  --mysql-dump "$SOURCE_DUMP" \
+  --replace \
+  --apply \
+  --strict \
+  --confirm-database "$EXPECTED_DATABASE" \
+  --confirm-host "$EXPECTED_WRITE_HOST" \
+  --confirm-source-sha256 "$SOURCE_SHA256" \
+  --confirm-system-count "$CONFIRM_SYSTEM_COUNT" \
+  --confirm-integration-count "$CONFIRM_INTEGRATION_COUNT" \
+  --suppress-notifications \
+  --report-file "$CHANGE_RECORD/import-apply.md" \
+  --import-user "$IMPORT_USER"
+```
+
+### 8. Verify the database and rendered application
+
+```bash
+"$PYTHON" "$MANAGE" shell -c "
 from infrastructure_news.models import SystemStatusNews
 from integration_news.models import IntegrationNews
 
-print('database:', settings.DATABASES['default']['NAME'])
 print('system rows:', SystemStatusNews.objects.count())
-print(
-    'system null outage_id:',
-    SystemStatusNews.objects.filter(outage_id__isnull=True).count()
-)
+print('system null outage_id:', SystemStatusNews.objects.filter(outage_id__isnull=True).count())
+print('system relationships:', sum(item.affected_infrastructure_items.count() for item in SystemStatusNews.objects.all()))
 print('integration rows:', IntegrationNews.objects.count())
-print(
-    'integration null integration_news_id:',
-    IntegrationNews.objects.filter(
-        integration_news_id__isnull=True
-    ).count()
-)
-print(
-    'system IDs 951-956:',
-    list(
-        SystemStatusNews.objects.filter(
-            outage_id__in=[951, 952, 953, 954, 955, 956]
-        ).values_list('outage_id', 'subject')
-    )
-)
+print('integration null integration_news_id:', IntegrationNews.objects.filter(integration_news_id__isnull=True).count())
+print('integration relationships:', sum(item.affected_elements.count() for item in IntegrationNews.objects.all()))
 "
 ```
 
-Local draft/test records may legitimately remain without IDs.
+Compare all four counts with the apply report. Then manually verify representative oldest,
+newest, multi-resource, multi-element, empty/optional-field and HTML-heavy records through
+the beta pages and both JSON APIs. Confirm no migration email or Slack notification was
+sent.
 
-## 7. Optional author mapping
+### 9. Repeat the rehearsal
 
-Map original Drupal authors only when:
+Repeat dry-run, apply and verification at least once with the same approved release and
+dump. Because replacement is deterministic, the second apply must produce the same row,
+stable-ID and relationship counts. Preserve a separate report directory for each run.
 
-1. Drupal author email matches a Django `auth_user.email`
-2. The match is case-insensitive
-3. Exactly one Django user matches
+Repeat again after any code change, source correction, new dump, dependency-lock change or
+target configuration change. A different SHA-256 is a new rehearsal input.
 
-Never create users automatically. Unmatched or retired Drupal authors remain assigned to `jlambertson`.
+## Final cutover
 
-The current API does not expose author or updater fields.
+The final cutover uses the same command sequence and flags as the successful beta
+rehearsals, with these controlled substitutions:
 
-## 8. Verify the public infrastructure API
+- Use the final frozen MySQL dump taken after Drupal becomes read-only.
+- Pin the specifically approved production release and its `.venv`.
+- Run as `software` on the production CMS host.
+- Use the host-specific production `APP_CONFIG`.
+- Set `EXPECTED_DATABASE` to the approved production database and
+  `EXPECTED_WRITE_HOST` to its approved write endpoint.
+- Use a durable production change-record directory.
+- Take and verify a PostgreSQL backup from the same write host immediately before apply.
+- Require the active maintenance window and separate final data-change authorization.
 
-```bash
-curl -fsSL \
-  "https://beta-operations.access-ci.org/api/infrastructure_news_v1?verify=$(date +%s)" \
-  -o "$WORK/infrastructure_api.json"
+Do not reuse a beta checksum, report, count confirmation, config file or backup. Run a new
+strict dry-run against the final frozen dump, review it, record its SHA-256 and counts, then
+apply that exact file.
 
-.venv/bin/python - "$WORK/infrastructure_api.json" <<'PY'
-import json
-import sys
+If the command fails, its PostgreSQL transaction rolls back. Do not retry until the error
+is understood. If it commits but acceptance fails, keep Drupal read-only, stop additional
+writes and obtain separate approval for the whole-database restore procedure. The importer
+does not perform restoration.
 
-rows = json.load(open(sys.argv[1]))
+## Post-cutover retirement
 
-print("API rows:", len(rows))
-print(
-    "null outage_id:",
-    sum(row.get("outage_id") is None for row in rows)
-)
-print(
-    "951-956:",
-    sorted(
-        int(row["outage_id"])
-        for row in rows
-        if str(row.get("outage_id")) in {
-            "951", "952", "953",
-            "954", "955", "956"
-        }
-    )
-)
-PY
-```
+Do not remove tooling immediately after the command commits. Wait until:
 
-Expected:
+1. Database, page and API acceptance is complete.
+2. Drupal retirement and rollback decisions are closed.
+3. The source dump, reports, checksums and pre-cutover backup have been retained in their
+   approved durable locations.
 
-```text
-null outage_id: 0
-951-956: [951, 952, 953, 954, 955, 956]
-```
+A later reviewed cleanup release may remove:
 
-Integration News is a Django HTML page at:
+- `infrastructure_news/drupal_mysql.py`;
+- `infrastructure_news/management/commands/import_drupal_news.py`;
+- the `portal` command compatibility shim;
+- importer/parser tests and fixtures;
+- this runbook and import-only documentation.
 
-```text
-https://beta-operations.access-ci.org/integration-news/
-```
-
-It is not currently a public JSON API. Verify its database rows and page manually.
-
-## Final `portal1` cutover
-
-This is a one-time total replacement from the final Drupal MySQL dump. Drupal must be
-read-only before that dump is taken and remain available, but read-only, until Django CMS
-acceptance is complete. The complete Infrastructure News and Integration News history is
-imported; closed and expired records are not filtered.
-
-The replacement removes all current Django rows in both feeds, including local drafts and
-test rows. It does not remove Django users, CMS pages or plugins, CIDER data, or unrelated
-application data.
-
-### When to run
-
-Run only after all of the following are true:
-
-1. The Drupal content freeze is active and the final MySQL dump is available.
-2. The approved application release containing the atomic importer is installed.
-3. The normalized payload passed review and its SHA-256 is recorded.
-4. The `portal1` maintenance window and final cutover approval are active.
-5. An operator-approved durable directory exists for reports and the PostgreSQL backup.
-
-### 1. Start the approved release as `software`
-
-Run on the Django CMS target host:
+From the Git root, after every retirement condition above is satisfied, remove the
+importer, parser, compatibility shim, their dedicated tests, and this runbook with:
 
 ```bash
-sudo -i -u software
-cd /soft/django-cms-01/releases/<approved-release>
-
-export APP_CONFIG=/soft/django-cms-01/conf/portal.conf
-export INPUT=/path/to/approved/drupal_news_normalized_for_django.json
-export CHANGE_RECORD=/path/to/operator-approved/durable/change-record-directory
-export EXPECTED_WRITE_HOST=<approved-portal1-write-host>
-
-test -r "$APP_CONFIG"
-test -s "$INPUT"
-test -d "$CHANGE_RECORD"
-test -n "$EXPECTED_WRITE_HOST"
-sha256sum "$INPUT" | tee "$CHANGE_RECORD/input.sha256"
+rm -- \
+  operations_portalcms_django/infrastructure_news/drupal_mysql.py \
+  operations_portalcms_django/infrastructure_news/management/commands/import_drupal_news.py \
+  operations_portalcms_django/infrastructure_news/test_drupal_mysql.py \
+  operations_portalcms_django/infrastructure_news/test_import_drupal_news.py \
+  operations_portalcms_django/portal/management/commands/import_drupal_news.py \
+  dev_documentation/prod_dev_content_comparison.md \
+  database/news_import.md
 ```
 
-Do not edit `portal.conf`, and do not place the backup or reports under `$WORK` or another
-directory removed by a shell exit trap.
+Review the resulting Git diff before committing the cleanup release. This command does
+not remove `dev_documentation/integration_news_v1_work.md`, because that document also
+records the separate Integration News API work; archive or edit it as part of the reviewed
+cleanup if it is no longer useful.
 
-### 2. Confirm the configured target without printing credentials
-
-```bash
-.venv/bin/python operations_portalcms_django/manage.py shell -c "
-from django.conf import settings
-
-database = settings.DATABASES['default']
-print('database:', database['NAME'])
-print('write host:', database['HOST'])
-print('port:', database['PORT'])
-"
-```
-
-Stop unless the database is `portal1` and the write host exactly matches the approved
-value in `EXPECTED_WRITE_HOST`.
-
-### 3. Run and review the atomic replacement dry-run
-
-```bash
-.venv/bin/python operations_portalcms_django/manage.py \
-  import_drupal_news \
-  --input "$INPUT" \
-  --replace \
-  --dry-run \
-  --confirm-database portal1 \
-  --confirm-host "$EXPECTED_WRITE_HOST" \
-  --suppress-notifications \
-  --report-file "$CHANGE_RECORD/news_import_dry_run.md" \
-  --import-user jlambertson
-
-sed -n '/## Summary/,/## Errors/p' \
-  "$CHANGE_RECORD/news_import_dry_run.md"
-```
-
-The dry-run must complete successfully. Confirm that both staged feeds are nonempty, the
-planned deletion and creation counts are expected, errors are zero, and every warning is
-reviewed. Any change to the MySQL dump or normalized JSON invalidates this dry-run.
-
-### 4. Back up `portal1` from the write host
-
-`pg_dump_portal.sh` normally reads `DB_HOSTNAME_READ`. Override that selection for this
-cutover so the backup comes from the same write target that the importer will modify:
-
-```bash
-APP_CONFIG="$APP_CONFIG" \
-DB_HOSTNAME_READ="$EXPECTED_WRITE_HOST" \
-./database/pg_dump_portal.sh \
-  --source-db portal1 \
-  --format sql \
-  --output "$CHANGE_RECORD/portal1_before_news_cutover.sql"
-
-test -s "$CHANGE_RECORD/portal1_before_news_cutover.sql"
-```
-
-Do not continue if the dump fails or the durable backup is empty.
-
-### 5. Apply the atomic replacement
-
-Reconfirm the recorded input SHA-256 immediately before applying. Then run:
-
-```bash
-sha256sum --check "$CHANGE_RECORD/input.sha256"
-
-.venv/bin/python operations_portalcms_django/manage.py \
-  import_drupal_news \
-  --input "$INPUT" \
-  --replace \
-  --apply \
-  --confirm-database portal1 \
-  --confirm-host "$EXPECTED_WRITE_HOST" \
-  --suppress-notifications \
-  --report-file "$CHANGE_RECORD/news_import_run.md" \
-  --import-user jlambertson
-```
-
-The command verifies nonempty feeds and unique positive Drupal IDs before deleting
-anything. Deletion, import, stable-ID assignment, relationship creation, and final stable-ID
-set validation share one PostgreSQL transaction. An error in any of those operations rolls
-back the entire replacement. `--apply` is required for a replacement write.
-
-### 6. Verify before promotion
-
-Run the database verification from step 6, then verify both news pages and the
-Infrastructure News API through the pre-promotion Django CMS endpoint. Confirm source and
-database counts, stable IDs, authorship, mappings, rendered content, and that no migration
-email or Slack notification was sent. Preserve all output in `$CHANGE_RECORD`.
-
-### Rollback
-
-- If the replacement command fails, its transaction rolls back automatically. Confirm the
-  pre-cutover rows remain and do not rerun until the error is understood.
-- If the command commits but a post-import acceptance check fails, do not promote Django
-  CMS and keep Drupal read-only. Stop further writes to `portal1` and obtain separate human
-  approval for a database restore using
-  `$CHANGE_RECORD/portal1_before_news_cutover.sql` and the repository database-restore
-  procedure. A restore is a whole-database operational action and is not part of this
-  importer command.
-- After a restore, repeat database and page verification before deciding whether to retry
-  the cutover.
-
-Never use the beta config for this cutover. Never run the replacement without the dry-run,
-durable backup, target confirmations, active maintenance window, and explicit approval.
+Do not remove Django migration files, stable-ID fields, normalized relationship models,
+runtime APIs, or generic database backup/restore tooling. Raw dumps, reports and backups
+must never be committed to Git.
