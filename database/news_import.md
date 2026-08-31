@@ -57,24 +57,35 @@ Raw-dump imports enforce all of the following:
 10. Delete, import, stable-ID assignment, relationship creation, full field/relationship
     verification and final stable-ID-set verification share one PostgreSQL transaction.
 11. Any failure rolls back the complete replacement.
-12. Every run writes a Markdown report. Parser failures are also recorded.
+12. Requested exclusions must exist exactly once. Named source corrections require an
+    exact original-value match and fail rather than changing an unexpected value.
+13. Every run writes a Markdown report, including explicit exclusions and corrections.
+    Parser failures are also recorded.
 
 The parser reads only current Drupal field tables and ignores unrelated dump tables. It
 uses no live MySQL or Drupal API connection.
 
-## Source data that must be corrected or explicitly resolved
+## Approved source adjustments
 
-The August 28 rehearsal dump exposes two source issues:
+The August 31 dump contains 244 Infrastructure News and 17 Integration News records, but
+has two source issues that the operator cannot correct in Drupal. The approved import
+policy is explicit and narrow:
 
-- Infrastructure News node `928` has start value `0026-01-07T12:50:36`. The importer
-  refuses to guess that this means 2026. Correct it in Drupal before producing the next
-  rehearsal/final dump, or document a separately reviewed explicit source correction.
-- Infrastructure News node `404` has empty content. This is reported by the parser and
-  rejected by model validation. Correct the source or deliberately review and change the
-  handling policy before any write.
+- Exclude Infrastructure News nid `404`, whose source content is empty, by supplying
+  `--exclude-system-nid 404` on every dry-run and apply invocation.
+- Correct only nid `928`'s start datetime from the exact source value
+  `0026-01-07T12:50:36` to `2026-01-07T12:50:36` by supplying
+  `--source-correction infrastructure-928-start-year`. Its Drupal creation timestamp and
+  end datetime are both in January 2026. If the original start value changes, the importer
+  refuses the correction.
 
-Do not patch the dump silently. The final dump should be a reproducible export of the
-approved Drupal source state.
+After these adjustments, the August 31 dump stages 243 Infrastructure News records, 17
+Integration News records, 445 infrastructure relationships and 39 integration-element
+relationships. Later dumps must be reviewed from their own report rather than assumed to
+have the same counts.
+
+Do not edit the dump. Its SHA-256 continues to identify the exact source artifact, while
+the report records the exclusion and correction separately.
 
 ## Rehearsal on beta
 
@@ -90,6 +101,12 @@ Before running anything:
 - Know the exact beta database name and write host.
 - Confirm the selected Django import user already exists. Do not create it in the importer.
 
+Committing and pushing the branch does not update an existing release. Use a newly
+deployed immutable release built from the exact commit containing the importer changes;
+do not use the older `news_apis_imports_testing-...` release or the normalized JSON under
+`/soft/django-cms-01/tags/`. The local `database/dumps/` directory is ignored by Git, so
+copy the reviewed raw dump separately to a durable location readable by `software`.
+
 ### 2. Start a `software` login shell and pin the release
 
 ```bash
@@ -100,7 +117,7 @@ RELEASE=/soft/django-cms-01/releases/<approved-release>
 PYTHON="$RELEASE/.venv/bin/python"
 MANAGE="$RELEASE/operations_portalcms_django/manage.py"
 APP_CONFIG="$APP_HOME/conf/portal.conf"
-SOURCE_DUMP=/path/to/recent/backup_database.mysql.gz
+SOURCE_DUMP=/path/to/backup_database-2026-08-31T04:00:03-05:00.mysql.gz
 CHANGE_RECORD=/path/to/durable/change-record/rehearsal-N
 IMPORT_USER=jlambertson
 EXPECTED_DATABASE=portal_beta
@@ -118,6 +135,8 @@ test -n "$EXPECTED_WRITE_HOST"
 ```
 
 Do not continue if any check fails. Do not use a release path inferred from an old report.
+Do not export `PYTHONPATH`; invoking the pinned release's `manage.py` with its own
+`.venv/bin/python` selects the intended application code and environment.
 
 ### 3. Confirm the interpreter and target without exposing credentials
 
@@ -144,6 +163,14 @@ sha256sum "$SOURCE_DUMP" | tee "$CHANGE_RECORD/source.sha256"
 
 Any source-file change invalidates every previous dry-run and report.
 
+For the exact August 31 dump reviewed during importer development, the output is:
+
+```text
+ab48e0976af0eb18f075d19673400e357a19e1f876ca9e03162aa63e93d99b27
+```
+
+Stop if the server-side checksum differs. A later dump must use its own checksum.
+
 ### 5. Run the strict atomic replacement dry-run
 
 ```bash
@@ -154,6 +181,8 @@ Any source-file change invalidates every previous dry-run and report.
   --strict \
   --confirm-database "$EXPECTED_DATABASE" \
   --confirm-host "$EXPECTED_WRITE_HOST" \
+  --exclude-system-nid 404 \
+  --source-correction infrastructure-928-start-year \
   --suppress-notifications \
   --report-file "$CHANGE_RECORD/import-dry-run.md" \
   --import-user "$IMPORT_USER"
@@ -166,10 +195,25 @@ Review the complete report. It must show:
 - the same SHA-256 recorded in `source.sha256`;
 - nonzero and expected record counts for both feeds;
 - expected infrastructure and integration-element relationship counts;
+- excluded Infrastructure News nid `404` and no other excluded nid;
+- the exact-match nid `928` start-datetime correction and no other correction;
 - zero errors and zero warnings under strict mode.
 
 A dry-run performs ORM work inside a transaction and then forces rollback. Confirm that
 the beta row counts are unchanged after the dry-run.
+
+For the reviewed August 31 dump, the adjusted dry-run must stage exactly:
+
+```text
+SystemStatusNews: 243
+IntegrationNews: 17
+Infrastructure relationships: 445
+Integration-element relationships: 39
+Excluded SystemStatusNews nid: 404
+Corrected SystemStatusNews nid: 928
+Warnings: 0
+Errors: 0
+```
 
 ### 6. Back up the beta target
 
@@ -184,9 +228,10 @@ Copy the 64-character checksum and the two source counts from the reviewed dry-r
 Then run:
 
 ```bash
-SOURCE_SHA256=<reviewed-64-character-sha256>
-CONFIRM_SYSTEM_COUNT=<reviewed-system-count>
-CONFIRM_INTEGRATION_COUNT=<reviewed-integration-count>
+# These are the reviewed values for the exact August 31 dump.
+SOURCE_SHA256=ab48e0976af0eb18f075d19673400e357a19e1f876ca9e03162aa63e93d99b27
+CONFIRM_SYSTEM_COUNT=243
+CONFIRM_INTEGRATION_COUNT=17
 
 sha256sum --check "$CHANGE_RECORD/source.sha256"
 
@@ -200,10 +245,15 @@ sha256sum --check "$CHANGE_RECORD/source.sha256"
   --confirm-source-sha256 "$SOURCE_SHA256" \
   --confirm-system-count "$CONFIRM_SYSTEM_COUNT" \
   --confirm-integration-count "$CONFIRM_INTEGRATION_COUNT" \
+  --exclude-system-nid 404 \
+  --source-correction infrastructure-928-start-year \
   --suppress-notifications \
   --report-file "$CHANGE_RECORD/import-apply.md" \
   --import-user "$IMPORT_USER"
 ```
+
+For a later dump, replace those three values with the values from that dump's successful
+dry-run report. Never reuse the August 31 values for a different file.
 
 ### 8. Verify the database and rendered application
 

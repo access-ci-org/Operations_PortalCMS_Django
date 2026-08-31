@@ -27,6 +27,56 @@ class ImportCommandResolutionTests(SimpleTestCase):
         self.assertIs(PortalCommand, CanonicalCommand)
 
 
+class NormalizedSourceAdjustmentTests(SimpleTestCase):
+    def setUp(self):
+        self.command = CanonicalCommand()
+        self.records = [
+            {
+                "subject": "Excluded",
+                "content": "",
+                "start_datetime": "2023-04-03T10:00:30",
+                "source_metadata": {"drupal_nid": 404},
+            },
+            {
+                "subject": "Corrected",
+                "content": "Content",
+                "start_datetime": "0026-01-07T12:50:36",
+                "source_metadata": {"drupal_nid": 928},
+            },
+        ]
+
+    def test_excludes_and_exactly_corrects_requested_records(self):
+        adjusted, exclusions, corrections = (
+            self.command._adjust_normalized_system_records(
+                records=self.records,
+                excluded_system_nids={404},
+                start_datetime_corrections={
+                    928: ("0026-01-07T12:50:36", "2026-01-07T12:50:36")
+                },
+            )
+        )
+
+        self.assertEqual(
+            [record["source_metadata"]["drupal_nid"] for record in adjusted],
+            [928],
+        )
+        self.assertEqual(adjusted[0]["start_datetime"], "2026-01-07T12:50:36")
+        self.assertEqual(exclusions, [404])
+        self.assertEqual(len(corrections), 1)
+
+    def test_refuses_correction_when_original_value_changed(self):
+        self.records[1]["start_datetime"] = "2027-01-07T12:50:36"
+
+        with self.assertRaisesMessage(CommandError, "refusing to alter"):
+            self.command._adjust_normalized_system_records(
+                records=self.records,
+                excluded_system_nids={404},
+                start_datetime_corrections={
+                    928: ("0026-01-07T12:50:36", "2026-01-07T12:50:36")
+                },
+            )
+
+
 class AtomicReplaceCommandTests(TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()

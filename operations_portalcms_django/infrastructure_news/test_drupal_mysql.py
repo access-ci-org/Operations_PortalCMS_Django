@@ -232,6 +232,70 @@ class DrupalMysqlParserTests(TestCase):
         with self.assertRaisesRegex(DrupalDumpError, "implausible year 26"):
             self._parse(path)
 
+    def test_applies_requested_exact_match_start_date_correction(self):
+        rows = _base_rows()
+        rows["node__field_start_date"][0][-1] = "0026-08-01T12:00:00"
+        path = self._write(_dump_text(rows))
+
+        parsed = parse_drupal_news_dump(
+            path,
+            infrastructure_type_choices=INFRASTRUCTURE_TYPES,
+            integration_type_choices=INTEGRATION_TYPES,
+            integration_element_choices=INTEGRATION_ELEMENTS,
+            system_start_datetime_corrections={
+                101: ("0026-08-01T12:00:00", "2026-08-01T12:00:00")
+            },
+        )
+
+        self.assertEqual(
+            parsed.payload["SystemStatusNews"][0]["start_datetime"],
+            "2026-08-01T12:00:00",
+        )
+        self.assertEqual(len(parsed.source_corrections), 1)
+
+    def test_rejects_correction_when_source_does_not_match(self):
+        path = self._write(_dump_text())
+
+        with self.assertRaisesRegex(DrupalDumpError, "expected .* found"):
+            parse_drupal_news_dump(
+                path,
+                infrastructure_type_choices=INFRASTRUCTURE_TYPES,
+                integration_type_choices=INTEGRATION_TYPES,
+                integration_element_choices=INTEGRATION_ELEMENTS,
+                system_start_datetime_corrections={
+                    101: ("0026-08-01T12:00:00", "2026-08-01T12:00:00")
+                },
+            )
+
+    def test_excludes_only_requested_existing_system_nid(self):
+        rows = _base_rows()
+        rows["node__field_news_content"][0][-2] = ""
+        path = self._write(_dump_text(rows))
+
+        parsed = parse_drupal_news_dump(
+            path,
+            infrastructure_type_choices=INFRASTRUCTURE_TYPES,
+            integration_type_choices=INTEGRATION_TYPES,
+            integration_element_choices=INTEGRATION_ELEMENTS,
+            excluded_system_nids=[101],
+        )
+
+        self.assertEqual(parsed.payload["SystemStatusNews"], [])
+        self.assertEqual(parsed.excluded_system_nids, [101])
+        self.assertEqual(parsed.warnings, [])
+
+    def test_rejects_requested_exclusion_missing_from_source(self):
+        path = self._write(_dump_text())
+
+        with self.assertRaisesRegex(DrupalDumpError, "exclusions were not present"):
+            parse_drupal_news_dump(
+                path,
+                infrastructure_type_choices=INFRASTRUCTURE_TYPES,
+                integration_type_choices=INTEGRATION_TYPES,
+                integration_element_choices=INTEGRATION_ELEMENTS,
+                excluded_system_nids=[404],
+            )
+
     def test_accepts_standard_multiline_create_table_statements(self):
         path = self._write(_dump_text(multiline_definitions=True))
 

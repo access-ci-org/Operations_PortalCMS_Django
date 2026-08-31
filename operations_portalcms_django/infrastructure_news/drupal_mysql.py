@@ -63,6 +63,8 @@ class ParsedDump:
     payload: Dict[str, List[dict]]
     sha256: str
     warnings: List[str]
+    excluded_system_nids: List[int]
+    source_corrections: List[str]
 
 
 def sha256_file(path: Path) -> str:
@@ -382,6 +384,8 @@ def parse_drupal_news_dump(
     infrastructure_type_choices: Sequence[Sequence[str]],
     integration_type_choices: Sequence[Sequence[str]],
     integration_element_choices: Sequence[Sequence[str]],
+    excluded_system_nids: Sequence[int] = (),
+    system_start_datetime_corrections: Mapping[int, tuple[str, str]] | None = None,
 ) -> ParsedDump:
     """Convert current Drupal news field tables into the importer's JSON shape."""
 
@@ -399,6 +403,18 @@ def parse_drupal_news_dump(
     integration_elements = _choice_map(
         integration_element_choices, "Integration element choices"
     )
+    excluded_system_nid_set = {
+        _positive_int(value, "Excluded Infrastructure News nid")
+        for value in excluded_system_nids
+    }
+    start_datetime_corrections = dict(system_start_datetime_corrections or {})
+    for correction_nid, correction_values in start_datetime_corrections.items():
+        _positive_int(correction_nid, "Corrected Infrastructure News nid")
+        if len(correction_values) != 2:
+            raise DrupalDumpError(
+                "Infrastructure News start-date corrections require exact "
+                "(source, replacement) pairs."
+            )
 
     content = _group_by_entity(table_rows["node__field_news_content"], SYSTEM_BUNDLE)
     content.update(
@@ -478,9 +494,16 @@ def parse_drupal_news_dump(
             element_code_by_nid[nid] = code
 
     warnings: List[str] = []
+    excluded_system_nids_found: List[int] = []
+    source_corrections: List[str] = []
+    corrected_system_nids: set[int] = set()
     system_records: List[dict] = []
     for node in _news_nodes(table_rows, SYSTEM_BUNDLE):
         nid = _positive_int(node.get("nid"), "Infrastructure News nid")
+        if nid in excluded_system_nid_set:
+            excluded_system_nids_found.append(nid)
+            continue
+
         type_label = _one_value(
             infrastructure_type,
             nid,
@@ -529,6 +552,33 @@ def parse_drupal_news_dump(
             row.get("field_news_distribution_options_value")
             for row in distribution_system.get(nid, [])
         }
+        start_datetime_source = _one_value(
+            start_dates,
+            nid,
+            "field_start_date_value",
+            f"Infrastructure News nid={nid} start date",
+            required=True,
+        )
+        correction = start_datetime_corrections.get(nid)
+        if correction is not None:
+            expected_source, replacement = correction
+            if start_datetime_source != expected_source:
+                raise DrupalDumpError(
+                    f"Infrastructure News nid={nid} start date correction expected "
+                    f"{expected_source!r}, found {start_datetime_source!r}; refusing "
+                    "to alter an unexpected source value."
+                )
+            _validate_datetime(
+                replacement,
+                f"Infrastructure News nid={nid} corrected start date",
+            )
+            start_datetime_source = replacement
+            corrected_system_nids.add(nid)
+            source_corrections.append(
+                f"SystemStatusNews nid={nid} start_datetime: "
+                f"{expected_source!r} -> {replacement!r}"
+            )
+
         system_records.append(
             {
                 "subject": node.get("title") or "Untitled",
@@ -543,13 +593,7 @@ def parse_drupal_news_dump(
                 "infrastructure_news_type": type_code,
                 "affected_infrastructure": ",".join(resource_ids),
                 "start_datetime": _validate_datetime(
-                    _one_value(
-                        start_dates,
-                        nid,
-                        "field_start_date_value",
-                        f"Infrastructure News nid={nid} start date",
-                        required=True,
-                    ),
+                    start_datetime_source,
                     f"Infrastructure News nid={nid} start date",
                 ),
                 "end_datetime": _validate_datetime(
@@ -580,6 +624,23 @@ def parse_drupal_news_dump(
                     "affected_infrastructure_nodes": related_nodes,
                 },
             }
+        )
+
+    missing_exclusions = sorted(
+        excluded_system_nid_set - set(excluded_system_nids_found)
+    )
+    if missing_exclusions:
+        raise DrupalDumpError(
+            "Requested Infrastructure News exclusions were not present in the dump: "
+            + ", ".join(str(value) for value in missing_exclusions)
+        )
+    missing_corrections = sorted(
+        set(start_datetime_corrections) - corrected_system_nids
+    )
+    if missing_corrections:
+        raise DrupalDumpError(
+            "Requested Infrastructure News corrections were not applied: "
+            + ", ".join(str(value) for value in missing_corrections)
         )
 
     integration_records: List[dict] = []
@@ -695,4 +756,6 @@ def parse_drupal_news_dump(
         },
         sha256=sha256_file(path),
         warnings=warnings,
+        excluded_system_nids=sorted(excluded_system_nids_found),
+        source_corrections=source_corrections,
     )

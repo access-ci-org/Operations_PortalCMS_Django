@@ -30,6 +30,13 @@ from infrastructure_news.models import SystemStatusNews
 
 DEFAULT_INPUT = Path("database/drupal_backups/generated/drupal_news_normalized_for_django.json")
 DEFAULT_REPORT = Path("database/drupal_backups/generated/drupal_news_import_dry_run.md")
+KNOWN_SOURCE_CORRECTIONS = {
+    "infrastructure-928-start-year": {
+        "nid": 928,
+        "source": "0026-01-07T12:50:36",
+        "replacement": "2026-01-07T12:50:36",
+    },
+}
 
 
 @dataclass
@@ -41,6 +48,8 @@ class ImportResult:
     integration_relationships: int = 0
     integration_elements_created: int = 0
     integration_elements_updated: int = 0
+    excluded_system_nids: List[int] = field(default_factory=list)
+    source_corrections: List[str] = field(default_factory=list)
     created_system: int = 0
     updated_system: int = 0
     created_integration: int = 0
@@ -206,6 +215,26 @@ class Command(BaseCommand):
             action="store_true",
             help="Force imported infrastructure-news email and Slack flags off.",
         )
+        parser.add_argument(
+            "--exclude-system-nid",
+            action="append",
+            type=int,
+            default=[],
+            help=(
+                "Explicitly exclude one Infrastructure News Drupal nid. Repeat for "
+                "multiple IDs. The requested ID must exist in the source."
+            ),
+        )
+        parser.add_argument(
+            "--source-correction",
+            action="append",
+            choices=sorted(KNOWN_SOURCE_CORRECTIONS),
+            default=[],
+            help=(
+                "Apply a named, exact-match source correction. Repeat if needed. "
+                "The import fails if the expected original value is not present."
+            ),
+        )
 
     def handle(self, *args, **options):
         mysql_dump = options.get("mysql_dump")
@@ -216,6 +245,31 @@ class Command(BaseCommand):
         strict = bool(options["strict"])
         replace = bool(options["replace"])
         apply = bool(options["apply"])
+        excluded_system_nids = options.get("exclude_system_nid") or []
+        source_correction_names = options.get("source_correction") or []
+
+        if len(excluded_system_nids) != len(set(excluded_system_nids)):
+            raise CommandError("Duplicate --exclude-system-nid values are not permitted.")
+        if any(value <= 0 for value in excluded_system_nids):
+            raise CommandError("--exclude-system-nid values must be positive integers.")
+        if len(source_correction_names) != len(set(source_correction_names)):
+            raise CommandError("Duplicate --source-correction values are not permitted.")
+
+        start_datetime_corrections = {
+            int(KNOWN_SOURCE_CORRECTIONS[name]["nid"]): (
+                str(KNOWN_SOURCE_CORRECTIONS[name]["source"]),
+                str(KNOWN_SOURCE_CORRECTIONS[name]["replacement"]),
+            )
+            for name in source_correction_names
+        }
+        overlapping_adjustments = sorted(
+            set(excluded_system_nids) & set(start_datetime_corrections)
+        )
+        if overlapping_adjustments:
+            raise CommandError(
+                "A SystemStatusNews nid cannot be both excluded and corrected: "
+                + ", ".join(str(value) for value in overlapping_adjustments)
+            )
 
         if apply and not replace:
             raise CommandError("--apply is only valid with --replace.")
@@ -262,6 +316,8 @@ class Command(BaseCommand):
             )
 
         source_warnings: List[str] = []
+        excluded_system_nids_found: List[int] = []
+        source_corrections_applied: List[str] = []
         result = ImportResult()
         if mysql_dump:
             try:
@@ -270,6 +326,8 @@ class Command(BaseCommand):
                     infrastructure_type_choices=SystemStatusNews.INFRASTRUCTURE_NEWS_TYPES,
                     integration_type_choices=IntegrationNews.INTEGRATION_NEWS_TYPES,
                     integration_element_choices=IntegrationNews.AFFECTED_ELEMENTS,
+                    excluded_system_nids=excluded_system_nids,
+                    system_start_datetime_corrections=start_datetime_corrections,
                 )
             except DrupalDumpError as exc:
                 result.add_error(str(exc))
@@ -286,10 +344,22 @@ class Command(BaseCommand):
                 raise CommandError("Source changed while it was being parsed; rerun the dry-run.")
             payload = parsed_dump.payload
             source_warnings.extend(parsed_dump.warnings)
+            excluded_system_nids_found.extend(parsed_dump.excluded_system_nids)
+            source_corrections_applied.extend(parsed_dump.source_corrections)
         else:
             payload = json.loads(input_path.read_text(encoding="utf-8"))
         system_records = payload.get("SystemStatusNews", [])
         integration_records = payload.get("IntegrationNews", [])
+        if not mysql_dump and (excluded_system_nids or start_datetime_corrections):
+            (
+                system_records,
+                excluded_system_nids_found,
+                source_corrections_applied,
+            ) = self._adjust_normalized_system_records(
+                records=system_records,
+                excluded_system_nids=set(excluded_system_nids),
+                start_datetime_corrections=start_datetime_corrections,
+            )
 
         if apply:
             expected_system_count = options.get("confirm_system_count")
@@ -333,6 +403,8 @@ class Command(BaseCommand):
         result.total_records = len(system_records) + len(integration_records)
         result.system_records = len(system_records)
         result.integration_records = len(integration_records)
+        result.excluded_system_nids = excluded_system_nids_found
+        result.source_corrections = source_corrections_applied
         result.system_relationships = sum(
             len(
                 (record.get("source_metadata", {}) or {}).get(
@@ -430,6 +502,86 @@ class Command(BaseCommand):
             source_sha256=source_sha256,
         )
         self._emit_summary(result=result, dry_run=dry_run, report_path=report_path)
+
+    def _adjust_normalized_system_records(
+        self,
+        records: Any,
+        excluded_system_nids: set[int],
+        start_datetime_corrections: Dict[int, tuple[str, str]],
+    ) -> tuple[List[Dict[str, Any]], List[int], List[str]]:
+        if not isinstance(records, list):
+            raise CommandError("SystemStatusNews must be a JSON list.")
+
+        nid_counts: Dict[int, int] = {}
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                raise CommandError(
+                    f"SystemStatusNews record {index} must be a JSON object."
+                )
+            raw_nid = (record.get("source_metadata", {}) or {}).get("drupal_nid")
+            try:
+                nid = int(raw_nid)
+            except (TypeError, ValueError):
+                continue
+            nid_counts[nid] = nid_counts.get(nid, 0) + 1
+
+        requested_nids = excluded_system_nids | set(start_datetime_corrections)
+        for nid in sorted(requested_nids):
+            if nid_counts.get(nid, 0) != 1:
+                raise CommandError(
+                    f"Requested SystemStatusNews adjustment nid={nid} must match "
+                    f"exactly one input record; found {nid_counts.get(nid, 0)}."
+                )
+
+        adjusted_records = []
+        exclusions_found: List[int] = []
+        corrections_applied: List[str] = []
+        corrected_nids: set[int] = set()
+        for record in records:
+            raw_nid = (record.get("source_metadata", {}) or {}).get("drupal_nid")
+            try:
+                nid = int(raw_nid)
+            except (TypeError, ValueError):
+                adjusted_records.append(record)
+                continue
+            if nid in excluded_system_nids:
+                exclusions_found.append(nid)
+                continue
+
+            correction = start_datetime_corrections.get(nid)
+            if correction is not None:
+                expected_source, replacement = correction
+                actual_source = record.get("start_datetime")
+                if actual_source != expected_source:
+                    raise CommandError(
+                        f"SystemStatusNews nid={nid} start date correction expected "
+                        f"{expected_source!r}, found {actual_source!r}; refusing to "
+                        "alter an unexpected source value."
+                    )
+                record = dict(record)
+                record["start_datetime"] = replacement
+                corrections_applied.append(
+                    f"SystemStatusNews nid={nid} start_datetime: "
+                    f"{expected_source!r} -> {replacement!r}"
+                )
+                corrected_nids.add(nid)
+            adjusted_records.append(record)
+
+        missing_exclusions = sorted(excluded_system_nids - set(exclusions_found))
+        if missing_exclusions:
+            raise CommandError(
+                "Requested SystemStatusNews exclusions were not present in the input: "
+                + ", ".join(str(value) for value in missing_exclusions)
+            )
+        missing_corrections = sorted(
+            set(start_datetime_corrections) - corrected_nids
+        )
+        if missing_corrections:
+            raise CommandError(
+                "Requested SystemStatusNews corrections were not applied: "
+                + ", ".join(str(value) for value in missing_corrections)
+            )
+        return adjusted_records, sorted(exclusions_found), corrections_applied
 
     def _validate_replace_target(
         self,
@@ -951,6 +1103,26 @@ class Command(BaseCommand):
             f"- `IntegrationElement` rows created: `{result.integration_elements_created}`",
             f"- `IntegrationElement` labels updated: `{result.integration_elements_updated}`",
             "",
+            "## Explicit Source Adjustments",
+            "",
+            "- Excluded `SystemStatusNews` Drupal nids: "
+            + (
+                ", ".join(f"`{nid}`" for nid in result.excluded_system_nids)
+                if result.excluded_system_nids
+                else "None"
+            ),
+            "- Applied exact-match corrections:",
+        ]
+
+        if result.source_corrections:
+            lines.extend(
+                [f"  - {correction}" for correction in result.source_corrections]
+            )
+        else:
+            lines.append("  - None")
+
+        lines.extend([
+            "",
             "## Planned/Applied Changes",
             "",
             f"- `SystemStatusNews` deleted: `{result.deleted_system}`",
@@ -968,7 +1140,7 @@ class Command(BaseCommand):
             "",
             "## Warnings",
             "",
-        ]
+        ])
 
         if result.warnings:
             lines.extend([f"- {warning}" for warning in result.warnings])
@@ -999,6 +1171,11 @@ class Command(BaseCommand):
         self.stdout.write(
             f"N/A -> infrastructure: {result.system_na_infrastructure}, "
             f"integration element: {result.integration_na_element}"
+        )
+        self.stdout.write(
+            "Source adjustments -> excluded system nids: "
+            f"{result.excluded_system_nids or 'none'}, exact corrections: "
+            f"{len(result.source_corrections)}"
         )
         self.stdout.write(f"Warnings: {len(result.warnings)}; Errors: {len(result.errors)}")
         self.stdout.write(f"Report: {report_path}")
