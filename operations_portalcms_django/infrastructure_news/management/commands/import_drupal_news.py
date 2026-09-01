@@ -49,6 +49,8 @@ class ImportResult:
     integration_elements_created: int = 0
     integration_elements_updated: int = 0
     excluded_system_nids: List[int] = field(default_factory=list)
+    system_news_as_of: Optional[str] = None
+    cutoff_excluded_system_nids: List[int] = field(default_factory=list)
     source_corrections: List[str] = field(default_factory=list)
     created_system: int = 0
     updated_system: int = 0
@@ -226,6 +228,14 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--system-news-as-of",
+            help=(
+                "Required for replacement imports. Retain only current or future "
+                "Infrastructure News as of this timezone-aware ISO-8601 timestamp. "
+                "Use the identical value for dry-run and apply."
+            ),
+        )
+        parser.add_argument(
             "--source-correction",
             action="append",
             choices=sorted(KNOWN_SOURCE_CORRECTIONS),
@@ -247,6 +257,18 @@ class Command(BaseCommand):
         apply = bool(options["apply"])
         excluded_system_nids = options.get("exclude_system_nid") or []
         source_correction_names = options.get("source_correction") or []
+        system_news_as_of_raw = options.get("system_news_as_of")
+
+        if replace and not system_news_as_of_raw:
+            raise CommandError(
+                "--replace requires --system-news-as-of so past Infrastructure News "
+                "is excluded deterministically."
+            )
+        system_news_as_of = (
+            self._parse_system_news_as_of(system_news_as_of_raw)
+            if system_news_as_of_raw
+            else None
+        )
 
         if len(excluded_system_nids) != len(set(excluded_system_nids)):
             raise CommandError("Duplicate --exclude-system-nid values are not permitted.")
@@ -318,7 +340,7 @@ class Command(BaseCommand):
         source_warnings: List[str] = []
         excluded_system_nids_found: List[int] = []
         source_corrections_applied: List[str] = []
-        result = ImportResult()
+        result = ImportResult(system_news_as_of=system_news_as_of_raw)
         if mysql_dump:
             try:
                 parsed_dump = parse_drupal_news_dump(
@@ -350,6 +372,11 @@ class Command(BaseCommand):
             payload = json.loads(input_path.read_text(encoding="utf-8"))
         system_records = payload.get("SystemStatusNews", [])
         integration_records = payload.get("IntegrationNews", [])
+        if replace and (not isinstance(system_records, list) or not system_records):
+            raise CommandError(
+                "Replacement requires a nonempty SystemStatusNews source list "
+                "before cutoff filtering."
+            )
         if not mysql_dump and (excluded_system_nids or start_datetime_corrections):
             (
                 system_records,
@@ -359,6 +386,14 @@ class Command(BaseCommand):
                 records=system_records,
                 excluded_system_nids=set(excluded_system_nids),
                 start_datetime_corrections=start_datetime_corrections,
+            )
+        cutoff_excluded_system_nids: List[int] = []
+        if system_news_as_of is not None:
+            system_records, cutoff_excluded_system_nids = (
+                self._filter_system_records_as_of(
+                    records=system_records,
+                    cutoff=system_news_as_of,
+                )
             )
 
         if apply:
@@ -388,6 +423,7 @@ class Command(BaseCommand):
             expected_system_ids = self._validated_source_ids(
                 records=system_records,
                 feed_name="SystemStatusNews",
+                allow_empty=True,
             )
             expected_integration_ids = self._validated_source_ids(
                 records=integration_records,
@@ -404,6 +440,7 @@ class Command(BaseCommand):
         result.system_records = len(system_records)
         result.integration_records = len(integration_records)
         result.excluded_system_nids = excluded_system_nids_found
+        result.cutoff_excluded_system_nids = cutoff_excluded_system_nids
         result.source_corrections = source_corrections_applied
         result.system_relationships = sum(
             len(
@@ -583,6 +620,62 @@ class Command(BaseCommand):
             )
         return adjusted_records, sorted(exclusions_found), corrections_applied
 
+    def _parse_system_news_as_of(self, value: str) -> datetime:
+        parsed = parse_datetime(value)
+        if parsed is None or parsed.tzinfo is None:
+            raise CommandError(
+                "--system-news-as-of must be a timezone-aware ISO-8601 timestamp "
+                "such as 2026-09-01T12:00:00Z."
+            )
+        return parsed.astimezone(timezone.utc)
+
+    def _filter_system_records_as_of(
+        self,
+        records: Any,
+        cutoff: datetime,
+    ) -> tuple[List[Dict[str, Any]], List[int]]:
+        if not isinstance(records, list):
+            raise CommandError("SystemStatusNews must be a JSON list.")
+
+        retained: List[Dict[str, Any]] = []
+        excluded_nids: List[int] = []
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                raise CommandError(
+                    f"SystemStatusNews record {index} must be a JSON object."
+                )
+
+            try:
+                nid = int(_nid(record))
+            except (TypeError, ValueError) as exc:
+                raise CommandError(
+                    f"SystemStatusNews record {index} requires a numeric Drupal nid "
+                    "for cutoff reporting."
+                ) from exc
+
+            start = _as_dt(record.get("start_datetime"))
+            if start is None:
+                raise CommandError(
+                    f"SystemStatusNews nid={nid} requires a valid start_datetime "
+                    "for --system-news-as-of filtering."
+                )
+            raw_end = record.get("end_datetime")
+            end = _as_dt(raw_end)
+            if raw_end and end is None:
+                raise CommandError(
+                    f"SystemStatusNews nid={nid} has an invalid end_datetime for "
+                    "--system-news-as-of filtering."
+                )
+
+            is_current = start <= cutoff and (end is None or end >= cutoff)
+            is_future = start >= cutoff
+            if is_current or is_future:
+                retained.append(record)
+            else:
+                excluded_nids.append(nid)
+
+        return retained, sorted(excluded_nids)
+
     def _validate_replace_target(
         self,
         confirm_database: Optional[str],
@@ -612,8 +705,11 @@ class Command(BaseCommand):
         self,
         records: Any,
         feed_name: str,
+        allow_empty: bool = False,
     ) -> set[int]:
-        if not isinstance(records, list) or not records:
+        if not isinstance(records, list):
+            raise CommandError(f"Replacement requires a {feed_name} list.")
+        if not records and not allow_empty:
             raise CommandError(
                 f"Replacement requires a nonempty {feed_name} list."
             )
@@ -1105,6 +1201,16 @@ class Command(BaseCommand):
             "",
             "## Explicit Source Adjustments",
             "",
+            "- Infrastructure News cutoff: "
+            + (f"`{result.system_news_as_of}`" if result.system_news_as_of else "None"),
+            "- Cutoff-excluded past `SystemStatusNews` Drupal nids: "
+            + (
+                ", ".join(
+                    f"`{nid}`" for nid in result.cutoff_excluded_system_nids
+                )
+                if result.cutoff_excluded_system_nids
+                else "None"
+            ),
             "- Excluded `SystemStatusNews` Drupal nids: "
             + (
                 ", ".join(f"`{nid}`" for nid in result.excluded_system_nids)
@@ -1176,6 +1282,11 @@ class Command(BaseCommand):
             "Source adjustments -> excluded system nids: "
             f"{result.excluded_system_nids or 'none'}, exact corrections: "
             f"{len(result.source_corrections)}"
+        )
+        self.stdout.write(
+            "System news cutoff -> as of: "
+            f"{result.system_news_as_of or 'none'}, excluded past nids: "
+            f"{result.cutoff_excluded_system_nids or 'none'}"
         )
         self.stdout.write(f"Warnings: {len(result.warnings)}; Errors: {len(result.errors)}")
         self.stdout.write(f"Report: {report_path}")

@@ -52,51 +52,52 @@ Raw-dump imports enforce all of the following:
    `--suppress-notifications`.
 8. Drupal node IDs and revisions, field-table revisions, types, dates, references and
    choice mappings are validated before PostgreSQL replacement begins.
-9. Every affected infrastructure and integration-element reference on a retained record
-   is retained. Records tied to reviewed historical CIDER resources are excluded by exact
-   Drupal nid; any other unknown, missing or duplicate relationship fails validation or
-   becomes a strict-mode failure.
+9. Only Infrastructure News that is current or future at the operator-approved cutover
+   timestamp is retained. Every affected infrastructure and integration-element reference
+   on a retained record is preserved; unknown, missing or duplicate relationships fail
+   validation or become strict-mode failures.
 10. Delete, import, stable-ID assignment, relationship creation, full field/relationship
     verification and final stable-ID-set verification share one PostgreSQL transaction.
 11. Any failure rolls back the complete replacement.
-12. Requested exclusions must exist exactly once. Named source corrections require an
-    exact original-value match and fail rather than changing an unexpected value.
-13. Every run writes a Markdown report, including explicit exclusions and corrections.
-    Parser failures are also recorded.
+12. Replacement imports require a timezone-aware `--system-news-as-of` value. Dry-run
+    and apply must use the identical value, and every cutoff-excluded Drupal nid is
+    recorded in the report.
+13. Requested explicit exclusions must exist exactly once. Named source corrections
+    require an exact original-value match and fail rather than changing an unexpected
+    value.
+14. Every run writes a Markdown report, including the cutoff, cutoff exclusions, explicit
+    exclusions and corrections. Parser failures are also recorded.
 
 The parser reads only current Drupal field tables and ignores unrelated dump tables. It
 uses no live MySQL or Drupal API connection.
 
-## Approved source adjustments
+## Approved cutover window and source correction
 
-The August 31 dump contains 244 Infrastructure News and 17 Integration News records, but
-has source issues that the operator cannot correct in Drupal. The approved import policy
-is explicit and narrow:
+Infrastructure News is a cutover snapshot, not a historical archive. The importer keeps
+the union of records that are current or future at `--system-news-as-of`:
 
-- Exclude Infrastructure News nid `404`, whose source content is empty, by supplying
-  `--exclude-system-nid 404` on every dry-run and apply invocation.
-- Exclude the following Infrastructure News records because their affected resource is
-  absent from the CIDER
-  `https://operations-api.access-ci.org/wh2/cider/v1/access-active/?format=json` feed.
-  These exact mappings came from the beta strict dry-run report and were rechecked
-  against the public feed before updating this runbook:
-  - `tickets.access-ci.org`: nids `76`, `79`, `80`, and `392`
-  - `stampede2.tacc.access-ci.org`: nids `90`, `377`, and `391`
-  - `faster.tamu.access-ci.org`: nids `273` and `378`
-  - `delta-storage.ncsa.access-ci.org`: nid `332`
-  - `lyric.uky.access-ci.org`: nid `381`
-- Correct only nid `928`'s start datetime from the exact source value
+- current: start is at or before the cutoff and end is absent or at or after the cutoff;
+- future: start is at or after the cutoff.
+
+Everything else is past and is excluded with its Drupal nid recorded in the report. The
+cutoff must be an explicit timezone-aware ISO-8601 timestamp. Select it once for each
+rehearsal or cutover and reuse the exact string for dry-run and apply. The importer never
+uses its live clock or calls the Operations API to make this decision. Integration News
+is not date-filtered.
+
+One source correction remains necessary before the cutoff can be evaluated: correct only
+nid `928`'s start datetime from the exact source value
   `0026-01-07T12:50:36` to `2026-01-07T12:50:36` by supplying
-  `--source-correction infrastructure-928-start-year`. Its Drupal creation timestamp and
-  end datetime are both in January 2026. If the original start value changes, the importer
-  refuses the correction.
+`--source-correction infrastructure-928-start-year`. Its Drupal creation timestamp and
+end datetime are both in January 2026. If the original start value changes, the importer
+refuses the correction. Whether this corrected record is retained then depends only on the
+approved cutoff.
 
-After these exclusions, the August 31 dump should stage 232 Infrastructure News records
-and 17 Integration News records. The previous count of 445 infrastructure relationships
-included the excluded records and must not be reused: record the adjusted relationship
-count from the new successful strict dry-run. The expected integration-element count
-remains 39. Later dumps must be reviewed from their own report rather than assumed to
-have the same counts or exclusions.
+Do not reuse the previous full-history counts. Record the retained SystemStatusNews count,
+infrastructure-relationship count and cutoff-excluded nid list from the successful strict
+dry-run. For the reviewed August 31 dump, the unfiltered Integration News count remains 17
+and its expected relationship count remains 39. Later dumps must be reviewed from their
+own report.
 
 Do not edit the dump. Its SHA-256 continues to identify the exact source artifact, while
 the report records the exclusion and correction separately.
@@ -114,6 +115,7 @@ Before running anything:
 - Create a durable, `software`-writable change-record directory for reports and checksums.
 - Know the exact beta database name and write host.
 - Confirm the selected Django import user already exists. Do not create it in the importer.
+- Select and record the exact timezone-aware Infrastructure News cutoff timestamp.
 
 Committing and pushing the branch does not update an existing release. Use a newly
 deployed immutable release built from the exact commit containing the importer changes;
@@ -136,6 +138,7 @@ CHANGE_RECORD=/path/to/durable/change-record/rehearsal-N
 IMPORT_USER=jlambertson
 EXPECTED_DATABASE=portal_beta
 EXPECTED_WRITE_HOST=<approved-beta-write-host>
+SYSTEM_NEWS_AS_OF=REPLACE_WITH_APPROVED_UTC_CUTOVER_TIMESTAMP
 
 export APP_CONFIG
 
@@ -146,6 +149,7 @@ test -r "$APP_CONFIG"
 test -s "$SOURCE_DUMP"
 test -d "$CHANGE_RECORD"
 test -n "$EXPECTED_WRITE_HOST"
+test "$SYSTEM_NEWS_AS_OF" != REPLACE_WITH_APPROVED_UTC_CUTOVER_TIMESTAMP
 ```
 
 Do not continue if any check fails. Do not use a release path inferred from an old report.
@@ -195,18 +199,7 @@ Stop if the server-side checksum differs. A later dump must use its own checksum
   --strict \
   --confirm-database "$EXPECTED_DATABASE" \
   --confirm-host "$EXPECTED_WRITE_HOST" \
-  --exclude-system-nid 76 \
-  --exclude-system-nid 79 \
-  --exclude-system-nid 80 \
-  --exclude-system-nid 90 \
-  --exclude-system-nid 273 \
-  --exclude-system-nid 332 \
-  --exclude-system-nid 377 \
-  --exclude-system-nid 378 \
-  --exclude-system-nid 381 \
-  --exclude-system-nid 391 \
-  --exclude-system-nid 392 \
-  --exclude-system-nid 404 \
+  --system-news-as-of "$SYSTEM_NEWS_AS_OF" \
   --source-correction infrastructure-928-start-year \
   --suppress-notifications \
   --report-file "$CHANGE_RECORD/import-dry-run.md" \
@@ -220,23 +213,25 @@ Review the complete report. It must show:
 - the same SHA-256 recorded in `source.sha256`;
 - nonzero and expected record counts for both feeds;
 - expected infrastructure and integration-element relationship counts;
-- exactly the 12 excluded Infrastructure News nids `76`, `79`, `80`, `90`, `273`,
-  `332`, `377`, `378`, `381`, `391`, `392`, and `404`;
+- the exact `SYSTEM_NEWS_AS_OF` value;
+- every past Infrastructure News nid excluded by that cutoff;
+- no explicit nid exclusions unless separately reviewed;
 - the exact-match nid `928` start-datetime correction and no other correction;
 - zero errors and zero warnings under strict mode.
 
 A dry-run performs ORM work inside a transaction and then forces rollback. Confirm that
 the beta row counts are unchanged after the dry-run.
 
-For the reviewed August 31 dump, the adjusted dry-run must stage the known counts below
-and supply a new infrastructure-relationship count:
+Record these values from the successful adjusted dry-run:
 
 ```text
-SystemStatusNews: 232
-IntegrationNews: 17
-Infrastructure relationships: <record the adjusted dry-run value>
-Integration-element relationships: 39
-Excluded SystemStatusNews nids: 76, 79, 80, 90, 273, 332, 377, 378, 381, 391, 392, 404
+Infrastructure News cutoff: <exact SYSTEM_NEWS_AS_OF value>
+SystemStatusNews: <retained current/future count>
+IntegrationNews: <unfiltered count; 17 for the reviewed August 31 dump>
+Infrastructure relationships: <retained relationship count>
+Integration-element relationships: <39 for the reviewed August 31 dump>
+Cutoff-excluded past SystemStatusNews nids: <complete reported list>
+Explicitly excluded SystemStatusNews nids: None
 Corrected SystemStatusNews nid: 928
 Warnings: 0
 Errors: 0
@@ -255,11 +250,12 @@ Copy the 64-character checksum and the two source counts from the reviewed dry-r
 Then run:
 
 ```bash
-# These are the reviewed values for the exact August 31 dump.
+# Copy these values from the successful dry-run of the exact source and cutoff.
 SOURCE_SHA256=ab48e0976af0eb18f075d19673400e357a19e1f876ca9e03162aa63e93d99b27
-CONFIRM_SYSTEM_COUNT=232
+CONFIRM_SYSTEM_COUNT=REPLACE_WITH_DRY_RUN_SYSTEM_COUNT
 CONFIRM_INTEGRATION_COUNT=17
 
+test "$CONFIRM_SYSTEM_COUNT" != REPLACE_WITH_DRY_RUN_SYSTEM_COUNT
 sha256sum --check "$CHANGE_RECORD/source.sha256"
 
 "$PYTHON" "$MANAGE" import_drupal_news \
@@ -272,26 +268,16 @@ sha256sum --check "$CHANGE_RECORD/source.sha256"
   --confirm-source-sha256 "$SOURCE_SHA256" \
   --confirm-system-count "$CONFIRM_SYSTEM_COUNT" \
   --confirm-integration-count "$CONFIRM_INTEGRATION_COUNT" \
-  --exclude-system-nid 76 \
-  --exclude-system-nid 79 \
-  --exclude-system-nid 80 \
-  --exclude-system-nid 90 \
-  --exclude-system-nid 273 \
-  --exclude-system-nid 332 \
-  --exclude-system-nid 377 \
-  --exclude-system-nid 378 \
-  --exclude-system-nid 381 \
-  --exclude-system-nid 391 \
-  --exclude-system-nid 392 \
-  --exclude-system-nid 404 \
+  --system-news-as-of "$SYSTEM_NEWS_AS_OF" \
   --source-correction infrastructure-928-start-year \
   --suppress-notifications \
   --report-file "$CHANGE_RECORD/import-apply.md" \
   --import-user "$IMPORT_USER"
 ```
 
-For a later dump, replace those three values with the values from that dump's successful
-dry-run report. Never reuse the August 31 values for a different file.
+Before apply, verify `SYSTEM_NEWS_AS_OF` is byte-for-byte identical to the dry-run report.
+For a later dump, replace the checksum and both counts with values from that dump's
+successful dry-run report. Never reuse reviewed values for a different file or cutoff.
 
 ### 8. Verify the database and rendered application
 

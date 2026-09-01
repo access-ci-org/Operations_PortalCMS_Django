@@ -77,6 +77,107 @@ class NormalizedSourceAdjustmentTests(SimpleTestCase):
             )
 
 
+class SystemNewsCutoffTests(SimpleTestCase):
+    def setUp(self):
+        self.command = CanonicalCommand()
+        self.cutoff = self.command._parse_system_news_as_of(
+            "2026-09-01T12:00:00Z"
+        )
+        self.records = [
+            {
+                "subject": "Past",
+                "start_datetime": "2026-08-01T12:00:00Z",
+                "end_datetime": "2026-08-01T13:00:00Z",
+                "source_metadata": {"drupal_nid": 1},
+            },
+            {
+                "subject": "Current",
+                "start_datetime": "2026-09-01T11:00:00Z",
+                "end_datetime": "2026-09-01T13:00:00Z",
+                "source_metadata": {"drupal_nid": 2},
+            },
+            {
+                "subject": "Current without end",
+                "start_datetime": "2026-08-01T12:00:00Z",
+                "end_datetime": None,
+                "source_metadata": {"drupal_nid": 3},
+            },
+            {
+                "subject": "Future",
+                "start_datetime": "2026-09-02T12:00:00Z",
+                "end_datetime": "2026-09-02T13:00:00Z",
+                "source_metadata": {"drupal_nid": 4},
+            },
+        ]
+
+    def test_retains_current_and_future_and_reports_past(self):
+        retained, excluded = self.command._filter_system_records_as_of(
+            self.records,
+            self.cutoff,
+        )
+
+        self.assertEqual(
+            [record["source_metadata"]["drupal_nid"] for record in retained],
+            [2, 3, 4],
+        )
+        self.assertEqual(excluded, [1])
+
+    def test_retains_start_or_end_exactly_at_cutoff(self):
+        records = [
+            {
+                "start_datetime": "2026-09-01T12:00:00Z",
+                "end_datetime": "2026-09-01T13:00:00Z",
+                "source_metadata": {"drupal_nid": 10},
+            },
+            {
+                "start_datetime": "2026-09-01T11:00:00Z",
+                "end_datetime": "2026-09-01T12:00:00Z",
+                "source_metadata": {"drupal_nid": 11},
+            },
+        ]
+
+        retained, excluded = self.command._filter_system_records_as_of(
+            records,
+            self.cutoff,
+        )
+
+        self.assertEqual(len(retained), 2)
+        self.assertEqual(excluded, [])
+
+    def test_allows_no_retained_system_records(self):
+        retained, excluded = self.command._filter_system_records_as_of(
+            [self.records[0]],
+            self.cutoff,
+        )
+
+        self.assertEqual(retained, [])
+        self.assertEqual(excluded, [1])
+        self.assertEqual(
+            self.command._validated_source_ids(
+                retained,
+                "SystemStatusNews",
+                allow_empty=True,
+            ),
+            set(),
+        )
+
+    def test_rejects_naive_cutoff(self):
+        with self.assertRaisesMessage(CommandError, "timezone-aware ISO-8601"):
+            self.command._parse_system_news_as_of("2026-09-01T12:00:00")
+
+    def test_rejects_record_without_valid_start(self):
+        with self.assertRaisesMessage(CommandError, "valid start_datetime"):
+            self.command._filter_system_records_as_of(
+                [
+                    {
+                        "start_datetime": "not-a-date",
+                        "source_metadata": {"drupal_nid": 12},
+                    }
+                ],
+                self.cutoff,
+            )
+
+
 class AtomicReplaceCommandTests(TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
@@ -168,6 +269,8 @@ class AtomicReplaceCommandTests(TestCase):
             "--import-user",
             self.author.username,
             "--replace",
+            "--system-news-as-of",
+            "2026-01-01T00:00:00Z",
             "--confirm-database",
             self.database_name,
             "--confirm-host",
@@ -232,6 +335,8 @@ class AtomicReplaceCommandTests(TestCase):
                 "--input",
                 str(self.input_path),
                 "--replace",
+                "--system-news-as-of",
+                "2026-01-01T00:00:00Z",
                 "--apply",
                 "--confirm-database",
                 self.database_name,
@@ -262,6 +367,8 @@ class AtomicReplaceCommandTests(TestCase):
             "--mysql-dump",
             str(raw_path),
             "--replace",
+            "--system-news-as-of",
+            "2026-01-01T00:00:00Z",
             "--apply",
             "--strict",
             "--confirm-database",
@@ -335,6 +442,8 @@ class AtomicReplaceCommandTests(TestCase):
                 "--input",
                 str(self.input_path),
                 "--replace",
+                "--system-news-as-of",
+                "2026-01-01T00:00:00Z",
                 "--dry-run",
                 "--confirm-database",
                 self.database_name,
