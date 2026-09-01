@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -14,6 +15,7 @@ from integration_news.models import IntegrationNews
 from resources.models import CiderInfrastructure
 
 from .management.commands.import_drupal_news import Command as CanonicalCommand
+from .management.commands.import_drupal_news import ImportResult
 from .models import SystemStatusNews
 from .test_drupal_mysql import _dump_text
 
@@ -178,12 +180,125 @@ class SystemNewsCutoffTests(SimpleTestCase):
             )
 
 
+class MysqlDumpSelectionTests(SimpleTestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.directory = Path(self.temp_dir.name)
+        self.command = CanonicalCommand()
+
+    def test_selects_newest_filename_timestamp_not_mtime(self):
+        older = self.directory / "backup_database-2026-08-31T04:00:03-05:00.mysql.gz"
+        newer = self.directory / "backup_database-2026-09-01T04:00:03-05:00.mysql.gz"
+        older.write_bytes(b"older")
+        newer.write_bytes(b"newer")
+        os.utime(older, (2_000_000_000, 2_000_000_000))
+        os.utime(newer, (1_000_000_000, 1_000_000_000))
+
+        selected = self.command._select_newest_mysql_dump(self.directory)
+
+        self.assertEqual(selected, newer.resolve())
+
+    def test_rejects_malformed_matching_backup_filename(self):
+        malformed = self.directory / "backup_database-not-a-date.mysql.gz"
+        malformed.write_bytes(b"data")
+
+        with self.assertRaisesMessage(CommandError, "Malformed MySQL backup filename"):
+            self.command._select_newest_mysql_dump(self.directory)
+
+    def test_rejects_two_names_for_same_newest_instant(self):
+        first = self.directory / "backup_database-2026-09-01T04:00:03-05:00.mysql.gz"
+        second = self.directory / "backup_database-2026-09-01T09:00:03Z.mysql.gz"
+        first.write_bytes(b"first")
+        second.write_bytes(b"second")
+
+        with self.assertRaisesMessage(CommandError, "same newest instant"):
+            self.command._select_newest_mysql_dump(self.directory)
+
+
+class ImportPlanTests(SimpleTestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.directory = Path(self.temp_dir.name)
+        self.source_path = self.directory / "news.json"
+        self.source_path.write_text("{}", encoding="utf-8")
+        self.plan_path = self.directory / "import-plan.json"
+        self.command = CanonicalCommand()
+        self.result = ImportResult(
+            system_records=1,
+            integration_records=1,
+            system_relationships=2,
+            integration_relationships=1,
+            excluded_system_nids=[404],
+            cutoff_excluded_system_nids=[1, 2],
+            system_news_as_of="2026-09-01T12:00:00Z",
+            source_corrections=["correction applied"],
+            created_system=1,
+            created_integration=1,
+            deleted_system=3,
+            deleted_integration=4,
+        )
+        self.options = {
+            "suppress_notifications": True,
+            "allow_na_affected_element": True,
+            "create_import_user": False,
+            "import_user": "cutover_author",
+        }
+
+    def _plan(self):
+        return self.command._build_import_plan(
+            input_path=self.source_path,
+            source_kind="normalized-json",
+            source_sha256=hashlib.sha256(self.source_path.read_bytes()).hexdigest(),
+            result=self.result,
+            expected_system_ids={101},
+            expected_integration_ids={201},
+            excluded_system_nids=[404],
+            source_correction_names=["infrastructure-928-start-year"],
+            options=self.options,
+        )
+
+    def test_round_trips_versioned_plan_and_file_digest(self):
+        plan = self._plan()
+        plan_sha256 = self.command._write_import_plan(self.plan_path, plan)
+
+        loaded, loaded_sha256 = self.command._load_import_plan(
+            self.plan_path,
+            plan_sha256,
+        )
+
+        self.assertEqual(loaded, plan)
+        self.assertEqual(loaded_sha256, plan_sha256)
+
+    def test_rejects_plan_file_changed_after_review(self):
+        plan = self._plan()
+        plan_sha256 = self.command._write_import_plan(self.plan_path, plan)
+        self.plan_path.write_text("{}\n", encoding="utf-8")
+
+        with self.assertRaisesMessage(CommandError, "plan SHA-256 does not match"):
+            self.command._load_import_plan(self.plan_path, plan_sha256)
+
+    def test_rejects_contract_changed_without_integrity_update(self):
+        plan = self._plan()
+        plan["contract"]["target"]["database"] = "different"
+        self.plan_path.write_text(
+            json.dumps(plan, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        changed_sha256 = hashlib.sha256(self.plan_path.read_bytes()).hexdigest()
+
+        with self.assertRaisesMessage(CommandError, "contract integrity check failed"):
+            self.command._load_import_plan(self.plan_path, changed_sha256)
+
+
 class AtomicReplaceCommandTests(TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.input_path = Path(self.temp_dir.name) / "news.json"
         self.report_path = Path(self.temp_dir.name) / "report.md"
+        self.plan_path = Path(self.temp_dir.name) / "import-plan.json"
         self.author = User.objects.create_user(username="cutover_author")
         self.old_system = SystemStatusNews.objects.create(
             subject="Old system news",
@@ -250,16 +365,20 @@ class AtomicReplaceCommandTests(TestCase):
         )
 
     def _run_replace(self, *mode):
-        source_confirmation = []
         if "--apply" in mode:
-            source_confirmation = [
-                "--confirm-source-sha256",
-                hashlib.sha256(self.input_path.read_bytes()).hexdigest(),
-                "--confirm-system-count",
-                "1",
-                "--confirm-integration-count",
-                "1",
-            ]
+            if not self.plan_path.exists():
+                self._run_replace("--dry-run")
+            return call_command(
+                "import_drupal_news",
+                "--apply",
+                "--plan-file",
+                str(self.plan_path),
+                "--confirm-plan-sha256",
+                hashlib.sha256(self.plan_path.read_bytes()).hexdigest(),
+                "--report-file",
+                str(self.report_path),
+                stdout=StringIO(),
+            )
         return call_command(
             "import_drupal_news",
             "--input",
@@ -269,6 +388,9 @@ class AtomicReplaceCommandTests(TestCase):
             "--import-user",
             self.author.username,
             "--replace",
+            "--strict",
+            "--plan-file",
+            str(self.plan_path),
             "--system-news-as-of",
             "2026-01-01T00:00:00Z",
             "--confirm-database",
@@ -276,7 +398,6 @@ class AtomicReplaceCommandTests(TestCase):
             "--confirm-host",
             self.database_host,
             "--suppress-notifications",
-            *source_confirmation,
             *mode,
             stdout=StringIO(),
         )
@@ -295,6 +416,8 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertIn("`IntegrationNews` deleted: `1`", report)
         self.assertIn("`SystemStatusNews` created: `1`", report)
         self.assertIn("`IntegrationNews` created: `1`", report)
+        self.assertTrue(self.plan_path.is_file())
+        self.assertIn("Import plan SHA-256", report)
 
     def test_replace_apply_replaces_both_feeds_and_builds_relationships(self):
         self._write_payload()
@@ -328,28 +451,14 @@ class AtomicReplaceCommandTests(TestCase):
 
     def test_replace_apply_requires_matching_source_checksum(self):
         self._write_payload()
+        self._run_replace("--dry-run")
+        self.input_path.write_text(
+            json.dumps({"SystemStatusNews": [], "IntegrationNews": []}),
+            encoding="utf-8",
+        )
 
         with self.assertRaisesMessage(CommandError, "source SHA-256 does not match"):
-            call_command(
-                "import_drupal_news",
-                "--input",
-                str(self.input_path),
-                "--replace",
-                "--system-news-as-of",
-                "2026-01-01T00:00:00Z",
-                "--apply",
-                "--confirm-database",
-                self.database_name,
-                "--confirm-host",
-                self.database_host,
-                "--confirm-source-sha256",
-                "0" * 64,
-                "--confirm-system-count",
-                "1",
-                "--confirm-integration-count",
-                "1",
-                stdout=StringIO(),
-            )
+            self._run_replace("--apply")
 
     def test_raw_dump_apply_replaces_both_feeds_with_all_relationships(self):
         raw_path = Path(self.temp_dir.name) / "news.mysql"
@@ -362,6 +471,7 @@ class AtomicReplaceCommandTests(TestCase):
             resource_descriptive_name="Example resource",
         )
 
+        raw_plan_path = Path(self.temp_dir.name) / "raw-import-plan.json"
         call_command(
             "import_drupal_news",
             "--mysql-dump",
@@ -369,23 +479,30 @@ class AtomicReplaceCommandTests(TestCase):
             "--replace",
             "--system-news-as-of",
             "2026-01-01T00:00:00Z",
-            "--apply",
+            "--dry-run",
             "--strict",
             "--confirm-database",
             self.database_name,
             "--confirm-host",
             self.database_host,
-            "--confirm-source-sha256",
-            hashlib.sha256(raw_path.read_bytes()).hexdigest(),
-            "--confirm-system-count",
-            "1",
-            "--confirm-integration-count",
-            "1",
             "--suppress-notifications",
+            "--plan-file",
+            str(raw_plan_path),
             "--report-file",
             str(self.report_path),
             "--import-user",
             self.author.username,
+            stdout=StringIO(),
+        )
+        call_command(
+            "import_drupal_news",
+            "--apply",
+            "--plan-file",
+            str(raw_plan_path),
+            "--confirm-plan-sha256",
+            hashlib.sha256(raw_plan_path.read_bytes()).hexdigest(),
+            "--report-file",
+            str(self.report_path),
             stdout=StringIO(),
         )
 
@@ -422,6 +539,25 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertFalse(SystemStatusNews.objects.filter(outage_id=101).exists())
         self.assertFalse(IntegrationNews.objects.filter(integration_news_id=201).exists())
 
+    def test_replace_apply_rolls_back_when_target_changed_after_dry_run(self):
+        self._write_payload()
+        self._run_replace("--dry-run")
+        extra = SystemStatusNews.objects.create(
+            subject="Unexpected target drift",
+            content="Created after plan review",
+            infrastructure_news_type="degraded",
+            outage_id=999,
+            author=self.author,
+        )
+
+        with self.assertRaisesMessage(CommandError, "database outcome differs"):
+            self._run_replace("--apply")
+
+        self.assertTrue(SystemStatusNews.objects.filter(pk=self.old_system.pk).exists())
+        self.assertTrue(SystemStatusNews.objects.filter(pk=extra.pk).exists())
+        self.assertTrue(IntegrationNews.objects.filter(pk=self.old_integration.pk).exists())
+        self.assertFalse(SystemStatusNews.objects.filter(outage_id=101).exists())
+
     def test_replace_rejects_duplicate_source_ids_before_deleting(self):
         payload = self._payload()
         payload["SystemStatusNews"].append(dict(payload["SystemStatusNews"][0]))
@@ -436,7 +572,10 @@ class AtomicReplaceCommandTests(TestCase):
     def test_replace_rejects_unconfirmed_target(self):
         self._write_payload()
 
-        with self.assertRaisesMessage(CommandError, "configured write host does not match"):
+        with self.assertRaisesMessage(
+            CommandError,
+            "configured write host does not match",
+        ):
             call_command(
                 "import_drupal_news",
                 "--input",
@@ -445,6 +584,9 @@ class AtomicReplaceCommandTests(TestCase):
                 "--system-news-as-of",
                 "2026-01-01T00:00:00Z",
                 "--dry-run",
+                "--strict",
+                "--plan-file",
+                str(self.plan_path),
                 "--confirm-database",
                 self.database_name,
                 "--confirm-host",

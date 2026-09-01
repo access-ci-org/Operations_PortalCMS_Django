@@ -42,12 +42,15 @@ name, write host, source path and checksum, Python executable, counts, warnings 
 
 Raw-dump imports enforce all of the following:
 
-1. The source is an explicit plain SQL or `.gz` MySQL dump.
+1. A dry-run uses an explicit dump or selects the newest valid timestamped dump from an
+   explicit directory. Apply never rescans that directory.
 2. Both Drupal bundles must be present and nonempty.
 3. Raw dumps can only use atomic `--replace`; additive raw-dump imports are refused.
 4. `--confirm-database` and `--confirm-host` must match resolved Django settings.
 5. `--dry-run` and `--apply` are mutually exclusive; replacement without either is refused.
-6. A write requires the exact reviewed source SHA-256 and operator-confirmed feed counts.
+6. A strict dry-run writes a versioned JSON plan binding the source path and SHA-256,
+   release interpreter, target, options, adjustments, IDs, counts, relationships and
+   planned database outcome.
 7. A raw-dump write requires `--strict`, an existing import user, and
    `--suppress-notifications`.
 8. Drupal node IDs and revisions, field-table revisions, types, dates, references and
@@ -59,14 +62,17 @@ Raw-dump imports enforce all of the following:
 10. Delete, import, stable-ID assignment, relationship creation, full field/relationship
     verification and final stable-ID-set verification share one PostgreSQL transaction.
 11. Any failure rolls back the complete replacement.
-12. Replacement imports require a timezone-aware `--system-news-as-of` value. Dry-run
-    and apply must use the identical value, and every cutoff-excluded Drupal nid is
-    recorded in the report.
+12. Replacement dry-runs require a timezone-aware `--system-news-as-of` value. Apply
+    loads the exact value from the reviewed plan, and every cutoff-excluded Drupal nid is
+    recorded in both artifacts.
 13. Requested explicit exclusions must exist exactly once. Named source corrections
     require an exact original-value match and fail rather than changing an unexpected
     value.
-14. Every run writes a Markdown report, including the cutoff, cutoff exclusions, explicit
-    exclusions and corrections. Parser failures are also recorded.
+14. Apply requires the reviewed plan file and its independently recorded SHA-256. It
+    refuses a changed plan, source, release interpreter, target, correction definition,
+    staged dataset or database outcome and rolls back transactional drift.
+15. Every run writes a Markdown report, including the plan identity, cutoff, cutoff
+    exclusions, explicit exclusions and corrections. Parser failures are also recorded.
 
 The parser reads only current Drupal field tables and ignores unrelated dump tables. It
 uses no live MySQL or Drupal API connection.
@@ -84,6 +90,14 @@ cutoff must be an explicit timezone-aware ISO-8601 timestamp. Select it once for
 rehearsal or cutover and reuse the exact string for dry-run and apply. The importer never
 uses its live clock or calls the Operations API to make this decision. Integration News
 is not date-filtered.
+
+Two reviewed source exclusions are required for the August 31 and September 1 source
+family:
+
+- nid `404` has empty content. The raw parser validates content before applying the date
+  cutoff, so strict mode requires its explicit exclusion even though it is past;
+- nid `797` is the historical Hive Gateway retirement. Its absent end date makes it look
+  current to the generic cutoff rule, but its resource is no longer in active CIDER.
 
 One source correction remains necessary before the cutoff can be evaluated: correct only
 nid `928`'s start datetime from the exact source value
@@ -123,7 +137,7 @@ do not use the older `news_apis_imports_testing-...` release or the normalized J
 `/soft/django-cms-01/tags/`. The local `database/dumps/` directory is ignored by Git, so
 copy the reviewed raw dump separately to a durable location readable by `software`.
 
-### 2. Start a `software` login shell and pin the release
+### 2. Start a `software` login shell and set one rehearsal contract
 
 ```bash
 sudo -i -u software
@@ -133,12 +147,17 @@ RELEASE=/soft/django-cms-01/releases/<approved-release>
 PYTHON="$RELEASE/.venv/bin/python"
 MANAGE="$RELEASE/operations_portalcms_django/manage.py"
 APP_CONFIG="$APP_HOME/conf/portal.conf"
-SOURCE_DUMP=/path/to/backup_database-2026-08-31T04:00:03-05:00.mysql.gz
-CHANGE_RECORD=/path/to/durable/change-record/rehearsal-N
+SOURCE_DIRECTORY="$APP_HOME/var/news-import"
+CHANGE_RECORD="$APP_HOME/var/news-import/beta-rehearsal-<unique-run-id>"
+IMPORT_PLAN="$CHANGE_RECORD/import-plan.json"
 IMPORT_USER=jlambertson
 EXPECTED_DATABASE=portal_beta
 EXPECTED_WRITE_HOST=<approved-beta-write-host>
-SYSTEM_NEWS_AS_OF=REPLACE_WITH_APPROVED_UTC_CUTOVER_TIMESTAMP
+
+# For a new beta rehearsal, capture now exactly once. For a deterministic replay,
+# assign the exact cutoff from the earlier plan instead.
+SYSTEM_NEWS_AS_OF="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+readonly SYSTEM_NEWS_AS_OF
 
 export APP_CONFIG
 
@@ -146,20 +165,33 @@ test "$(id -un)" = software
 test -x "$PYTHON"
 test -r "$MANAGE"
 test -r "$APP_CONFIG"
-test -s "$SOURCE_DUMP"
+test -d "$SOURCE_DIRECTORY"
+test -r "$SOURCE_DIRECTORY"
+test -x "$SOURCE_DIRECTORY"
 test -d "$CHANGE_RECORD"
+test -w "$CHANGE_RECORD"
+test ! -e "$IMPORT_PLAN"
 test -n "$EXPECTED_WRITE_HOST"
-test "$SYSTEM_NEWS_AS_OF" != REPLACE_WITH_APPROVED_UTC_CUTOVER_TIMESTAMP
+printf 'Infrastructure News cutoff: %s\n' "$SYSTEM_NEWS_AS_OF"
 ```
 
 Do not continue if any check fails. Do not use a release path inferred from an old report.
 Do not export `PYTHONPATH`; invoking the pinned release's `manage.py` with its own
 `.venv/bin/python` selects the intended application code and environment.
 
-### 3. Confirm the interpreter and target without exposing credentials
+The directory selector considers only readable regular files whose names exactly match
+`backup_database-<timezone-aware ISO timestamp>.mysql.gz`. It parses and compares those
+timestamps rather than file modification times. A malformed candidate, unreadable file,
+tie, or empty candidate set fails the dry-run. File ownership is not authoritative;
+`test -r` as `software` and the importer checks are authoritative.
+
+### 3. Confirm the release and target without exposing credentials
 
 ```bash
-"$PYTHON" "$MANAGE" shell -c "
+"$PYTHON" "$MANAGE" import_drupal_news --help | grep -F -- '--plan-file'
+"$PYTHON" "$MANAGE" import_drupal_news --help | grep -F -- '--mysql-dump-directory'
+
+"$PYTHON" "$MANAGE" shell --no-imports <<'PY'
 import sys
 from django.conf import settings
 database = settings.DATABASES['default']
@@ -167,132 +199,133 @@ print('python:', sys.executable)
 print('database:', database.get('NAME'))
 print('write host:', database.get('HOST'))
 print('port:', database.get('PORT'))
-"
+PY
 ```
 
 Stop unless the Python path is under `$RELEASE/.venv` and the database and host exactly
 match `EXPECTED_DATABASE` and `EXPECTED_WRITE_HOST`.
 
-### 4. Record the source checksum
+### 4. Run the strict atomic replacement dry-run and write the plan
 
 ```bash
-sha256sum "$SOURCE_DUMP" | tee "$CHANGE_RECORD/source.sha256"
+(
+  set -Eeuo pipefail
+
+  "$PYTHON" "$MANAGE" import_drupal_news \
+    --mysql-dump-directory "$SOURCE_DIRECTORY" \
+    --replace \
+    --dry-run \
+    --strict \
+    --confirm-database "$EXPECTED_DATABASE" \
+    --confirm-host "$EXPECTED_WRITE_HOST" \
+    --system-news-as-of "$SYSTEM_NEWS_AS_OF" \
+    --exclude-system-nid 404 \
+    --exclude-system-nid 797 \
+    --source-correction infrastructure-928-start-year \
+    --suppress-notifications \
+    --plan-file "$IMPORT_PLAN" \
+    --report-file "$CHANGE_RECORD/import-dry-run.md" \
+    --import-user "$IMPORT_USER"
+)
 ```
 
-Any source-file change invalidates every previous dry-run and report.
-
-For the exact August 31 dump reviewed during importer development, the output is:
-
-```text
-ab48e0976af0eb18f075d19673400e357a19e1f876ca9e03162aa63e93d99b27
-```
-
-Stop if the server-side checksum differs. A later dump must use its own checksum.
-
-### 5. Run the strict atomic replacement dry-run
+Review both complete artifacts. The JSON plan is machine-readable; the Markdown report is
+the human-readable rendering of the run:
 
 ```bash
-"$PYTHON" "$MANAGE" import_drupal_news \
-  --mysql-dump "$SOURCE_DUMP" \
-  --replace \
-  --dry-run \
-  --strict \
-  --confirm-database "$EXPECTED_DATABASE" \
-  --confirm-host "$EXPECTED_WRITE_HOST" \
-  --system-news-as-of "$SYSTEM_NEWS_AS_OF" \
-  --source-correction infrastructure-928-start-year \
-  --suppress-notifications \
-  --report-file "$CHANGE_RECORD/import-dry-run.md" \
-  --import-user "$IMPORT_USER"
+"$PYTHON" -m json.tool "$IMPORT_PLAN" | less
+less "$CHANGE_RECORD/import-dry-run.md"
 ```
 
-Review the complete report. It must show:
+They must show:
 
 - the pinned release Python executable;
+- the exact selected absolute source path and SHA-256;
 - the intended database and write host;
-- the same SHA-256 recorded in `source.sha256`;
-- nonzero and expected record counts for both feeds;
+- the plan contract and schema versions;
+- expected record counts, allowing zero retained Infrastructure News;
 - expected infrastructure and integration-element relationship counts;
 - the exact `SYSTEM_NEWS_AS_OF` value;
 - every past Infrastructure News nid excluded by that cutoff;
-- no explicit nid exclusions unless separately reviewed;
+- exactly the reviewed explicit exclusions `404` and `797` for this source family;
 - the exact-match nid `928` start-datetime correction and no other correction;
 - zero errors and zero warnings under strict mode.
 
 A dry-run performs ORM work inside a transaction and then forces rollback. Confirm that
 the beta row counts are unchanged after the dry-run.
 
-Record these values from the successful adjusted dry-run:
+For the September 1 beta rehearsal at cutoff `2026-09-01T18:43:13Z`, the reviewed values
+were:
 
 ```text
 Infrastructure News cutoff: <exact SYSTEM_NEWS_AS_OF value>
-SystemStatusNews: <retained current/future count>
-IntegrationNews: <unfiltered count; 17 for the reviewed August 31 dump>
-Infrastructure relationships: <retained relationship count>
-Integration-element relationships: <39 for the reviewed August 31 dump>
+SystemStatusNews: 2
+IntegrationNews: 17
+Infrastructure relationships: 3
+Integration-element relationships: 39
 Cutoff-excluded past SystemStatusNews nids: <complete reported list>
-Explicitly excluded SystemStatusNews nids: None
+Explicitly excluded SystemStatusNews nids: 404, 797
 Corrected SystemStatusNews nid: 928
 Warnings: 0
 Errors: 0
 ```
 
-### 6. Back up the beta target
+These values are evidence for that exact source and cutoff, not reusable command inputs.
+Apply obtains them from the plan.
+
+### 5. Back up the beta target
 
 Use the repository's targeted PostgreSQL backup procedure with the beta `APP_CONFIG` and
 the same confirmed write host. Store the backup in the durable change-record location.
 This is a separate production-data-style operation and requires its own human approval.
 Do not continue unless the backup exists and is nonempty.
 
-### 7. Apply the reviewed dump
+### 6. Apply only the exact reviewed plan
 
-Copy the 64-character checksum and the two source counts from the reviewed dry-run report.
-Then run:
+After human review, record the exact plan-file SHA-256. This is the only confirmation value
+copied into apply:
 
 ```bash
-# Copy these values from the successful dry-run of the exact source and cutoff.
-SOURCE_SHA256=ab48e0976af0eb18f075d19673400e357a19e1f876ca9e03162aa63e93d99b27
-CONFIRM_SYSTEM_COUNT=REPLACE_WITH_DRY_RUN_SYSTEM_COUNT
-CONFIRM_INTEGRATION_COUNT=17
+PLAN_SHA256="$(sha256sum "$IMPORT_PLAN" | awk '{print $1}')"
+readonly PLAN_SHA256
+printf 'Reviewed import plan SHA-256: %s\n' "$PLAN_SHA256"
 
-test "$CONFIRM_SYSTEM_COUNT" != REPLACE_WITH_DRY_RUN_SYSTEM_COUNT
-sha256sum --check "$CHANGE_RECORD/source.sha256"
+(
+  set -Eeuo pipefail
 
-"$PYTHON" "$MANAGE" import_drupal_news \
-  --mysql-dump "$SOURCE_DUMP" \
-  --replace \
-  --apply \
-  --strict \
-  --confirm-database "$EXPECTED_DATABASE" \
-  --confirm-host "$EXPECTED_WRITE_HOST" \
-  --confirm-source-sha256 "$SOURCE_SHA256" \
-  --confirm-system-count "$CONFIRM_SYSTEM_COUNT" \
-  --confirm-integration-count "$CONFIRM_INTEGRATION_COUNT" \
-  --system-news-as-of "$SYSTEM_NEWS_AS_OF" \
-  --source-correction infrastructure-928-start-year \
-  --suppress-notifications \
-  --report-file "$CHANGE_RECORD/import-apply.md" \
-  --import-user "$IMPORT_USER"
+  test -s "$IMPORT_PLAN"
+  test -s /path/to/separately-approved-target-backup
+
+  "$PYTHON" "$MANAGE" import_drupal_news \
+    --apply \
+    --plan-file "$IMPORT_PLAN" \
+    --confirm-plan-sha256 "$PLAN_SHA256" \
+    --report-file "$CHANGE_RECORD/import-apply.md"
+)
 ```
 
-Before apply, verify `SYSTEM_NEWS_AS_OF` is byte-for-byte identical to the dry-run report.
-For a later dump, replace the checksum and both counts with values from that dump's
-successful dry-run report. Never reuse reviewed values for a different file or cutoff.
+Apply rejects repeated source, cutoff, target, exclusion, correction, count, strict-mode,
+notification and import-user flags. It loads those values from the plan, verifies the plan
+file SHA-256, then revalidates the bound source SHA-256, exact release interpreter, target,
+staged IDs/counts/relationships and transactional outcome. A new backup arriving in
+`SOURCE_DIRECTORY` after dry-run is ignored; apply uses only the exact planned file.
 
-### 8. Verify the database and rendered application
+### 7. Verify the database and rendered application
 
 ```bash
-"$PYTHON" "$MANAGE" shell -c "
-from infrastructure_news.models import SystemStatusNews
-from integration_news.models import IntegrationNews
+"$PYTHON" "$MANAGE" shell --no-imports <<'PY'
+from infrastructure_news.models import SystemStatusNews as S
+from integration_news.models import IntegrationNews as I
 
-print('system rows:', SystemStatusNews.objects.count())
-print('system null outage_id:', SystemStatusNews.objects.filter(outage_id__isnull=True).count())
-print('system relationships:', sum(item.affected_infrastructure_items.count() for item in SystemStatusNews.objects.all()))
-print('integration rows:', IntegrationNews.objects.count())
-print('integration null integration_news_id:', IntegrationNews.objects.filter(integration_news_id__isnull=True).count())
-print('integration relationships:', sum(item.affected_elements.count() for item in IntegrationNews.objects.all()))
-"
+print('system rows:', S.objects.count())
+print('system null outage_id:', S.objects.filter(outage_id__isnull=True).count())
+print('system relationships:', S.affected_infrastructure_items.through.objects.count())
+print('integration rows:', I.objects.count())
+print('integration null integration_news_id:', I.objects.filter(
+    integration_news_id__isnull=True
+).count())
+print('integration relationships:', I.affected_elements.through.objects.count())
+PY
 ```
 
 Compare all four counts with the apply report. Then manually verify representative oldest,
@@ -300,11 +333,13 @@ newest, multi-resource, multi-element, empty/optional-field and HTML-heavy recor
 the beta pages and both JSON APIs. Confirm no migration email or Slack notification was
 sent.
 
-### 9. Repeat the rehearsal
+### 8. Repeat the rehearsal
 
 Repeat dry-run, apply and verification at least once with the same approved release and
-dump. Because replacement is deterministic, the second apply must produce the same row,
-stable-ID and relationship counts. Preserve a separate report directory for each run.
+dump. For an exact determinism test, use a directory containing the same newest dump and
+set the previous plan's exact cutoff rather than capturing a new time. Because replacement
+is deterministic, the second plan and apply must produce the same row, stable-ID and
+relationship counts. Preserve a new change-record directory and plan for each run.
 
 Repeat again after any code change, source correction, new dump, dependency-lock change or
 target configuration change. A different SHA-256 is a new rehearsal input.
@@ -324,9 +359,9 @@ rehearsals, with these controlled substitutions:
 - Take and verify a PostgreSQL backup from the same write host immediately before apply.
 - Require the active maintenance window and separate final data-change authorization.
 
-Do not reuse a beta checksum, report, count confirmation, config file or backup. Run a new
-strict dry-run against the final frozen dump, review it, record its SHA-256 and counts, then
-apply that exact file.
+Do not reuse a beta plan, plan SHA-256, report, config file or backup. Run a new strict
+dry-run against the final frozen dump, review its new JSON plan and Markdown report, record
+the exact plan-file SHA-256, then apply only that plan.
 
 If the command fails, its PostgreSQL transaction rolls back. Do not retry until the error
 is understood. If it commits but acceptance fails, keep Drupal read-only, stop additional
