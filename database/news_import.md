@@ -52,8 +52,10 @@ Raw-dump imports enforce all of the following:
    `--suppress-notifications`.
 8. Drupal node IDs and revisions, field-table revisions, types, dates, references and
    choice mappings are validated before PostgreSQL replacement begins.
-9. Every affected infrastructure and integration-element reference is retained. Unknown,
-   missing or duplicate relationships fail validation or become strict-mode failures.
+9. Every affected infrastructure and integration-element reference on a retained record
+   is retained. Records tied to reviewed historical CIDER resources are excluded by exact
+   Drupal nid; any other unknown, missing or duplicate relationship fails validation or
+   becomes a strict-mode failure.
 10. Delete, import, stable-ID assignment, relationship creation, full field/relationship
     verification and final stable-ID-set verification share one PostgreSQL transaction.
 11. Any failure rolls back the complete replacement.
@@ -68,21 +70,33 @@ uses no live MySQL or Drupal API connection.
 ## Approved source adjustments
 
 The August 31 dump contains 244 Infrastructure News and 17 Integration News records, but
-has two source issues that the operator cannot correct in Drupal. The approved import
-policy is explicit and narrow:
+has source issues that the operator cannot correct in Drupal. The approved import policy
+is explicit and narrow:
 
 - Exclude Infrastructure News nid `404`, whose source content is empty, by supplying
   `--exclude-system-nid 404` on every dry-run and apply invocation.
+- Exclude the following Infrastructure News records because their affected resource is
+  absent from the CIDER
+  `https://operations-api.access-ci.org/wh2/cider/v1/access-active/?format=json` feed.
+  These exact mappings came from the beta strict dry-run report and were rechecked
+  against the public feed before updating this runbook:
+  - `tickets.access-ci.org`: nids `76`, `79`, `80`, and `392`
+  - `stampede2.tacc.access-ci.org`: nids `90`, `377`, and `391`
+  - `faster.tamu.access-ci.org`: nids `273` and `378`
+  - `delta-storage.ncsa.access-ci.org`: nid `332`
+  - `lyric.uky.access-ci.org`: nid `381`
 - Correct only nid `928`'s start datetime from the exact source value
   `0026-01-07T12:50:36` to `2026-01-07T12:50:36` by supplying
   `--source-correction infrastructure-928-start-year`. Its Drupal creation timestamp and
   end datetime are both in January 2026. If the original start value changes, the importer
   refuses the correction.
 
-After these adjustments, the August 31 dump stages 243 Infrastructure News records, 17
-Integration News records, 445 infrastructure relationships and 39 integration-element
-relationships. Later dumps must be reviewed from their own report rather than assumed to
-have the same counts.
+After these exclusions, the August 31 dump should stage 232 Infrastructure News records
+and 17 Integration News records. The previous count of 445 infrastructure relationships
+included the excluded records and must not be reused: record the adjusted relationship
+count from the new successful strict dry-run. The expected integration-element count
+remains 39. Later dumps must be reviewed from their own report rather than assumed to
+have the same counts or exclusions.
 
 Do not edit the dump. Its SHA-256 continues to identify the exact source artifact, while
 the report records the exclusion and correction separately.
@@ -181,6 +195,17 @@ Stop if the server-side checksum differs. A later dump must use its own checksum
   --strict \
   --confirm-database "$EXPECTED_DATABASE" \
   --confirm-host "$EXPECTED_WRITE_HOST" \
+  --exclude-system-nid 76 \
+  --exclude-system-nid 79 \
+  --exclude-system-nid 80 \
+  --exclude-system-nid 90 \
+  --exclude-system-nid 273 \
+  --exclude-system-nid 332 \
+  --exclude-system-nid 377 \
+  --exclude-system-nid 378 \
+  --exclude-system-nid 381 \
+  --exclude-system-nid 391 \
+  --exclude-system-nid 392 \
   --exclude-system-nid 404 \
   --source-correction infrastructure-928-start-year \
   --suppress-notifications \
@@ -195,21 +220,23 @@ Review the complete report. It must show:
 - the same SHA-256 recorded in `source.sha256`;
 - nonzero and expected record counts for both feeds;
 - expected infrastructure and integration-element relationship counts;
-- excluded Infrastructure News nid `404` and no other excluded nid;
+- exactly the 12 excluded Infrastructure News nids `76`, `79`, `80`, `90`, `273`,
+  `332`, `377`, `378`, `381`, `391`, `392`, and `404`;
 - the exact-match nid `928` start-datetime correction and no other correction;
 - zero errors and zero warnings under strict mode.
 
 A dry-run performs ORM work inside a transaction and then forces rollback. Confirm that
 the beta row counts are unchanged after the dry-run.
 
-For the reviewed August 31 dump, the adjusted dry-run must stage exactly:
+For the reviewed August 31 dump, the adjusted dry-run must stage the known counts below
+and supply a new infrastructure-relationship count:
 
 ```text
-SystemStatusNews: 243
+SystemStatusNews: 232
 IntegrationNews: 17
-Infrastructure relationships: 445
+Infrastructure relationships: <record the adjusted dry-run value>
 Integration-element relationships: 39
-Excluded SystemStatusNews nid: 404
+Excluded SystemStatusNews nids: 76, 79, 80, 90, 273, 332, 377, 378, 381, 391, 392, 404
 Corrected SystemStatusNews nid: 928
 Warnings: 0
 Errors: 0
@@ -230,7 +257,7 @@ Then run:
 ```bash
 # These are the reviewed values for the exact August 31 dump.
 SOURCE_SHA256=ab48e0976af0eb18f075d19673400e357a19e1f876ca9e03162aa63e93d99b27
-CONFIRM_SYSTEM_COUNT=243
+CONFIRM_SYSTEM_COUNT=232
 CONFIRM_INTEGRATION_COUNT=17
 
 sha256sum --check "$CHANGE_RECORD/source.sha256"
@@ -245,6 +272,17 @@ sha256sum --check "$CHANGE_RECORD/source.sha256"
   --confirm-source-sha256 "$SOURCE_SHA256" \
   --confirm-system-count "$CONFIRM_SYSTEM_COUNT" \
   --confirm-integration-count "$CONFIRM_INTEGRATION_COUNT" \
+  --exclude-system-nid 76 \
+  --exclude-system-nid 79 \
+  --exclude-system-nid 80 \
+  --exclude-system-nid 90 \
+  --exclude-system-nid 273 \
+  --exclude-system-nid 332 \
+  --exclude-system-nid 377 \
+  --exclude-system-nid 378 \
+  --exclude-system-nid 381 \
+  --exclude-system-nid 391 \
+  --exclude-system-nid 392 \
   --exclude-system-nid 404 \
   --source-correction infrastructure-928-start-year \
   --suppress-notifications \
