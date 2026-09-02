@@ -239,7 +239,8 @@ class ImportPlanTests(SimpleTestCase):
                 {
                     "nid": 101,
                     "drupal_uid": 11,
-                    "drupal_username": "source_author",
+                    "username_candidate": "source_author",
+                    "username_derivation": "local-part",
                     "django_username": "source_author",
                     "resolution": "drupal-username",
                     "fallback_reason": "",
@@ -250,7 +251,8 @@ class ImportPlanTests(SimpleTestCase):
                 {
                     "nid": 201,
                     "drupal_uid": 12,
-                    "drupal_username": "missing_author",
+                    "username_candidate": "missing_author",
+                    "username_derivation": "plain",
                     "django_username": "cutover_author",
                     "resolution": "fallback",
                     "fallback_reason": "no-django-username-match",
@@ -316,7 +318,7 @@ class ImportPlanTests(SimpleTestCase):
 
     def test_rejects_plan_from_previous_schema_version(self):
         plan = self._plan()
-        plan["version"] = 1
+        plan["version"] = 2
         self.plan_path.write_text(
             json.dumps(plan, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -374,7 +376,8 @@ class AtomicReplaceCommandTests(TestCase):
                         "drupal_created_at": "2026-08-01T11:00:00Z",
                         "drupal_author": {
                             "uid": 10,
-                            "username": self.matched_author.username,
+                            "username": self.matched_author.username
+                            + "@arbitrary.example",
                         },
                     },
                 }
@@ -463,10 +466,10 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertTrue(self.plan_path.is_file())
         self.assertIn("Import plan SHA-256", report)
         self.assertIn("## Author and Post-Date Attribution", report)
-        self.assertIn("Exact Drupal username matches: `1`", report)
+        self.assertIn("Exact derived-username matches: `1`", report)
         self.assertIn("Explicit import-user fallbacks: `1`", report)
         plan = json.loads(self.plan_path.read_text(encoding="utf-8"))
-        self.assertEqual(plan["version"], 2)
+        self.assertEqual(plan["version"], 3)
         self.assertEqual(
             plan["expected"]["system_attribution"][0]["django_username"],
             self.matched_author.username,
@@ -475,6 +478,8 @@ class AtomicReplaceCommandTests(TestCase):
             plan["expected"]["integration_attribution"][0]["django_username"],
             self.author.username,
         )
+        self.assertNotIn("@arbitrary.example", json.dumps(plan))
+        self.assertNotIn("@arbitrary.example", report)
 
     def test_replace_apply_replaces_both_feeds_and_builds_relationships(self):
         self._write_payload()
@@ -517,7 +522,7 @@ class AtomicReplaceCommandTests(TestCase):
         payload = self._payload()
         payload["SystemStatusNews"][0]["source_metadata"]["drupal_author"][
             "username"
-        ] = self.matched_author.username.upper()
+        ] = self.matched_author.username.upper() + "@arbitrary.example"
         self._write_payload(payload)
 
         self._run_replace("--dry-run")

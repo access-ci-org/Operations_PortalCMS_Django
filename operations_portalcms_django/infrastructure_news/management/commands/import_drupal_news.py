@@ -25,7 +25,9 @@ from integration_news.models import IntegrationElement, IntegrationNews
 from resources.models import CiderInfrastructure
 
 from infrastructure_news.drupal_mysql import (
+    AUTHOR_USERNAME_DERIVATIONS,
     DrupalDumpError,
+    derive_drupal_username,
     parse_drupal_news_dump,
     sha256_file,
 )
@@ -34,8 +36,8 @@ from infrastructure_news.models import SystemStatusNews
 DEFAULT_INPUT = Path("database/drupal_backups/generated/drupal_news_normalized_for_django.json")
 DEFAULT_REPORT = Path("database/drupal_backups/generated/drupal_news_import_dry_run.md")
 IMPORT_PLAN_SCHEMA = "access-ci.drupal-news-import-plan"
-IMPORT_PLAN_VERSION = 2
-IMPORT_CONTRACT_VERSION = 2
+IMPORT_PLAN_VERSION = 3
+IMPORT_CONTRACT_VERSION = 3
 MYSQL_BACKUP_NAME_RE = re.compile(
     r"^backup_database-(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
     r"(?:Z|[+-]\d{2}:\d{2}))\.mysql\.gz$"
@@ -125,9 +127,26 @@ def _provenance_tag(record: Dict[str, Any]) -> str:
 def _source_author(record: Dict[str, Any]) -> str:
     source_author = (record.get("source_metadata", {}) or {}).get("drupal_author") or {}
     if isinstance(source_author, dict):
-        username = source_author.get("username")
-        return username if isinstance(username, str) else ""
+        username, _ = derive_drupal_username(source_author.get("username"))
+        return username
     return ""
+
+
+def _source_author_derivation(record: Dict[str, Any]) -> str:
+    source_author = (record.get("source_metadata", {}) or {}).get("drupal_author") or {}
+    if not isinstance(source_author, dict):
+        return "invalid"
+    raw_username = source_author.get("username")
+    username, derived_method = derive_drupal_username(raw_username)
+    stored_method = source_author.get("username_derivation")
+    if (
+        isinstance(stored_method, str)
+        and stored_method in AUTHOR_USERNAME_DERIVATIONS
+        and isinstance(raw_username, str)
+        and username == raw_username
+    ):
+        return stored_method
+    return derived_method
 
 
 def _source_author_uid(record: Dict[str, Any]) -> Optional[int]:
@@ -1208,7 +1227,8 @@ class Command(BaseCommand):
         keys = {
             "nid",
             "drupal_uid",
-            "drupal_username",
+            "username_candidate",
+            "username_derivation",
             "django_username",
             "resolution",
             "fallback_reason",
@@ -1240,7 +1260,8 @@ class Command(BaseCommand):
             if any(
                 not isinstance(value[name], str)
                 for name in (
-                    "drupal_username",
+                    "username_candidate",
+                    "username_derivation",
                     "django_username",
                     "resolution",
                     "fallback_reason",
@@ -1249,6 +1270,23 @@ class Command(BaseCommand):
             ):
                 raise CommandError(
                     f"Import plan {feed_name} attribution values are invalid."
+                )
+            if value["username_derivation"] not in AUTHOR_USERNAME_DERIVATIONS:
+                raise CommandError(
+                    f"Import plan {feed_name} username derivation is invalid."
+                )
+            has_candidate = bool(value["username_candidate"])
+            derivation_has_candidate = value["username_derivation"] in {
+                "plain",
+                "local-part",
+            }
+            if has_candidate != derivation_has_candidate:
+                raise CommandError(
+                    f"Import plan {feed_name} username derivation is inconsistent."
+                )
+            if "@" in value["username_candidate"]:
+                raise CommandError(
+                    f"Import plan {feed_name} username candidate contains an email domain."
                 )
             if not value["django_username"]:
                 raise CommandError(
@@ -1261,8 +1299,8 @@ class Command(BaseCommand):
                 )
             if value["resolution"] == "drupal-username":
                 if (
-                    not value["drupal_username"]
-                    or value["drupal_username"] != value["django_username"]
+                    not value["username_candidate"]
+                    or value["username_candidate"] != value["django_username"]
                     or value["fallback_reason"]
                 ):
                     raise CommandError(
@@ -1784,6 +1822,7 @@ class Command(BaseCommand):
             stable_id = int(_nid(record))
             source_uid = _source_author_uid(record)
             source_username = _source_author(record)
+            source_derivation = _source_author_derivation(record)
             posted_at = _source_posted_at(record)
             if require_posted_at and posted_at is None:
                 raise CommandError(
@@ -1809,7 +1848,8 @@ class Command(BaseCommand):
                 {
                     "nid": stable_id,
                     "drupal_uid": source_uid,
-                    "drupal_username": source_username,
+                    "username_candidate": source_username,
+                    "username_derivation": source_derivation,
                     "django_username": author.username,
                     "resolution": resolution,
                     "fallback_reason": fallback_reason,
@@ -2179,7 +2219,7 @@ class Command(BaseCommand):
                 [
                     f"### `{feed_name}`",
                     "",
-                    f"- Exact Drupal username matches: `{matched}`",
+                    f"- Exact derived-username matches: `{matched}`",
                     f"- Explicit import-user fallbacks: `{fallback}`",
                 ]
             )
@@ -2190,7 +2230,8 @@ class Command(BaseCommand):
                 lines.append(
                     "- nid="
                     f"`{value['nid']}`; Drupal uid=`{value['drupal_uid']}`; "
-                    f"Drupal username=`{value['drupal_username']}`; "
+                    f"username candidate=`{value['username_candidate']}`; "
+                    f"derivation=`{value['username_derivation']}`; "
                     f"Django username=`{value['django_username']}`; "
                     f"resolution=`{resolution}`; posted=`{value['posted_at']}`"
                 )

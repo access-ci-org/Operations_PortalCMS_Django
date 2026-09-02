@@ -33,7 +33,7 @@ The identities involved are different:
 | OS process owner | `software` |
 | Python runtime | `<approved-release>/.venv/bin/python` |
 | PostgreSQL role | Loaded by Django from the host-specific `APP_CONFIG` |
-| Django author for imported rows | Exact case-sensitive Drupal username match, otherwise the existing user supplied with `--import-user` |
+| Django author for imported rows | Exact case-sensitive match of the derived Drupal username candidate, otherwise the existing user supplied with `--import-user` |
 
 Never print the configuration file or credentials. The importer reports the database
 name, write host, source path and checksum, Python executable, counts, usernames,
@@ -74,11 +74,13 @@ Raw-dump imports enforce all of the following:
     refuses a changed plan, source, release interpreter, target, correction definition,
     staged dataset or database outcome and rolls back transactional drift.
 15. Each retained record preserves its original Drupal post timestamp in Django's
-    displayed `created_at` field (and in `published_at` when published). Drupal usernames
-    are matched exactly and case-sensitively to existing Django usernames; blank, deleted
-    or unmatched names use the explicit `--import-user` fallback. Drupal uid, username,
-    selected Django username, resolution reason and post timestamp are bound per nid in
-    the plan. Email addresses and password data are never used or retained.
+    displayed `created_at` field (and in `published_at` when published). For both feeds,
+    a Drupal login containing one `@` is reduced to the local part before an exact,
+    case-sensitive Django username match; a plain login is unchanged. Blank, deleted,
+    malformed or unmatched names use the explicit `--import-user` fallback. Drupal uid,
+    derived username candidate and method, selected Django username, resolution reason and
+    post timestamp are bound per nid in the plan. Raw email-shaped logins, their domains,
+    Drupal mail columns and password data are never retained or emitted.
 16. Every run writes a Markdown report, including the plan identity, cutoff, cutoff
     exclusions, explicit exclusions, corrections and every author/post-date decision.
     Parser failures are also recorded.
@@ -255,7 +257,8 @@ They must show:
 - the plan contract and schema versions;
 - expected record counts, allowing zero retained Infrastructure News;
 - expected infrastructure and integration-element relationship counts;
-- every retained nid's original post timestamp and selected Django author;
+- every retained nid's original post timestamp, non-email username candidate, derivation
+  method and selected Django author;
 - every username fallback, with only `jlambertson` accepted for this cutover;
 - the exact `SYSTEM_NEWS_AS_OF` value;
 - every past Infrastructure News nid excluded by that cutoff;

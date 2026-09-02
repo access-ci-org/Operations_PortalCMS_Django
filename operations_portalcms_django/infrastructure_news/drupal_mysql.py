@@ -52,6 +52,15 @@ PROJECTED_COLUMNS = {
     "users_field_data": ("uid", "name"),
 }
 
+AUTHOR_USERNAME_DERIVATIONS = {
+    "blank",
+    "invalid",
+    "plain",
+    "local-part",
+    "malformed-email-shaped-login",
+    "missing-user",
+}
+
 _CREATE_RE = re.compile(r"CREATE TABLE `([^`]+)` \((.*?)\) ENGINE=", re.S)
 _COLUMN_RE = re.compile(r"(?:^|,\s*)\s*`([^`]+)`\s+[A-Za-z]", re.S)
 _INSERT_RE = re.compile(
@@ -64,6 +73,23 @@ _STATEMENT_START_RE = re.compile(r"^\s*(CREATE TABLE|INSERT INTO) `([^`]+)`")
 
 class DrupalDumpError(ValueError):
     """The dump cannot be converted into an unambiguous news payload."""
+
+
+def derive_drupal_username(value) -> tuple[str, str]:
+    """Return a non-email username candidate and a non-sensitive derivation label."""
+
+    if value in (None, ""):
+        return "", "blank"
+    if not isinstance(value, str):
+        return "", "invalid"
+    at_count = value.count("@")
+    if at_count == 0:
+        return value, "plain"
+    if at_count == 1:
+        local_part, domain = value.split("@", 1)
+        if local_part and domain:
+            return local_part, "local-part"
+    return "", "malformed-email-shaped-login"
 
 
 @dataclass(frozen=True)
@@ -433,24 +459,19 @@ def parse_drupal_news_dump(
         raise DrupalDumpError(f"MySQL dump does not exist or is not a file: {path}")
 
     table_rows = _read_tables(path)
-    usernames_by_uid: Dict[int, str] = {}
+    usernames_by_uid: Dict[int, tuple[str, str]] = {}
     for row in table_rows["users_field_data"]:
         uid = _nonnegative_int(row.get("uid"), "users_field_data uid")
-        raw_username = row.get("name")
-        if raw_username is None:
-            username = ""
-        elif isinstance(raw_username, str):
-            username = raw_username
-        else:
-            raise DrupalDumpError(
-                f"users_field_data uid={uid} has a non-text username."
-            )
+        username = derive_drupal_username(row.get("name"))
         existing_username = usernames_by_uid.get(uid)
         if existing_username is not None and existing_username != username:
             raise DrupalDumpError(
                 f"users_field_data uid={uid} has conflicting usernames."
             )
         usernames_by_uid[uid] = username
+    # The raw email-shaped login values are no longer needed after deriving the
+    # non-sensitive candidates above.
+    table_rows["users_field_data"].clear()
     infrastructure_types = _choice_map(
         infrastructure_type_choices, "Infrastructure news choices"
     )
@@ -570,6 +591,9 @@ def parse_drupal_news_dump(
             raise DrupalDumpError(
                 f"Infrastructure News nid={nid} is missing its original post date."
             )
+        author_username, author_derivation = usernames_by_uid.get(
+            author_uid, ("", "missing-user")
+        )
 
         type_label = _one_value(
             infrastructure_type,
@@ -688,7 +712,8 @@ def parse_drupal_news_dump(
                     "drupal_created_at": posted_at,
                     "drupal_author": {
                         "uid": author_uid,
-                        "username": usernames_by_uid.get(author_uid, ""),
+                        "username": author_username,
+                        "username_derivation": author_derivation,
                     },
                     "affected_infrastructure_nodes": related_nodes,
                 },
@@ -725,6 +750,9 @@ def parse_drupal_news_dump(
             raise DrupalDumpError(
                 f"Integration News nid={nid} is missing its original post date."
             )
+        author_username, author_derivation = usernames_by_uid.get(
+            author_uid, ("", "missing-user")
+        )
         type_label = _one_value(
             integration_type,
             nid,
@@ -812,7 +840,8 @@ def parse_drupal_news_dump(
                     "drupal_created_at": posted_at,
                     "drupal_author": {
                         "uid": author_uid,
-                        "username": usernames_by_uid.get(author_uid, ""),
+                        "username": author_username,
+                        "username_derivation": author_derivation,
                     },
                     "affected_integration_elements": selected_targets,
                 },

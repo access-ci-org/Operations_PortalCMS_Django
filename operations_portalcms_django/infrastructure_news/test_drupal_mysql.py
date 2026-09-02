@@ -4,7 +4,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from .drupal_mysql import DrupalDumpError, parse_drupal_news_dump
+from .drupal_mysql import (
+    DrupalDumpError,
+    derive_drupal_username,
+    parse_drupal_news_dump,
+)
 
 INFRASTRUCTURE_TYPES = [
     ("outage_full", "Outage Full"),
@@ -153,7 +157,12 @@ def _base_rows():
             _field_row("infrastructure_news_v2", 101, "2026-08-01T12:00:00"),
         ],
         "users_field_data": [
-            [1, "drupal_author", "not-retained@example.test", "not-retained-hash"],
+            [
+                1,
+                "drupal_author@access-ci.org",
+                "not-retained@example.test",
+                "not-retained-hash",
+            ],
         ],
     }
 
@@ -175,6 +184,32 @@ def _dump_text(rows=None, *, omit_table=None, multiline_definitions=False):
             )
             statements.append(f"INSERT INTO `{table}` VALUES {values};")
     return "\n".join(statements) + "\n"
+
+
+class DrupalUsernameDerivationTests(TestCase):
+    def test_preserves_plain_username(self):
+        self.assertEqual(derive_drupal_username("drupaladmin"), ("drupaladmin", "plain"))
+
+    def test_strips_domain_from_any_single_at_login(self):
+        self.assertEqual(
+            derive_drupal_username("navarro@example.net"),
+            ("navarro", "local-part"),
+        )
+
+    def test_rejects_blank_and_malformed_email_shaped_logins(self):
+        self.assertEqual(derive_drupal_username(None), ("", "blank"))
+        self.assertEqual(
+            derive_drupal_username("a@b@example.net"),
+            ("", "malformed-email-shaped-login"),
+        )
+        self.assertEqual(
+            derive_drupal_username("@example.net"),
+            ("", "malformed-email-shaped-login"),
+        )
+        self.assertEqual(
+            derive_drupal_username("navarro@"),
+            ("", "malformed-email-shaped-login"),
+        )
 
 
 class DrupalMysqlParserTests(TestCase):
@@ -215,8 +250,13 @@ class DrupalMysqlParserTests(TestCase):
         self.assertTrue(system["post_to_slack"])
         self.assertEqual(
             system["source_metadata"]["drupal_author"],
-            {"uid": 1, "username": "drupal_author"},
+            {
+                "uid": 1,
+                "username": "drupal_author",
+                "username_derivation": "local-part",
+            },
         )
+        self.assertNotIn("@access-ci.org", repr(parsed.payload))
         self.assertEqual(
             system["source_metadata"]["drupal_created_at"],
             "2023-11-14T22:13:20+00:00",
@@ -230,7 +270,11 @@ class DrupalMysqlParserTests(TestCase):
         )
         self.assertEqual(
             integration["source_metadata"]["drupal_author"],
-            {"uid": 1, "username": "drupal_author"},
+            {
+                "uid": 1,
+                "username": "drupal_author",
+                "username_derivation": "local-part",
+            },
         )
         self.assertEqual(
             integration["source_metadata"]["drupal_created_at"],
@@ -346,7 +390,7 @@ class DrupalMysqlParserTests(TestCase):
             parsed.payload["SystemStatusNews"][0]["source_metadata"][
                 "drupal_author"
             ],
-            {"uid": 99, "username": ""},
+            {"uid": 99, "username": "", "username_derivation": "missing-user"},
         )
 
     def test_treats_anonymized_null_username_as_blank(self):
@@ -358,7 +402,7 @@ class DrupalMysqlParserTests(TestCase):
 
         self.assertEqual(
             parsed.payload["SystemStatusNews"][0]["source_metadata"]["drupal_author"],
-            {"uid": 1, "username": ""},
+            {"uid": 1, "username": "", "username_derivation": "blank"},
         )
 
     def test_rejects_duplicate_multi_value_reference(self):
