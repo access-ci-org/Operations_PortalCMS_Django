@@ -53,6 +53,8 @@ TABLE_COLUMNS = {
     "node__field_news_distribution_options": FIELD_PREFIX
     + ["field_news_distribution_options_value"],
     "node__field_start_date": FIELD_PREFIX + ["field_start_date_value"],
+    # The parser must project only uid/name and never retain mail/pass.
+    "users_field_data": ["uid", "name", "mail", "pass"],
 }
 
 
@@ -82,8 +84,8 @@ def _field_row(bundle, entity_id, value, *, delta=0, revision_id=None):
     ]
 
 
-def _node_row(nid, vid, bundle, title, timestamp):
-    return [nid, vid, bundle, "en", 1, 1, title, timestamp, timestamp, 0, 0, 1, 1]
+def _node_row(nid, vid, bundle, title, timestamp, *, uid=1):
+    return [nid, vid, bundle, "en", 1, uid, title, timestamp, timestamp, 0, 0, 1, 1]
 
 
 def _base_rows():
@@ -150,6 +152,9 @@ def _base_rows():
         "node__field_start_date": [
             _field_row("infrastructure_news_v2", 101, "2026-08-01T12:00:00"),
         ],
+        "users_field_data": [
+            [1, "drupal_author", "not-retained@example.test", "not-retained-hash"],
+        ],
     }
 
 
@@ -208,10 +213,28 @@ class DrupalMysqlParserTests(TestCase):
         )
         self.assertEqual(system["affected_infrastructure"], "resource.example")
         self.assertTrue(system["post_to_slack"])
+        self.assertEqual(
+            system["source_metadata"]["drupal_author"],
+            {"uid": 1, "username": "drupal_author"},
+        )
+        self.assertEqual(
+            system["source_metadata"]["drupal_created_at"],
+            "2023-11-14T22:13:20+00:00",
+        )
+        self.assertNotIn("mail", system["source_metadata"]["drupal_author"])
+        self.assertNotIn("pass", system["source_metadata"]["drupal_author"])
 
         integration = parsed.payload["IntegrationNews"][0]
         self.assertEqual(
             integration["affected_elements"], ["compute_roadmap", "accessusage"]
+        )
+        self.assertEqual(
+            integration["source_metadata"]["drupal_author"],
+            {"uid": 1, "username": "drupal_author"},
+        )
+        self.assertEqual(
+            integration["source_metadata"]["drupal_created_at"],
+            "2023-11-14T22:15:00+00:00",
         )
         self.assertEqual(integration["affected_element"], "")
         self.assertEqual(
@@ -311,6 +334,32 @@ class DrupalMysqlParserTests(TestCase):
             DrupalDumpError, "node__field_affected_intelm"
         ):
             self._parse(path)
+
+    def test_preserves_uid_but_leaves_username_blank_for_deleted_user(self):
+        rows = _base_rows()
+        rows["node_field_data"][0][5] = 99
+        path = self._write(_dump_text(rows))
+
+        parsed = self._parse(path)
+
+        self.assertEqual(
+            parsed.payload["SystemStatusNews"][0]["source_metadata"][
+                "drupal_author"
+            ],
+            {"uid": 99, "username": ""},
+        )
+
+    def test_treats_anonymized_null_username_as_blank(self):
+        rows = _base_rows()
+        rows["users_field_data"][0][1] = None
+        path = self._write(_dump_text(rows))
+
+        parsed = self._parse(path)
+
+        self.assertEqual(
+            parsed.payload["SystemStatusNews"][0]["source_metadata"]["drupal_author"],
+            {"uid": 1, "username": ""},
+        )
 
     def test_rejects_duplicate_multi_value_reference(self):
         rows = _base_rows()

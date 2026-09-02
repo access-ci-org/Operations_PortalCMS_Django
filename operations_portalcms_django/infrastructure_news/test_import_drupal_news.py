@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase
+from django.utils.dateparse import parse_datetime
 from integration_news.models import IntegrationNews
 from resources.models import CiderInfrastructure
 
@@ -234,6 +235,28 @@ class ImportPlanTests(SimpleTestCase):
             cutoff_excluded_system_nids=[1, 2],
             system_news_as_of="2026-09-01T12:00:00Z",
             source_corrections=["correction applied"],
+            system_attribution=[
+                {
+                    "nid": 101,
+                    "drupal_uid": 11,
+                    "drupal_username": "source_author",
+                    "django_username": "source_author",
+                    "resolution": "drupal-username",
+                    "fallback_reason": "",
+                    "posted_at": "2026-08-01T11:00:00+00:00",
+                }
+            ],
+            integration_attribution=[
+                {
+                    "nid": 201,
+                    "drupal_uid": 12,
+                    "drupal_username": "missing_author",
+                    "django_username": "cutover_author",
+                    "resolution": "fallback",
+                    "fallback_reason": "no-django-username-match",
+                    "posted_at": "2026-08-01T11:00:00+00:00",
+                }
+            ],
             created_system=1,
             created_integration=1,
             deleted_system=3,
@@ -291,6 +314,18 @@ class ImportPlanTests(SimpleTestCase):
         with self.assertRaisesMessage(CommandError, "contract integrity check failed"):
             self.command._load_import_plan(self.plan_path, changed_sha256)
 
+    def test_rejects_plan_from_previous_schema_version(self):
+        plan = self._plan()
+        plan["version"] = 1
+        self.plan_path.write_text(
+            json.dumps(plan, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        plan_sha256 = hashlib.sha256(self.plan_path.read_bytes()).hexdigest()
+
+        with self.assertRaisesMessage(CommandError, "plan version is not supported"):
+            self.command._load_import_plan(self.plan_path, plan_sha256)
+
 
 class AtomicReplaceCommandTests(TestCase):
     def setUp(self):
@@ -300,6 +335,7 @@ class AtomicReplaceCommandTests(TestCase):
         self.report_path = Path(self.temp_dir.name) / "report.md"
         self.plan_path = Path(self.temp_dir.name) / "import-plan.json"
         self.author = User.objects.create_user(username="cutover_author")
+        self.matched_author = User.objects.create_user(username="drupal_author")
         self.old_system = SystemStatusNews.objects.create(
             subject="Old system news",
             content="Old content",
@@ -336,6 +372,10 @@ class AtomicReplaceCommandTests(TestCase):
                         "drupal_nid": 101,
                         "drupal_vid": 1001,
                         "drupal_created_at": "2026-08-01T11:00:00Z",
+                        "drupal_author": {
+                            "uid": 10,
+                            "username": self.matched_author.username,
+                        },
                     },
                 }
             ],
@@ -353,6 +393,10 @@ class AtomicReplaceCommandTests(TestCase):
                         "drupal_nid": 201,
                         "drupal_vid": 2001,
                         "drupal_created_at": "2026-08-01T11:00:00Z",
+                        "drupal_author": {
+                            "uid": 11,
+                            "username": "missing_drupal_author",
+                        },
                     },
                 }
             ],
@@ -418,6 +462,19 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertIn("`IntegrationNews` created: `1`", report)
         self.assertTrue(self.plan_path.is_file())
         self.assertIn("Import plan SHA-256", report)
+        self.assertIn("## Author and Post-Date Attribution", report)
+        self.assertIn("Exact Drupal username matches: `1`", report)
+        self.assertIn("Explicit import-user fallbacks: `1`", report)
+        plan = json.loads(self.plan_path.read_text(encoding="utf-8"))
+        self.assertEqual(plan["version"], 2)
+        self.assertEqual(
+            plan["expected"]["system_attribution"][0]["django_username"],
+            self.matched_author.username,
+        )
+        self.assertEqual(
+            plan["expected"]["integration_attribution"][0]["django_username"],
+            self.author.username,
+        )
 
     def test_replace_apply_replaces_both_feeds_and_builds_relationships(self):
         self._write_payload()
@@ -428,6 +485,13 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertEqual(IntegrationNews.objects.count(), 1)
         system = SystemStatusNews.objects.get(outage_id=101)
         integration = IntegrationNews.objects.get(integration_news_id=201)
+        posted_at = parse_datetime("2026-08-01T11:00:00Z")
+        self.assertEqual(system.author, self.matched_author)
+        self.assertEqual(integration.author, self.author)
+        self.assertEqual(system.created_at, posted_at)
+        self.assertEqual(system.published_at, posted_at)
+        self.assertEqual(integration.created_at, posted_at)
+        self.assertEqual(integration.published_at, posted_at)
         self.assertFalse(system.send_email)
         self.assertFalse(system.post_to_slack)
         self.assertEqual(
@@ -448,6 +512,23 @@ class AtomicReplaceCommandTests(TestCase):
             set(integration.affected_elements.values_list("code", flat=True)),
             {"nagios", "cider"},
         )
+
+    def test_case_different_drupal_username_uses_explicit_fallback(self):
+        payload = self._payload()
+        payload["SystemStatusNews"][0]["source_metadata"]["drupal_author"][
+            "username"
+        ] = self.matched_author.username.upper()
+        self._write_payload(payload)
+
+        self._run_replace("--dry-run")
+
+        plan = json.loads(self.plan_path.read_text(encoding="utf-8"))
+        attribution = plan["expected"]["system_attribution"][0]
+        self.assertEqual(attribution["resolution"], "fallback")
+        self.assertEqual(
+            attribution["fallback_reason"], "no-django-username-match"
+        )
+        self.assertEqual(attribution["django_username"], self.author.username)
 
     def test_replace_apply_requires_matching_source_checksum(self):
         self._write_payload()
@@ -536,6 +617,21 @@ class AtomicReplaceCommandTests(TestCase):
 
         self.assertTrue(SystemStatusNews.objects.filter(pk=self.old_system.pk).exists())
         self.assertTrue(IntegrationNews.objects.filter(pk=self.old_integration.pk).exists())
+        self.assertFalse(SystemStatusNews.objects.filter(outage_id=101).exists())
+        self.assertFalse(IntegrationNews.objects.filter(integration_news_id=201).exists())
+
+    def test_apply_rolls_back_when_author_resolution_changes_after_dry_run(self):
+        self._write_payload()
+        self._run_replace("--dry-run")
+        User.objects.create_user(username="missing_drupal_author")
+
+        with self.assertRaisesMessage(CommandError, "staged import differs"):
+            self._run_replace("--apply")
+
+        self.assertTrue(SystemStatusNews.objects.filter(pk=self.old_system.pk).exists())
+        self.assertTrue(
+            IntegrationNews.objects.filter(pk=self.old_integration.pk).exists()
+        )
         self.assertFalse(SystemStatusNews.objects.filter(outage_id=101).exists())
         self.assertFalse(IntegrationNews.objects.filter(integration_news_id=201).exists())
 

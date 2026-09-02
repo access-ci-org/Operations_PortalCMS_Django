@@ -36,6 +36,7 @@ REQUIRED_TABLES = {
     "node__field_intelm_news_type",
     "node__field_news_content",
     "node__field_start_date",
+    "users_field_data",
 }
 
 OPTIONAL_TABLES = {
@@ -43,6 +44,13 @@ OPTIONAL_TABLES = {
 }
 
 TABLES = REQUIRED_TABLES | OPTIONAL_TABLES
+
+# Retain only the non-secret fields needed to resolve Drupal authors.  In
+# particular, never decode or store password hashes or email addresses from the
+# users table while parsing a dump.
+PROJECTED_COLUMNS = {
+    "users_field_data": ("uid", "name"),
+}
 
 _CREATE_RE = re.compile(r"CREATE TABLE `([^`]+)` \((.*?)\) ENGINE=", re.S)
 _COLUMN_RE = re.compile(r"(?:^|,\s*)\s*`([^`]+)`\s+[A-Za-z]", re.S)
@@ -144,7 +152,7 @@ def _decode_mysql_literal(token: str):
     return "".join(decoded)
 
 
-def _iter_insert_rows(values: str) -> Iterator[List[object]]:
+def _iter_insert_rows(values: str) -> Iterator[List[str]]:
     quoted = False
     escaped = False
     depth = 0
@@ -174,10 +182,7 @@ def _iter_insert_rows(values: str) -> Iterator[List[object]]:
             if depth < 0:
                 raise DrupalDumpError("Unbalanced closing parenthesis in MySQL INSERT.")
             if depth == 0 and start is not None:
-                yield [
-                    _decode_mysql_literal(field)
-                    for field in _split_fields(values[start:index])
-                ]
+                yield _split_fields(values[start:index])
                 start = None
         index += 1
 
@@ -242,13 +247,31 @@ def _read_tables(path: Path) -> Dict[str, List[dict]]:
                     f"at dump line {line_number}."
                 )
 
-            for parsed in _iter_insert_rows(values):
-                if len(parsed) != len(names):
+            projected_names = PROJECTED_COLUMNS.get(table)
+            if projected_names:
+                missing_projected = sorted(set(projected_names) - set(names))
+                if missing_projected:
+                    raise DrupalDumpError(
+                        f"{table}: missing required author columns: "
+                        + ", ".join(missing_projected)
+                    )
+                projected_indexes = [names.index(name) for name in projected_names]
+            else:
+                projected_indexes = list(range(len(names)))
+                projected_names = tuple(names)
+
+            for raw_values in _iter_insert_rows(values):
+                if len(raw_values) != len(names):
                     raise DrupalDumpError(
                         f"{table}: expected {len(names)} values but found "
-                        f"{len(parsed)} at dump line {line_number}."
+                        f"{len(raw_values)} at dump line {line_number}."
                     )
-                rows[table].append(dict(zip(names, parsed)))
+                rows[table].append(
+                    {
+                        name: _decode_mysql_literal(raw_values[index])
+                        for name, index in zip(projected_names, projected_indexes)
+                    }
+                )
 
     missing = sorted(REQUIRED_TABLES - columns.keys())
     if missing:
@@ -269,6 +292,22 @@ def _positive_int(value, context: str) -> int:
         ) from exc
     if parsed <= 0:
         raise DrupalDumpError(f"{context} must be positive, got {parsed}.")
+    return parsed
+
+
+def _nonnegative_int(value, context: str) -> int:
+    if isinstance(value, bool):
+        raise DrupalDumpError(
+            f"{context} must be a nonnegative integer, got {value!r}."
+        )
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise DrupalDumpError(
+            f"{context} must be a nonnegative integer, got {value!r}."
+        ) from exc
+    if parsed < 0:
+        raise DrupalDumpError(f"{context} must be nonnegative, got {parsed}.")
     return parsed
 
 
@@ -394,6 +433,24 @@ def parse_drupal_news_dump(
         raise DrupalDumpError(f"MySQL dump does not exist or is not a file: {path}")
 
     table_rows = _read_tables(path)
+    usernames_by_uid: Dict[int, str] = {}
+    for row in table_rows["users_field_data"]:
+        uid = _nonnegative_int(row.get("uid"), "users_field_data uid")
+        raw_username = row.get("name")
+        if raw_username is None:
+            username = ""
+        elif isinstance(raw_username, str):
+            username = raw_username
+        else:
+            raise DrupalDumpError(
+                f"users_field_data uid={uid} has a non-text username."
+            )
+        existing_username = usernames_by_uid.get(uid)
+        if existing_username is not None and existing_username != username:
+            raise DrupalDumpError(
+                f"users_field_data uid={uid} has conflicting usernames."
+            )
+        usernames_by_uid[uid] = username
     infrastructure_types = _choice_map(
         infrastructure_type_choices, "Infrastructure news choices"
     )
@@ -503,6 +560,16 @@ def parse_drupal_news_dump(
         if nid in excluded_system_nid_set:
             excluded_system_nids_found.append(nid)
             continue
+        author_uid = _nonnegative_int(
+            node.get("uid"), f"Infrastructure News nid={nid} author uid"
+        )
+        posted_at = _unix_datetime(
+            node.get("created"), f"Infrastructure News nid={nid} created"
+        )
+        if posted_at is None:
+            raise DrupalDumpError(
+                f"Infrastructure News nid={nid} is missing its original post date."
+            )
 
         type_label = _one_value(
             infrastructure_type,
@@ -618,9 +685,11 @@ def parse_drupal_news_dump(
                     "drupal_vid": _positive_int(
                         node.get("vid"), f"Infrastructure News nid={nid} vid"
                     ),
-                    "drupal_created_at": _unix_datetime(
-                        node.get("created"), f"Infrastructure News nid={nid} created"
-                    ),
+                    "drupal_created_at": posted_at,
+                    "drupal_author": {
+                        "uid": author_uid,
+                        "username": usernames_by_uid.get(author_uid, ""),
+                    },
                     "affected_infrastructure_nodes": related_nodes,
                 },
             }
@@ -646,6 +715,16 @@ def parse_drupal_news_dump(
     integration_records: List[dict] = []
     for node in _news_nodes(table_rows, INTEGRATION_BUNDLE):
         nid = _positive_int(node.get("nid"), "Integration News nid")
+        author_uid = _nonnegative_int(
+            node.get("uid"), f"Integration News nid={nid} author uid"
+        )
+        posted_at = _unix_datetime(
+            node.get("created"), f"Integration News nid={nid} created"
+        )
+        if posted_at is None:
+            raise DrupalDumpError(
+                f"Integration News nid={nid} is missing its original post date."
+            )
         type_label = _one_value(
             integration_type,
             nid,
@@ -730,9 +809,11 @@ def parse_drupal_news_dump(
                     "drupal_vid": _positive_int(
                         node.get("vid"), f"Integration News nid={nid} vid"
                     ),
-                    "drupal_created_at": _unix_datetime(
-                        node.get("created"), f"Integration News nid={nid} created"
-                    ),
+                    "drupal_created_at": posted_at,
+                    "drupal_author": {
+                        "uid": author_uid,
+                        "username": usernames_by_uid.get(author_uid, ""),
+                    },
                     "affected_integration_elements": selected_targets,
                 },
             }

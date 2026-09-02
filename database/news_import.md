@@ -33,10 +33,12 @@ The identities involved are different:
 | OS process owner | `software` |
 | Python runtime | `<approved-release>/.venv/bin/python` |
 | PostgreSQL role | Loaded by Django from the host-specific `APP_CONFIG` |
-| Django author for imported rows | Existing user supplied with `--import-user` |
+| Django author for imported rows | Exact case-sensitive Drupal username match, otherwise the existing user supplied with `--import-user` |
 
-Never print the configuration file or credentials. The importer reports only the database
-name, write host, source path and checksum, Python executable, counts, warnings and errors.
+Never print the configuration file or credentials. The importer reports the database
+name, write host, source path and checksum, Python executable, counts, usernames,
+post timestamps, resolution reasons, warnings and errors. It does not report email or
+password data.
 
 ## Import safety contract
 
@@ -49,8 +51,8 @@ Raw-dump imports enforce all of the following:
 4. `--confirm-database` and `--confirm-host` must match resolved Django settings.
 5. `--dry-run` and `--apply` are mutually exclusive; replacement without either is refused.
 6. A strict dry-run writes a versioned JSON plan binding the source path and SHA-256,
-   release interpreter, target, options, adjustments, IDs, counts, relationships and
-   planned database outcome.
+   release interpreter, target, options, adjustments, IDs, counts, relationships,
+   per-record author/post-date attribution and planned database outcome.
 7. A raw-dump write requires `--strict`, an existing import user, and
    `--suppress-notifications`.
 8. Drupal node IDs and revisions, field-table revisions, types, dates, references and
@@ -71,11 +73,19 @@ Raw-dump imports enforce all of the following:
 14. Apply requires the reviewed plan file and its independently recorded SHA-256. It
     refuses a changed plan, source, release interpreter, target, correction definition,
     staged dataset or database outcome and rolls back transactional drift.
-15. Every run writes a Markdown report, including the plan identity, cutoff, cutoff
-    exclusions, explicit exclusions and corrections. Parser failures are also recorded.
+15. Each retained record preserves its original Drupal post timestamp in Django's
+    displayed `created_at` field (and in `published_at` when published). Drupal usernames
+    are matched exactly and case-sensitively to existing Django usernames; blank, deleted
+    or unmatched names use the explicit `--import-user` fallback. Drupal uid, username,
+    selected Django username, resolution reason and post timestamp are bound per nid in
+    the plan. Email addresses and password data are never used or retained.
+16. Every run writes a Markdown report, including the plan identity, cutoff, cutoff
+    exclusions, explicit exclusions, corrections and every author/post-date decision.
+    Parser failures are also recorded.
 
-The parser reads only current Drupal field tables and ignores unrelated dump tables. It
-uses no live MySQL or Drupal API connection.
+The parser reads only the current Drupal node/field tables plus `uid` and `name` from the
+Drupal users table, and ignores unrelated dump tables and user columns. It uses no live
+MySQL or Drupal API connection.
 
 ## Approved cutover window and source correction
 
@@ -245,11 +255,18 @@ They must show:
 - the plan contract and schema versions;
 - expected record counts, allowing zero retained Infrastructure News;
 - expected infrastructure and integration-element relationship counts;
+- every retained nid's original post timestamp and selected Django author;
+- every username fallback, with only `jlambertson` accepted for this cutover;
 - the exact `SYSTEM_NEWS_AS_OF` value;
 - every past Infrastructure News nid excluded by that cutoff;
 - exactly the reviewed explicit exclusions `404` and `797` for this source family;
 - the exact-match nid `928` start-datetime correction and no other correction;
 - zero errors and zero warnings under strict mode.
+
+Author fallbacks are review items rather than strict-mode warnings. Continue only when
+every fallback is expected (for example, a deleted Drupal account) and resolves to the
+approved `IMPORT_USER`. If a Django account is added or renamed after dry-run, apply
+detects the changed resolution and refuses the plan.
 
 A dry-run performs ORM work inside a transaction and then forces rollback. Confirm that
 the beta row counts are unchanged after the dry-run.
@@ -307,8 +324,10 @@ printf 'Reviewed import plan SHA-256: %s\n' "$PLAN_SHA256"
 Apply rejects repeated source, cutoff, target, exclusion, correction, count, strict-mode,
 notification and import-user flags. It loads those values from the plan, verifies the plan
 file SHA-256, then revalidates the bound source SHA-256, exact release interpreter, target,
-staged IDs/counts/relationships and transactional outcome. A new backup arriving in
-`SOURCE_DIRECTORY` after dry-run is ignored; apply uses only the exact planned file.
+staged IDs/counts/relationships, per-record author/post-date attribution and transactional
+outcome. A new backup arriving in `SOURCE_DIRECTORY` after dry-run is ignored; apply uses
+only the exact planned file. Plans from an older schema version are rejected and require a
+new dry-run.
 
 ### 7. Verify the database and rendered application
 
@@ -320,18 +339,27 @@ from integration_news.models import IntegrationNews as I
 print('system rows:', S.objects.count())
 print('system null outage_id:', S.objects.filter(outage_id__isnull=True).count())
 print('system relationships:', S.affected_infrastructure_items.through.objects.count())
+print('system attribution:', list(S.objects.order_by('outage_id').values_list(
+    'outage_id', 'author__username', 'created_at', 'published_at'
+)))
 print('integration rows:', I.objects.count())
 print('integration null integration_news_id:', I.objects.filter(
     integration_news_id__isnull=True
 ).count())
 print('integration relationships:', I.affected_elements.through.objects.count())
+print('integration attribution:', list(I.objects.order_by(
+    'integration_news_id'
+).values_list(
+    'integration_news_id', 'author__username', 'created_at', 'published_at'
+)))
 PY
 ```
 
-Compare all four counts with the apply report. Then manually verify representative oldest,
-newest, multi-resource, multi-element, empty/optional-field and HTML-heavy records through
-the beta pages and both JSON APIs. Confirm no migration email or Slack notification was
-sent.
+Compare all counts, authors and timestamps with the apply report and reviewed plan. Then
+manually verify representative exact-match author, fallback author, oldest, newest,
+multi-resource, multi-element, empty/optional-field and HTML-heavy records through the beta
+pages and both JSON APIs. Confirm the displayed Posted value is the original Drupal post
+date and that no migration email or Slack notification was sent.
 
 ### 8. Repeat the rehearsal
 

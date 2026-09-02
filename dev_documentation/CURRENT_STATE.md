@@ -249,7 +249,7 @@ Run Django management commands from the Django project directory
 | `manage.py setup_rp_permissions` | Maps selected CIDER RP groups into Django auth groups and permissions; dry-run before any real run |
 | `manage.py sync_cider_from_api` | Refreshes CIDER infrastructure, organization, group, category, and feature metadata; supports `--dry-run` |
 | `manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups` | Checks or prunes stale local CIDER group rows |
-| `manage.py import_drupal_news` | One-time Drupal cutover importer for both news feeds; a strict replacement dry-run can select the newest timestamped raw dump from an explicit directory and writes a versioned JSON plan binding the source, release, target, cutoff, adjustments, IDs, counts, relationships, and expected outcome; apply consumes and revalidates that exact reviewed plan before guarded atomic replacement |
+| `manage.py import_drupal_news` | One-time Drupal cutover importer for both news feeds; a strict replacement dry-run can select the newest timestamped raw dump from an explicit directory and writes a versioned JSON plan binding the source, release, target, cutoff, adjustments, IDs, counts, relationships, per-record exact-username/fallback author resolution, original post dates, and expected outcome; apply consumes and revalidates that exact reviewed plan before guarded atomic replacement |
 | `database/verify_db.sh` | Read-only RDS schema, ownership, count, and migration-state verification |
 
 After pulling changes that include migrations, run `migrate` before starting the

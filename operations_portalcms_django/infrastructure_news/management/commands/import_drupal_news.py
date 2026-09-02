@@ -34,8 +34,8 @@ from infrastructure_news.models import SystemStatusNews
 DEFAULT_INPUT = Path("database/drupal_backups/generated/drupal_news_normalized_for_django.json")
 DEFAULT_REPORT = Path("database/drupal_backups/generated/drupal_news_import_dry_run.md")
 IMPORT_PLAN_SCHEMA = "access-ci.drupal-news-import-plan"
-IMPORT_PLAN_VERSION = 1
-IMPORT_CONTRACT_VERSION = 1
+IMPORT_PLAN_VERSION = 2
+IMPORT_CONTRACT_VERSION = 2
 MYSQL_BACKUP_NAME_RE = re.compile(
     r"^backup_database-(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
     r"(?:Z|[+-]\d{2}:\d{2}))\.mysql\.gz$"
@@ -62,6 +62,8 @@ class ImportResult:
     system_news_as_of: Optional[str] = None
     cutoff_excluded_system_nids: List[int] = field(default_factory=list)
     source_corrections: List[str] = field(default_factory=list)
+    system_attribution: List[Dict[str, Any]] = field(default_factory=list)
+    integration_attribution: List[Dict[str, Any]] = field(default_factory=list)
     plan_file: Optional[str] = None
     plan_sha256: Optional[str] = None
     created_system: int = 0
@@ -123,8 +125,29 @@ def _provenance_tag(record: Dict[str, Any]) -> str:
 def _source_author(record: Dict[str, Any]) -> str:
     source_author = (record.get("source_metadata", {}) or {}).get("drupal_author") or {}
     if isinstance(source_author, dict):
-        return source_author.get("username") or source_author.get("mail") or "unknown"
-    return "unknown"
+        username = source_author.get("username")
+        return username if isinstance(username, str) else ""
+    return ""
+
+
+def _source_author_uid(record: Dict[str, Any]) -> Optional[int]:
+    source_author = (record.get("source_metadata", {}) or {}).get("drupal_author") or {}
+    if not isinstance(source_author, dict):
+        return None
+    uid = source_author.get("uid")
+    if isinstance(uid, bool):
+        return None
+    try:
+        parsed = int(uid)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _source_posted_at(record: Dict[str, Any]) -> Optional[datetime]:
+    return _as_dt(
+        (record.get("source_metadata", {}) or {}).get("drupal_created_at")
+    )
 
 
 class Command(BaseCommand):
@@ -648,22 +671,37 @@ class Command(BaseCommand):
             for record in integration_records
         )
         result.warnings.extend(source_warnings)
-        if plan_data is not None:
-            self._validate_plan_staging(
-                plan_data=plan_data,
-                result=result,
-                expected_system_ids=expected_system_ids,
-                expected_integration_ids=expected_integration_ids,
-            )
 
         try:
             with transaction.atomic():
-                import_user = self._resolve_import_user(
+                fallback_user = self._resolve_import_user(
                     username=options["import_user"],
                     create_missing=bool(options["create_import_user"]),
-                    dry_run=dry_run,
                     result=result,
                 )
+                system_authors, result.system_attribution = (
+                    self._resolve_record_authors(
+                        records=system_records,
+                        feed_name="SystemStatusNews",
+                        fallback_user=fallback_user,
+                        require_posted_at=replace,
+                    )
+                )
+                integration_authors, result.integration_attribution = (
+                    self._resolve_record_authors(
+                        records=integration_records,
+                        feed_name="IntegrationNews",
+                        fallback_user=fallback_user,
+                        require_posted_at=replace,
+                    )
+                )
+                if plan_data is not None:
+                    self._validate_plan_staging(
+                        plan_data=plan_data,
+                        result=result,
+                        expected_system_ids=expected_system_ids,
+                        expected_integration_ids=expected_integration_ids,
+                    )
                 integration_elements = self._ensure_integration_elements(
                     dry_run=dry_run,
                     result=result,
@@ -677,18 +715,20 @@ class Command(BaseCommand):
                         IntegrationNews.objects.all().delete()
 
                 for record in system_records:
+                    stable_id = int(_nid(record))
                     self._import_system_record(
                         record=record,
-                        import_user=import_user,
+                        author=system_authors[stable_id],
                         dry_run=dry_run,
                         result=result,
                         force_create=replace,
                         suppress_notifications=bool(options["suppress_notifications"]),
                     )
                 for record in integration_records:
+                    stable_id = int(_nid(record))
                     self._import_integration_record(
                         record=record,
-                        import_user=import_user,
+                        author=integration_authors[stable_id],
                         integration_elements=integration_elements,
                         allow_na_affected_element=bool(options["allow_na_affected_element"]),
                         dry_run=dry_run,
@@ -703,6 +743,8 @@ class Command(BaseCommand):
                         system_records=system_records,
                         integration_records=integration_records,
                         suppress_notifications=bool(options["suppress_notifications"]),
+                        system_authors=system_authors,
+                        integration_authors=integration_authors,
                     )
 
                 if strict and result.warnings:
@@ -877,6 +919,8 @@ class Command(BaseCommand):
                 "excluded_system_nids": result.excluded_system_nids,
                 "cutoff_excluded_system_nids": result.cutoff_excluded_system_nids,
                 "source_corrections_applied": result.source_corrections,
+                "system_attribution": result.system_attribution,
+                "integration_attribution": result.integration_attribution,
                 "outcome": self._result_outcome_contract(result),
             },
         }
@@ -954,6 +998,8 @@ class Command(BaseCommand):
             "excluded_system_nids",
             "cutoff_excluded_system_nids",
             "source_corrections_applied",
+            "system_attribution",
+            "integration_attribution",
             "outcome",
         }
         outcome_keys = set(self._result_outcome_contract(ImportResult()))
@@ -1120,6 +1166,18 @@ class Command(BaseCommand):
             raise CommandError("Import plan SystemStatusNews count and IDs differ.")
         if expected["integration_records"] != len(expected["integration_ids"]):
             raise CommandError("Import plan IntegrationNews count and IDs differ.")
+        self._validate_plan_attribution(
+            expected["system_attribution"],
+            expected["system_ids"],
+            options["import_user"],
+            "SystemStatusNews",
+        )
+        self._validate_plan_attribution(
+            expected["integration_attribution"],
+            expected["integration_ids"],
+            options["import_user"],
+            "IntegrationNews",
+        )
         if (
             expected["excluded_system_nids"]
             != adjustments["excluded_system_nids"]
@@ -1139,6 +1197,99 @@ class Command(BaseCommand):
             or outcome["updated_integration"] != 0
         ):
             raise CommandError("Import plan replacement outcome is inconsistent.")
+
+    def _validate_plan_attribution(
+        self,
+        values: Any,
+        expected_ids: List[int],
+        fallback_username: str,
+        feed_name: str,
+    ) -> None:
+        keys = {
+            "nid",
+            "drupal_uid",
+            "drupal_username",
+            "django_username",
+            "resolution",
+            "fallback_reason",
+            "posted_at",
+        }
+        if not isinstance(values, list) or len(values) != len(expected_ids):
+            raise CommandError(
+                f"Import plan {feed_name} attribution count is invalid."
+            )
+
+        attribution_ids: List[int] = []
+        for value in values:
+            if not isinstance(value, dict) or set(value) != keys:
+                raise CommandError(
+                    f"Import plan {feed_name} attribution shape is invalid."
+                )
+            nid = value["nid"]
+            uid = value["drupal_uid"]
+            if isinstance(nid, bool) or not isinstance(nid, int) or nid <= 0:
+                raise CommandError(
+                    f"Import plan {feed_name} attribution nid is invalid."
+                )
+            if uid is not None and (
+                isinstance(uid, bool) or not isinstance(uid, int) or uid < 0
+            ):
+                raise CommandError(
+                    f"Import plan {feed_name} Drupal author uid is invalid."
+                )
+            if any(
+                not isinstance(value[name], str)
+                for name in (
+                    "drupal_username",
+                    "django_username",
+                    "resolution",
+                    "fallback_reason",
+                    "posted_at",
+                )
+            ):
+                raise CommandError(
+                    f"Import plan {feed_name} attribution values are invalid."
+                )
+            if not value["django_username"]:
+                raise CommandError(
+                    f"Import plan {feed_name} Django username is empty."
+                )
+            posted_at = parse_datetime(value["posted_at"])
+            if posted_at is None or posted_at.tzinfo is None:
+                raise CommandError(
+                    f"Import plan {feed_name} post date is invalid."
+                )
+            if value["resolution"] == "drupal-username":
+                if (
+                    not value["drupal_username"]
+                    or value["drupal_username"] != value["django_username"]
+                    or value["fallback_reason"]
+                ):
+                    raise CommandError(
+                        f"Import plan {feed_name} matched attribution is inconsistent."
+                    )
+            elif value["resolution"] == "fallback":
+                if (
+                    value["django_username"] != fallback_username
+                    or value["fallback_reason"]
+                    not in {
+                        "missing-drupal-username",
+                        "no-django-username-match",
+                    }
+                ):
+                    raise CommandError(
+                        f"Import plan {feed_name} fallback attribution is inconsistent."
+                    )
+            else:
+                raise CommandError(
+                    f"Import plan {feed_name} attribution resolution is invalid."
+                )
+            attribution_ids.append(nid)
+
+        if attribution_ids != expected_ids:
+            raise CommandError(
+                f"Import plan {feed_name} attribution IDs differ from record IDs."
+            )
 
     def _validate_plan_id_list(
         self,
@@ -1202,6 +1353,8 @@ class Command(BaseCommand):
             "excluded_system_nids": result.excluded_system_nids,
             "cutoff_excluded_system_nids": result.cutoff_excluded_system_nids,
             "source_corrections_applied": result.source_corrections,
+            "system_attribution": result.system_attribution,
+            "integration_attribution": result.integration_attribution,
         }
         mismatches = [name for name, value in actual.items() if expected[name] != value]
         if mismatches:
@@ -1448,6 +1601,8 @@ class Command(BaseCommand):
         system_records: List[Dict[str, Any]],
         integration_records: List[Dict[str, Any]],
         suppress_notifications: bool,
+        system_authors: Dict[int, User],
+        integration_authors: Dict[int, User],
     ) -> None:
         actual_system_ids = set(
             SystemStatusNews.objects.values_list("outage_id", flat=True)
@@ -1490,6 +1645,13 @@ class Command(BaseCommand):
                 else bool(record.get("post_to_slack", False)),
                 "is_active": bool(record.get("is_active", True)),
                 "status": record.get("status") or "published",
+                "author_id": system_authors[stable_id].pk,
+                "created_at": _source_posted_at(record),
+                "published_at": (
+                    _source_posted_at(record)
+                    if (record.get("status") or "published") == "published"
+                    else None
+                ),
                 "review_comments": _provenance_tag(record),
             }
             for field_name, expected in expected_fields.items():
@@ -1548,6 +1710,13 @@ class Command(BaseCommand):
                 "expiration_date": _as_date(record.get("expiration_date")),
                 "is_active": bool(record.get("is_active", True)),
                 "status": record.get("status") or "published",
+                "author_id": integration_authors[stable_id].pk,
+                "created_at": _source_posted_at(record),
+                "published_at": (
+                    _source_posted_at(record)
+                    if (record.get("status") or "published") == "published"
+                    else None
+                ),
                 "review_comments": _provenance_tag(record),
             }
             for field_name, expected in expected_fields.items():
@@ -1569,23 +1738,11 @@ class Command(BaseCommand):
         self,
         username: str,
         create_missing: bool,
-        dry_run: bool,
         result: ImportResult,
     ) -> User:
         user = User.objects.filter(username=username).first()
         if user:
             return user
-
-        if dry_run:
-            fallback = User.objects.order_by("id").first()
-            if fallback:
-                result.add_warning(
-                    f"Import user '{username}' not found; dry-run used fallback user id={fallback.id}."
-                )
-                return fallback
-            raise CommandError(
-                "No Django users exist to simulate author assignment in dry-run."
-            )
 
         if create_missing:
             user = User.objects.create_user(
@@ -1601,6 +1758,67 @@ class Command(BaseCommand):
             f"Import user '{username}' does not exist. "
             "Re-run with --create-import-user or set --import-user."
         )
+
+    def _resolve_record_authors(
+        self,
+        records: List[Dict[str, Any]],
+        feed_name: str,
+        fallback_user: User,
+        require_posted_at: bool,
+    ) -> tuple[Dict[int, User], List[Dict[str, Any]]]:
+        source_usernames = {
+            _source_author(record)
+            for record in records
+            if _source_author(record)
+        }
+        # The final dictionary lookup deliberately remains case-sensitive even
+        # if the database uses a case-insensitive collation for username.
+        matched_users = {
+            user.username: user
+            for user in User.objects.filter(username__in=source_usernames)
+        }
+
+        authors: Dict[int, User] = {}
+        attribution: List[Dict[str, Any]] = []
+        for record in records:
+            stable_id = int(_nid(record))
+            source_uid = _source_author_uid(record)
+            source_username = _source_author(record)
+            posted_at = _source_posted_at(record)
+            if require_posted_at and posted_at is None:
+                raise CommandError(
+                    f"{feed_name} nid={stable_id} has no valid original post date."
+                )
+
+            matched_user = matched_users.get(source_username)
+            if source_username and matched_user is not None:
+                author = matched_user
+                resolution = "drupal-username"
+                fallback_reason = ""
+            else:
+                author = fallback_user
+                resolution = "fallback"
+                fallback_reason = (
+                    "missing-drupal-username"
+                    if not source_username
+                    else "no-django-username-match"
+                )
+
+            authors[stable_id] = author
+            attribution.append(
+                {
+                    "nid": stable_id,
+                    "drupal_uid": source_uid,
+                    "drupal_username": source_username,
+                    "django_username": author.username,
+                    "resolution": resolution,
+                    "fallback_reason": fallback_reason,
+                    "posted_at": posted_at.isoformat() if posted_at else "",
+                }
+            )
+
+        attribution.sort(key=lambda value: value["nid"])
+        return authors, attribution
 
     def _ensure_integration_elements(
         self,
@@ -1679,7 +1897,7 @@ class Command(BaseCommand):
     def _import_system_record(
         self,
         record: Dict[str, Any],
-        import_user: User,
+        author: User,
         dry_run: bool,
         result: ImportResult,
         force_create: bool = False,
@@ -1687,8 +1905,9 @@ class Command(BaseCommand):
     ) -> None:
         existing = None if force_create else self._find_existing_system(record)
         creating = existing is None
-        obj = existing or SystemStatusNews(author=import_user)
+        obj = existing or SystemStatusNews(author=author)
 
+        obj.author = author
         obj.subject = record.get("subject") or "Untitled"
         obj.content = record.get("content") or ""
         obj.infrastructure_news_type = record.get("infrastructure_news_type") or "outage_full"
@@ -1700,8 +1919,8 @@ class Command(BaseCommand):
         obj.is_active = bool(record.get("is_active", True))
         obj.status = record.get("status") or "published"
         obj.review_comments = _provenance_tag(record)
-        if obj.status == "published":
-            obj.published_at = _as_dt((record.get("source_metadata", {}) or {}).get("drupal_created_at"))
+        source_posted_at = _source_posted_at(record)
+        obj.published_at = source_posted_at if obj.status == "published" else None
 
         nid_raw = _nid(record)
         if nid_raw != "unknown" and obj.outage_id is None:
@@ -1720,6 +1939,11 @@ class Command(BaseCommand):
 
         if not dry_run:
             obj.save()
+            if source_posted_at is not None:
+                SystemStatusNews.objects.filter(pk=obj.pk).update(
+                    created_at=source_posted_at
+                )
+                obj.created_at = source_posted_at
 
         if creating:
             result.created_system += 1
@@ -1769,7 +1993,7 @@ class Command(BaseCommand):
     def _import_integration_record(
         self,
         record: Dict[str, Any],
-        import_user: User,
+        author: User,
         integration_elements: Dict[str, IntegrationElement],
         allow_na_affected_element: bool,
         dry_run: bool,
@@ -1778,8 +2002,9 @@ class Command(BaseCommand):
     ) -> None:
         existing = None if force_create else self._find_existing_integration(record)
         creating = existing is None
-        obj = existing or IntegrationNews(author=import_user)
+        obj = existing or IntegrationNews(author=author)
 
+        obj.author = author
         obj.title = record.get("title") or "Untitled"
         obj.content = record.get("content") or ""
         obj.news_type = record.get("news_type") or ""
@@ -1788,8 +2013,8 @@ class Command(BaseCommand):
         obj.is_active = bool(record.get("is_active", True))
         obj.status = record.get("status") or "published"
         obj.review_comments = _provenance_tag(record)
-        if obj.status == "published":
-            obj.published_at = _as_dt((record.get("source_metadata", {}) or {}).get("drupal_created_at"))
+        source_posted_at = _source_posted_at(record)
+        obj.published_at = source_posted_at if obj.status == "published" else None
 
         nid_raw = _nid(record)
         if nid_raw != "unknown" and obj.integration_news_id is None:
@@ -1847,6 +2072,11 @@ class Command(BaseCommand):
 
         if not dry_run:
             obj.save()
+            if source_posted_at is not None:
+                IntegrationNews.objects.filter(pk=obj.pk).update(
+                    created_at=source_posted_at
+                )
+                obj.created_at = source_posted_at
 
         if creating:
             result.created_integration += 1
@@ -1930,6 +2160,43 @@ class Command(BaseCommand):
         else:
             lines.append("  - None")
 
+        lines.extend(
+            [
+                "",
+                "## Author and Post-Date Attribution",
+                "",
+            ]
+        )
+        for feed_name, values in (
+            ("SystemStatusNews", result.system_attribution),
+            ("IntegrationNews", result.integration_attribution),
+        ):
+            matched = sum(
+                value["resolution"] == "drupal-username" for value in values
+            )
+            fallback = len(values) - matched
+            lines.extend(
+                [
+                    f"### `{feed_name}`",
+                    "",
+                    f"- Exact Drupal username matches: `{matched}`",
+                    f"- Explicit import-user fallbacks: `{fallback}`",
+                ]
+            )
+            for value in values:
+                resolution = value["resolution"]
+                if value["fallback_reason"]:
+                    resolution += f": {value['fallback_reason']}"
+                lines.append(
+                    "- nid="
+                    f"`{value['nid']}`; Drupal uid=`{value['drupal_uid']}`; "
+                    f"Drupal username=`{value['drupal_username']}`; "
+                    f"Django username=`{value['django_username']}`; "
+                    f"resolution=`{resolution}`; posted=`{value['posted_at']}`"
+                )
+            if not values:
+                lines.append("- None")
+
         lines.extend([
             "",
             "## Planned/Applied Changes",
@@ -1991,6 +2258,17 @@ class Command(BaseCommand):
             f"{result.system_news_as_of or 'none'}, excluded past nids: "
             f"{result.cutoff_excluded_system_nids or 'none'}"
         )
+        for label, values in (
+            ("System", result.system_attribution),
+            ("Integration", result.integration_attribution),
+        ):
+            matched = sum(
+                value["resolution"] == "drupal-username" for value in values
+            )
+            self.stdout.write(
+                f"Attribution -> {label}: {matched} exact username matches, "
+                f"{len(values) - matched} import-user fallbacks"
+            )
         self.stdout.write(f"Warnings: {len(result.warnings)}; Errors: {len(result.errors)}")
         if result.plan_file:
             self.stdout.write(
