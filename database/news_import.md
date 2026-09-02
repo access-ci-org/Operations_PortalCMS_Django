@@ -130,250 +130,589 @@ the report records the exclusion and correction separately.
 
 ## Rehearsal on beta
 
-### 1. Human prerequisites
+This procedure deliberately avoids a shell-wide `set -e` and top-level `exit`. Each phase
+is a function: a failed check prints `STOP`, returns to the `software` prompt, and leaves
+the rehearsal variables available for inspection with `news_state`. Run one phase at a
+time and do not continue after a nonzero return. Paste only fenced command blocks; prose
+such as “review” or “then” is not a shell command.
 
-Before running anything:
+### 1. Prerequisites
 
-- Deploy or prepare the approved application release on the beta host through the normal
-  infrastructure workflow.
-- Obtain separate approval for modifying the beta PostgreSQL database.
-- Place a recent MySQL dump in an operator-approved location outside Git.
-- Create a durable, `software`-writable change-record directory for reports and checksums.
-- Know the exact beta database name and write host.
-- Confirm the selected Django import user already exists. Do not create it in the importer.
-- Select and record the exact timezone-aware Infrastructure News cutoff timestamp.
+Before starting:
 
-Committing and pushing the branch does not update an existing release. Use a newly
-deployed immutable release built from the exact commit containing the importer changes;
-do not use the older `news_apis_imports_testing-...` release or the normalized JSON under
-`/soft/django-cms-01/tags/`. The local `database/dumps/` directory is ignored by Git, so
-copy the reviewed raw dump separately to a durable location readable by `software`.
+- deploy the approved immutable release through the normal infrastructure workflow;
+- place one or more readable, timestamp-named MySQL dumps in
+  `/soft/django-cms-01/var/news-import`;
+- independently confirm the beta database name and PostgreSQL write endpoint;
+- obtain separate approval for the beta database replacement; and
+- confirm that `jlambertson` is the approved fallback Django user.
 
-### 2. Start a `software` login shell and set one rehearsal contract
+The dump directory selector accepts only readable regular files named
+`backup_database-<timezone-aware-ISO-timestamp>.mysql.gz`. It selects the newest timestamp
+in the filename, not the file modification time. Apply never rescans the directory; the
+selected absolute path and SHA-256 are bound into the dry-run plan.
+
+### 2. Start one `software` shell and initialize the run
+
+Start a clean login shell:
 
 ```bash
 sudo -i -u software
-
-APP_HOME=/soft/django-cms-01
-RELEASE=/soft/django-cms-01/releases/<approved-release>
-PYTHON="$RELEASE/.venv/bin/python"
-MANAGE="$RELEASE/operations_portalcms_django/manage.py"
-APP_CONFIG="$APP_HOME/conf/portal.conf"
-SOURCE_DIRECTORY="$APP_HOME/var/news-import"
-CHANGE_RECORD="$APP_HOME/var/news-import/beta-rehearsal-<unique-run-id>"
-IMPORT_PLAN="$CHANGE_RECORD/import-plan.json"
-IMPORT_USER=jlambertson
-EXPECTED_DATABASE=portal_beta
-EXPECTED_WRITE_HOST=<approved-beta-write-host>
-
-# For a new beta rehearsal, capture now exactly once. For a deterministic replay,
-# assign the exact cutoff from the earlier plan instead.
-SYSTEM_NEWS_AS_OF="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-readonly SYSTEM_NEWS_AS_OF
-
-export APP_CONFIG
-
-test "$(id -un)" = software
-test -x "$PYTHON"
-test -r "$MANAGE"
-test -r "$APP_CONFIG"
-test -d "$SOURCE_DIRECTORY"
-test -r "$SOURCE_DIRECTORY"
-test -x "$SOURCE_DIRECTORY"
-test -d "$CHANGE_RECORD"
-test -w "$CHANGE_RECORD"
-test ! -e "$IMPORT_PLAN"
-test -n "$EXPECTED_WRITE_HOST"
-printf 'Infrastructure News cutoff: %s\n' "$SYSTEM_NEWS_AS_OF"
 ```
 
-Do not continue if any check fails. Do not use a release path inferred from an old report.
-Do not export `PYTHONPATH`; invoking the pinned release's `manage.py` with its own
-`.venv/bin/python` selects the intended application code and environment.
-
-The directory selector considers only readable regular files whose names exactly match
-`backup_database-<timezone-aware ISO timestamp>.mysql.gz`. It parses and compares those
-timestamps rather than file modification times. A malformed candidate, unreadable file,
-tie, or empty candidate set fails the dry-run. File ownership is not authoritative;
-`test -r` as `software` and the importer checks are authoritative.
-
-### 3. Confirm the release and target without exposing credentials
+Paste this function block. Do not enable `set -e` in the login shell.
 
 ```bash
-"$PYTHON" "$MANAGE" import_drupal_news --help | grep -F -- '--plan-file'
-"$PYTHON" "$MANAGE" import_drupal_news --help | grep -F -- '--mysql-dump-directory'
+set +e
+set +u
 
-"$PYTHON" "$MANAGE" shell --no-imports <<'PY'
+news_fail() {
+  printf 'STOP: %s\n' "$*" >&2
+  return 1
+}
+
+news_require() {
+  local description="$1"
+  shift
+  if ! "$@"; then
+    news_fail "$description"
+    return 1
+  fi
+}
+
+news_state() {
+  printf 'Release: %s\n' "${RELEASE:-<unset>}"
+  printf 'Python: %s\n' "${PYTHON:-<unset>}"
+  printf 'Cutoff: %s\n' "${SYSTEM_NEWS_AS_OF:-<unset>}"
+  printf 'Evidence directory: %s\n' "${CHANGE_RECORD:-<unset>}"
+  printf 'Plan: %s\n' "${IMPORT_PLAN:-<unset>}"
+  printf 'Target backup: %s\n' "${TARGET_BACKUP:-<unset>}"
+}
+
+news_setup() {
+  local release_name="${1:-}"
+  local requested_cutoff="${2:-}"
+
+  case "$release_name" in
+    ''|*'<'*|*'>'*|*/*)
+      news_fail 'pass the exact release directory name, without angle brackets or slashes'
+      return 1
+      ;;
+  esac
+
+  umask 027
+
+  APP_HOME=/soft/django-cms-01
+  RELEASE="$APP_HOME/releases/$release_name"
+  PYTHON="$RELEASE/.venv/bin/python"
+  MANAGE="$RELEASE/operations_portalcms_django/manage.py"
+  BACKUP_SCRIPT="$RELEASE/database/pg_dump_portal.sh"
+  APP_CONFIG="$APP_HOME/conf/portal.conf"
+
+  SOURCE_DIRECTORY="$APP_HOME/var/news-import"
+  EXPECTED_DATABASE=portal_beta
+  EXPECTED_WRITE_HOST=opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com
+  IMPORT_USER=jlambertson
+
+  RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')"
+  CHANGE_RECORD="$APP_HOME/var/news-import/beta-rehearsal-$RUN_ID"
+  IMPORT_PLAN="$CHANGE_RECORD/import-plan.json"
+  DRY_RUN_REPORT="$CHANGE_RECORD/import-dry-run.md"
+  PRETTY_PLAN="$CHANGE_RECORD/import-plan.pretty.json"
+  PLAN_CHECKSUM_FILE="$CHANGE_RECORD/import-plan.sha256"
+  APPLY_REPORT="$CHANGE_RECORD/import-apply.md"
+  TARGET_BACKUP="$CHANGE_RECORD/portal_beta_pre_import.dump"
+  BACKUP_CHECKSUM_FILE="$CHANGE_RECORD/target-backup.sha256"
+  if test -n "$requested_cutoff"; then
+    SYSTEM_NEWS_AS_OF="$requested_cutoff"
+  else
+    SYSTEM_NEWS_AS_OF="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  fi
+
+  export APP_CONFIG RELEASE EXPECTED_DATABASE EXPECTED_WRITE_HOST
+  export IMPORT_USER CHANGE_RECORD IMPORT_PLAN
+
+  news_require 'the operating-system user is not software' \
+    test "$(id -un)" = software || return 1
+  news_require 'release Python is missing or not executable' \
+    test -x "$PYTHON" || return 1
+  news_require 'manage.py is missing or unreadable' \
+    test -r "$MANAGE" || return 1
+  news_require 'APP_CONFIG is missing or unreadable' \
+    test -r "$APP_CONFIG" || return 1
+  news_require 'source directory does not exist' \
+    test -d "$SOURCE_DIRECTORY" || return 1
+  news_require 'source directory is not readable/searchable' \
+    test -r "$SOURCE_DIRECTORY" || return 1
+  news_require 'source directory is not readable/searchable' \
+    test -x "$SOURCE_DIRECTORY" || return 1
+
+  if ! mkdir -m 0750 "$CHANGE_RECORD"; then
+    news_fail "could not create evidence directory: $CHANGE_RECORD"
+    return 1
+  fi
+  news_require 'evidence directory is not writable' \
+    test -w "$CHANGE_RECORD" || return 1
+
+  news_state
+  printf 'Setup checks: OK\n'
+}
+```
+
+Run setup, replacing only the release directory name:
+
+```bash
+news_setup '<NEW-EXACT-RELEASE>'
+```
+
+Keep this shell open and do not redefine the variables. Do not export `PYTHONPATH`.
+For a deterministic replay only, pass the previously reviewed cutoff as a second argument
+to `news_setup`; otherwise setup captures the current UTC time exactly once.
+
+### 3. Confirm the importer release and target
+
+Define and run the preflight function:
+
+```bash
+news_preflight() {
+  local help_text option
+
+  news_require 'run news_setup first' test -n "${PYTHON:-}" || return 1
+
+  if ! help_text="$("$PYTHON" "$MANAGE" import_drupal_news --help 2>&1)"; then
+    printf '%s\n' "$help_text" >&2
+    news_fail 'could not read importer help'
+    return 1
+  fi
+
+  for option in \
+    --mysql-dump-directory \
+    --plan-file \
+    --confirm-plan-sha256
+  do
+    if ! grep -Fq -- "$option" <<<"$help_text"; then
+      news_fail "release does not support $option"
+      return 1
+    fi
+  done
+
+  if ! "$PYTHON" "$MANAGE" shell --no-imports <<'PY'
+import os
 import sys
+from pathlib import Path
+
 from django.conf import settings
-database = settings.DATABASES['default']
-print('python:', sys.executable)
-print('database:', database.get('NAME'))
-print('write host:', database.get('HOST'))
-print('port:', database.get('PORT'))
+from django.contrib.auth.models import User
+from infrastructure_news.management.commands.import_drupal_news import (
+    IMPORT_CONTRACT_VERSION,
+    IMPORT_PLAN_VERSION,
+)
+
+database = settings.DATABASES["default"]
+expected_python = Path(os.environ["RELEASE"]) / ".venv/bin/python"
+
+print("python:", sys.executable)
+print("plan version:", IMPORT_PLAN_VERSION)
+print("contract version:", IMPORT_CONTRACT_VERSION)
+print("database:", database.get("NAME"))
+print("write host:", database.get("HOST"))
+print("port:", database.get("PORT"))
+print("fallback user:", os.environ["IMPORT_USER"])
+
+if Path(sys.executable) != expected_python:
+    raise SystemExit("Python executable does not match RELEASE")
+if (IMPORT_PLAN_VERSION, IMPORT_CONTRACT_VERSION) != (3, 3):
+    raise SystemExit("Release does not contain plan/contract version 3")
+if str(database.get("NAME") or "") != os.environ["EXPECTED_DATABASE"]:
+    raise SystemExit("Database does not match EXPECTED_DATABASE")
+if str(database.get("HOST") or "") != os.environ["EXPECTED_WRITE_HOST"]:
+    raise SystemExit("Host does not match EXPECTED_WRITE_HOST")
+if not User.objects.filter(username=os.environ["IMPORT_USER"]).exists():
+    raise SystemExit("Fallback Django user does not exist")
+
+print("Release and target checks: OK")
 PY
+  then
+    news_fail 'release or target preflight failed; inspect the output above'
+    return 1
+  fi
+}
+
+news_preflight
 ```
 
-Stop unless the Python path is under `$RELEASE/.venv` and the database and host exactly
-match `EXPECTED_DATABASE` and `EXPECTED_WRITE_HOST`.
+This reads settings but never prints credentials. Continue only after the output confirms
+plan and contract version 3, the release interpreter, `portal_beta`, the independently
+approved beta write host, and fallback user `jlambertson`.
 
-### 4. Run the strict atomic replacement dry-run and write the plan
+### 4. Run the strict dry-run
 
 ```bash
-(
-  set -Eeuo pipefail
+news_dry_run() {
+  news_require 'run news_setup first' test -n "${IMPORT_PLAN:-}" || return 1
+  news_require 'the import plan path already exists' \
+    test ! -e "$IMPORT_PLAN" || return 1
 
-  "$PYTHON" "$MANAGE" import_drupal_news \
+  if test -e "$DRY_RUN_REPORT"; then
+    DRY_RUN_REPORT="$CHANGE_RECORD/import-dry-run-retry-$(date -u '+%Y%m%dT%H%M%SZ').md"
+    printf 'Preserving the earlier report; retry report: %s\n' "$DRY_RUN_REPORT"
+  fi
+
+  if ! "$PYTHON" "$MANAGE" import_drupal_news \
     --mysql-dump-directory "$SOURCE_DIRECTORY" \
     --replace \
     --dry-run \
     --strict \
-    --confirm-database "$EXPECTED_DATABASE" \
-    --confirm-host "$EXPECTED_WRITE_HOST" \
+    --suppress-notifications \
     --system-news-as-of "$SYSTEM_NEWS_AS_OF" \
     --exclude-system-nid 404 \
     --exclude-system-nid 797 \
     --source-correction infrastructure-928-start-year \
-    --suppress-notifications \
+    --confirm-database "$EXPECTED_DATABASE" \
+    --confirm-host "$EXPECTED_WRITE_HOST" \
     --plan-file "$IMPORT_PLAN" \
-    --report-file "$CHANGE_RECORD/import-dry-run.md" \
+    --report-file "$DRY_RUN_REPORT" \
     --import-user "$IMPORT_USER"
-)
+  then
+    news_fail "dry-run failed; inspect $DRY_RUN_REPORT if it exists"
+    return 1
+  fi
+
+  news_require 'dry-run did not create a nonempty plan' \
+    test -s "$IMPORT_PLAN" || return 1
+  news_require 'dry-run did not create a nonempty report' \
+    test -s "$DRY_RUN_REPORT" || return 1
+
+  if ! "$PYTHON" -m json.tool "$IMPORT_PLAN" > "$PRETTY_PLAN"; then
+    news_fail 'plan JSON validation/formatting failed'
+    return 1
+  fi
+
+  printf 'Dry-run artifacts: OK\n'
+  printf 'MANDATORY PAUSE: review the plan and report before backup or apply.\n'
+  news_state
+}
+
+news_dry_run
 ```
 
-Review both complete artifacts. The JSON plan is machine-readable; the Markdown report is
-the human-readable rendering of the run:
+The importer chooses the newest valid dump and records its exact path and SHA-256, cutoff,
+retained IDs, counts, relationships, exclusions, correction, author/post-date attribution,
+and planned database outcome. If a newer dump was selected than intended, stop and start a
+new rehearsal with a controlled source directory.
+
+### 5. Mandatory review pause
+
+Open the human-readable report and, optionally, the complete formatted plan:
 
 ```bash
-"$PYTHON" -m json.tool "$IMPORT_PLAN" | less
-less "$CHANGE_RECORD/import-dry-run.md"
+less "$DRY_RUN_REPORT"
+less "$PRETTY_PLAN"
 ```
 
-They must show:
-
-- the pinned release Python executable;
-- the exact selected absolute source path and SHA-256;
-- the intended database and write host;
-- the plan contract and schema versions;
-- expected record counts, allowing zero retained Infrastructure News;
-- expected infrastructure and integration-element relationship counts;
-- every retained nid's original post timestamp, non-email username candidate, derivation
-  method and selected Django author;
-- every username fallback, with only `jlambertson` accepted for this cutover;
-- the exact `SYSTEM_NEWS_AS_OF` value;
-- every past Infrastructure News nid excluded by that cutoff;
-- exactly the reviewed explicit exclusions `404` and `797` for this source family;
-- the exact-match nid `928` start-datetime correction and no other correction;
-- zero errors and zero warnings under strict mode.
-
-Author fallbacks are review items rather than strict-mode warnings. Continue only when
-every fallback is expected (for example, a deleted Drupal account) and resolves to the
-approved `IMPORT_USER`. If a Django account is added or renamed after dry-run, apply
-detects the changed resolution and refuses the plan.
-
-A dry-run performs ORM work inside a transaction and then forces rollback. Confirm that
-the beta row counts are unchanged after the dry-run.
-
-For the September 1 beta rehearsal at cutoff `2026-09-01T18:43:13Z`, the reviewed values
-were:
-
-```text
-Infrastructure News cutoff: <exact SYSTEM_NEWS_AS_OF value>
-SystemStatusNews: 2
-IntegrationNews: 17
-Infrastructure relationships: 3
-Integration-element relationships: 39
-Cutoff-excluded past SystemStatusNews nids: <complete reported list>
-Explicitly excluded SystemStatusNews nids: 404, 797
-Corrected SystemStatusNews nid: 928
-Warnings: 0
-Errors: 0
-```
-
-These values are evidence for that exact source and cutoff, not reusable command inputs.
-Apply obtains them from the plan.
-
-### 5. Back up the beta target
-
-Use the repository's targeted PostgreSQL backup procedure with the beta `APP_CONFIG` and
-the same confirmed write host. Store the backup in the durable change-record location.
-This is a separate production-data-style operation and requires its own human approval.
-Do not continue unless the backup exists and is nonempty.
-
-### 6. Apply only the exact reviewed plan
-
-After human review, record the exact plan-file SHA-256. This is the only confirmation value
-copied into apply:
+Print and validate the compact version 3 contract:
 
 ```bash
-PLAN_SHA256="$(sha256sum "$IMPORT_PLAN" | awk '{print $1}')"
-readonly PLAN_SHA256
-printf 'Reviewed import plan SHA-256: %s\n' "$PLAN_SHA256"
+news_review_contract() {
+  if ! "$PYTHON" - "$IMPORT_PLAN" <<'PY'
+import json
+import sys
+from pathlib import Path
 
-(
-  set -Eeuo pipefail
+plan = json.loads(Path(sys.argv[1]).read_text())
+contract = plan["contract"]
+expected = plan["expected"]
 
-  test -s "$IMPORT_PLAN"
-  test -s /path/to/separately-approved-target-backup
+if plan["schema"] != "access-ci.drupal-news-import-plan":
+    raise SystemExit("Unexpected plan schema")
+if (plan["version"], contract["contract_version"]) != (3, 3):
+    raise SystemExit("Expected plan/contract version 3")
 
-  "$PYTHON" "$MANAGE" import_drupal_news \
+fallback_user = contract["options"]["import_user"]
+for feed, key in (
+    ("SystemStatusNews", "system_attribution"),
+    ("IntegrationNews", "integration_attribution"),
+):
+    values = expected[key]
+    for item in values:
+        if not item["posted_at"]:
+            raise SystemExit(f"{feed} nid={item['nid']} has no posted_at")
+        if "@" in item["username_candidate"]:
+            raise SystemExit(f"{feed} contains an email-shaped username candidate")
+        if (
+            item["resolution"] == "fallback"
+            and item["django_username"] != fallback_user
+        ):
+            raise SystemExit(f"{feed} fallback does not use {fallback_user}")
+
+print("schema:", plan["schema"])
+print("plan/contract version:", plan["version"], contract["contract_version"])
+print("python:", contract["python_executable"])
+print("source:", contract["source"]["path"])
+print("source SHA-256:", contract["source"]["sha256"])
+print("database/host/port:", contract["target"])
+print("fallback user:", fallback_user)
+print("cutoff:", contract["adjustments"]["system_news_as_of"])
+print("explicit exclusions:", contract["adjustments"]["excluded_system_nids"])
+print("corrections:", contract["adjustments"]["source_corrections"])
+print("system IDs:", expected["system_ids"])
+print("integration IDs:", expected["integration_ids"])
+print("cutoff-excluded system IDs:", expected["cutoff_excluded_system_nids"])
+print("system relationships:", expected["system_relationships"])
+print("integration relationships:", expected["integration_relationships"])
+print("planned outcome:", expected["outcome"])
+
+for feed, key in (
+    ("SystemStatusNews", "system_attribution"),
+    ("IntegrationNews", "integration_attribution"),
+):
+    values = expected[key]
+    matched = sum(item["resolution"] == "drupal-username" for item in values)
+    fallbacks = [item for item in values if item["resolution"] == "fallback"]
+    print(f"{feed} attribution: {matched} exact, {len(fallbacks)} fallback")
+    for item in fallbacks:
+        print(
+            f"  nid={item['nid']} uid={item['drupal_uid']} "
+            f"candidate={item['username_candidate']!r} "
+            f"derivation={item['username_derivation']} "
+            f"Django={item['django_username']!r} "
+            f"reason={item['fallback_reason']} "
+            f"posted={item['posted_at']}"
+        )
+PY
+  then
+    news_fail 'plan contract review failed'
+    return 1
+  fi
+}
+
+news_review_contract
+```
+
+Do not continue until a human confirms all of the following:
+
+- the selected source path and SHA-256 identify the intended dump;
+- the Python executable, database, write host, fallback user and cutoff are exact;
+- only operationally appropriate current/future Infrastructure News IDs are retained;
+- explicit exclusions are exactly `404` and `797`, and the only correction is nid `928`;
+- relationship and planned delete/create counts are sensible;
+- every post date and exact username match in the full report is correct;
+- every fallback is understood and resolves to `jlambertson`; and
+- the report contains zero importer warnings and zero importer errors.
+
+The Django Treebeard compatibility warning is separate from the importer report. A dry-run
+rolls back, so querying PostgreSQL at this point shows the existing rows rather than the
+staged replacement.
+
+### 6. Preview and take the separately approved beta backup
+
+The backup is a separate database operation and requires its own human authorization. Its
+script runs as a child process, so its internal `exit` cannot close the login shell. First
+preview the resolved database, host and output without taking a backup:
+
+```bash
+news_backup_preview() {
+  news_require 'backup script is missing or not executable' \
+    test -x "$BACKUP_SCRIPT" || return 1
+  news_require 'target backup path already exists' \
+    test ! -e "$TARGET_BACKUP" || return 1
+
+  if ! "$BACKUP_SCRIPT" \
+    --source-db "$EXPECTED_DATABASE" \
+    --output "$TARGET_BACKUP" \
+    --dry-run
+  then
+    news_fail 'backup preview failed'
+    return 1
+  fi
+}
+
+news_backup_preview
+```
+
+The preview must show the independently approved beta database and host. If the backup
+script's configured read host is not that approved target, stop; do not override or infer a
+different endpoint during the change.
+
+After visually confirming the preview and obtaining the separate backup approval, run:
+
+```bash
+news_backup() {
+  if test "${1:-}" != CREATE_BETA_BACKUP; then
+    news_fail 'call: news_backup CREATE_BETA_BACKUP'
+    return 1
+  fi
+  news_require 'target backup path already exists' \
+    test ! -e "$TARGET_BACKUP" || return 1
+
+  if ! "$BACKUP_SCRIPT" \
+    --source-db "$EXPECTED_DATABASE" \
+    --output "$TARGET_BACKUP"
+  then
+    news_fail 'beta backup failed'
+    return 1
+  fi
+
+  news_require 'beta backup is missing or empty' \
+    test -s "$TARGET_BACKUP" || return 1
+  if ! sha256sum "$TARGET_BACKUP" > "$BACKUP_CHECKSUM_FILE"; then
+    news_fail 'could not write the backup checksum'
+    return 1
+  fi
+  if ! sha256sum --check "$BACKUP_CHECKSUM_FILE"; then
+    news_fail 'backup checksum verification failed'
+    return 1
+  fi
+
+  printf 'Beta backup: OK\n'
+  printf 'Backup: %s\n' "$TARGET_BACKUP"
+}
+
+news_backup CREATE_BETA_BACKUP
+```
+
+### 7. Bind and apply only the reviewed plan
+
+Record and verify the plan checksum only after review and backup:
+
+```bash
+news_prepare_apply() {
+  news_require 'reviewed plan is missing or empty' \
+    test -s "$IMPORT_PLAN" || return 1
+  news_require 'beta backup is missing or empty' \
+    test -s "$TARGET_BACKUP" || return 1
+  news_require 'backup checksum record is missing' \
+    test -s "$BACKUP_CHECKSUM_FILE" || return 1
+  if ! sha256sum --check "$BACKUP_CHECKSUM_FILE"; then
+    news_fail 'backup checksum verification failed'
+    return 1
+  fi
+  if ! sha256sum "$IMPORT_PLAN" > "$PLAN_CHECKSUM_FILE"; then
+    news_fail 'could not write the plan checksum'
+    return 1
+  fi
+  if ! sha256sum --check "$PLAN_CHECKSUM_FILE"; then
+    news_fail 'plan checksum verification failed'
+    return 1
+  fi
+
+  PLAN_SHA256="$(awk '{print $1}' "$PLAN_CHECKSUM_FILE")"
+  export PLAN_SHA256
+  news_require 'plan SHA-256 is empty' test -n "$PLAN_SHA256" || return 1
+  printf 'Reviewed plan SHA-256: %s\n' "$PLAN_SHA256"
+}
+
+news_prepare_apply
+```
+
+Apply requires a final explicit phrase and refuses to overwrite an existing apply report:
+
+```bash
+news_apply() {
+  if test "${1:-}" != APPLY_BETA_NEWS_IMPORT; then
+    news_fail 'call: news_apply APPLY_BETA_NEWS_IMPORT'
+    return 1
+  fi
+  news_require 'run news_prepare_apply first' \
+    test -n "${PLAN_SHA256:-}" || return 1
+  news_require 'an apply report already exists' \
+    test ! -e "$APPLY_REPORT" || return 1
+  if ! sha256sum --check "$PLAN_CHECKSUM_FILE"; then
+    news_fail 'reviewed plan changed after checksum creation'
+    return 1
+  fi
+
+  if ! "$PYTHON" "$MANAGE" import_drupal_news \
     --apply \
     --plan-file "$IMPORT_PLAN" \
     --confirm-plan-sha256 "$PLAN_SHA256" \
-    --report-file "$CHANGE_RECORD/import-apply.md"
-)
+    --report-file "$APPLY_REPORT"
+  then
+    news_fail "apply failed; inspect $APPLY_REPORT if it exists"
+    return 1
+  fi
+
+  news_require 'apply did not create a nonempty report' \
+    test -s "$APPLY_REPORT" || return 1
+  printf 'Apply: OK\n'
+  printf 'Apply report: %s\n' "$APPLY_REPORT"
+}
+
+news_apply APPLY_BETA_NEWS_IMPORT
 ```
 
-Apply rejects repeated source, cutoff, target, exclusion, correction, count, strict-mode,
-notification and import-user flags. It loads those values from the plan, verifies the plan
-file SHA-256, then revalidates the bound source SHA-256, exact release interpreter, target,
-staged IDs/counts/relationships, per-record author/post-date attribution and transactional
-outcome. A new backup arriving in `SOURCE_DIRECTORY` after dry-run is ignored; apply uses
-only the exact planned file. Plans from an older schema version are rejected and require a
-new dry-run.
+Do not repeat source, cutoff, exclusion, correction, target, count, notification or import
+user options during apply. They come from the reviewed plan. A newer dump arriving after
+dry-run is ignored.
 
-### 7. Verify the database and rendered application
+### 8. Verify the applied rows
+
+Review the complete apply report, then query both feeds:
 
 ```bash
-"$PYTHON" "$MANAGE" shell --no-imports <<'PY'
+less "$APPLY_REPORT"
+```
+
+```bash
+news_verify() {
+  if ! "$PYTHON" "$MANAGE" shell --no-imports <<'PY'
 from infrastructure_news.models import SystemStatusNews as S
 from integration_news.models import IntegrationNews as I
 
-print('system rows:', S.objects.count())
-print('system null outage_id:', S.objects.filter(outage_id__isnull=True).count())
-print('system relationships:', S.affected_infrastructure_items.through.objects.count())
-print('system attribution:', list(S.objects.order_by('outage_id').values_list(
-    'outage_id', 'author__username', 'created_at', 'published_at'
-)))
-print('integration rows:', I.objects.count())
-print('integration null integration_news_id:', I.objects.filter(
-    integration_news_id__isnull=True
-).count())
-print('integration relationships:', I.affected_elements.through.objects.count())
-print('integration attribution:', list(I.objects.order_by(
-    'integration_news_id'
-).values_list(
-    'integration_news_id', 'author__username', 'created_at', 'published_at'
-)))
+print("system rows:", S.objects.count())
+print("system null outage_id:", S.objects.filter(outage_id__isnull=True).count())
+print("system relationships:", S.affected_infrastructure_items.through.objects.count())
+print("system attribution:")
+for row in S.objects.order_by("outage_id").values_list(
+    "outage_id", "author__username", "created_at", "published_at"
+):
+    print(" ", row)
+
+print("integration rows:", I.objects.count())
+print(
+    "integration null integration_news_id:",
+    I.objects.filter(integration_news_id__isnull=True).count(),
+)
+print("integration relationships:", I.affected_elements.through.objects.count())
+print("integration attribution:")
+for row in I.objects.order_by("integration_news_id").values_list(
+    "integration_news_id", "author__username", "created_at", "published_at"
+):
+    print(" ", row)
 PY
+  then
+    news_fail 'post-apply database verification failed'
+    return 1
+  fi
+}
+
+news_verify
 ```
 
-Compare all counts, authors and timestamps with the apply report and reviewed plan. Then
-manually verify representative exact-match author, fallback author, oldest, newest,
-multi-resource, multi-element, empty/optional-field and HTML-heavy records through the beta
-pages and both JSON APIs. Confirm the displayed Posted value is the original Drupal post
-date and that no migration email or Slack notification was sent.
+Confirm counts, relationships, authors and timestamps against the reviewed plan and apply
+report. Manually check representative exact-match, fallback, multi-resource,
+multi-element and HTML-heavy records in both beta pages and JSON APIs. Confirm displayed
+post dates are the Drupal dates and that no migration email or Slack notification was
+sent.
 
-### 8. Repeat the rehearsal
+### 9. Failure and retry behavior
 
-Repeat dry-run, apply and verification at least once with the same approved release and
-dump. For an exact determinism test, use a directory containing the same newest dump and
-set the previous plan's exact cutoff rather than capturing a new time. Because replacement
-is deterministic, the second plan and apply must produce the same row, stable-ID and
-relationship counts. Preserve a new change-record directory and plan for each run.
+When any phase prints `STOP`, remain in the same shell, run `news_state`, inspect the
+reported artifact, correct the cause, and rerun only that phase. The functions never call
+top-level `exit`, so they do not log out `software`, and their global rehearsal variables
+remain set. Do not retry a failed or uncertain apply until its report and database outcome
+are understood. Use a new evidence directory and a new dry-run if any reviewed input,
+release, target, source dump, cutoff, user resolution or correction changes.
 
-Repeat again after any code change, source correction, new dump, dependency-lock change or
-target configuration change. A different SHA-256 is a new rehearsal input.
+If the login shell itself is closed or disconnected, its variables and functions cannot
+be recovered from Bash. Start a new `software` shell and either begin a new rehearsal or
+restore the exact release and evidence paths from the successful dry-run before doing any
+further work; never guess paths from an older run.
+
+Repeat the full rehearsal after any code change, new dump, dependency-lock change or target
+configuration change. For a determinism test, use the same newest dump and call
+`news_setup '<NEW-EXACT-RELEASE>' '<PRIOR-PLAN-CUTOFF>'`, but always create a new evidence
+directory and plan.
 
 ## Final cutover
 
