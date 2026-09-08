@@ -57,10 +57,6 @@ class IntegrationNewsForm(forms.ModelForm):
         labels = {'title': 'Subject', 'content': 'News Content'}
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter news subject'}),
-            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 8, 'placeholder': 'Enter news content'}),
-        }
-        help_texts = {
-            'content': 'To update news content text please follow formatting guidance at <a href="https://operations.access-ci.org/operational-status-communications" target="_blank">Operational Status Communications</a>',
         }
 
     def __init__(self, *args, **kwargs):
