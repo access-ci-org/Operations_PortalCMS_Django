@@ -1,8 +1,11 @@
-0.7.3 jlambertson 2026-08-31
+v0.7.4 jlambertson 2026-09-08
+- updating html editing templates to allow for better content editing and formatting
+
+v0.7.3 jlambertson 2026-08-31
 - updating API end point for integration_news
 - adding test scripts for robust import of news feeds from mysql -> postgres
 
-0.7.2 jlambertson 2026-08-20
+v0.7.2 jlambertson 2026-08-20
 - updating API endpoint URL to match the previous
 
 v0.7.1 jlambertson 2026-08-19
