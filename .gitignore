@@ -166,6 +166,7 @@ venv.bak/
 dumps/
 .codex
 operations_portalcms_django/PROD
+dev_documentation/integration_news_v1_work.md
 
 
 # Spyder project settings
@@ -206,9 +207,9 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#  and can be added to the global gitignore or merged into this file. However, if you prefer,
 #  you could uncomment the following to ignore the entire vscode folder
 # .vscode/
 
@@ -243,5 +244,5 @@ django.*.dump*.gz
 *.sql.gz
 backup*.sql
 backup*.json
-database/drupal_backups 
+database/drupal_backups
 portal_django_cutover.psql

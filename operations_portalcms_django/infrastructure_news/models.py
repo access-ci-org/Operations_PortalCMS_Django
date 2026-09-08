@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 from cms.models.pluginmodel import CMSPlugin
+from djangocms_text_ckeditor.fields import HTMLField
 
 
 class SystemStatusNews(models.Model):
@@ -16,7 +17,7 @@ class SystemStatusNews(models.Model):
     ]
 
     subject = models.CharField(max_length=200, default='Untitled', verbose_name='Subject')
-    content = models.TextField(verbose_name='News Content')
+    content = HTMLField(verbose_name='News Content')
     infrastructure_news_type = models.CharField(
         max_length=50,
         choices=INFRASTRUCTURE_NEWS_TYPES,

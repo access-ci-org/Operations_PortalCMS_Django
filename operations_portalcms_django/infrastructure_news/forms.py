@@ -45,13 +45,11 @@ class SystemStatusNewsForm(forms.ModelForm):
         }
         widgets = {
             'subject': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter news subject'}),
-            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 8, 'placeholder': 'Enter news content'}),
             'infrastructure_news_type': forms.Select(attrs={'class': 'form-select'}),
             'email_list': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'email1@example.com, email2@example.com'}),
             'slack_channel': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '#channel-name'}),
         }
         help_texts = {
-            'content': 'To update news content text please follow formatting guidance at <a href="https://operations.access-ci.org/operational-status-communications" target="_blank">Operational Status Communications</a>',
             'email_list': 'Comma-separated email addresses for notifications',
             'slack_channel': 'Slack channel name (e.g., #operations-alerts)',
         }

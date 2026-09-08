@@ -4,9 +4,10 @@
 {% block title %}Update Integration News{% endblock %}
 
 {% block content %}
+{{ form.media }}
 <div class="container mt-4">
     <h1>Update Integration News</h1>
-    
+
     <form method="post">
         {% csrf_token %}
         

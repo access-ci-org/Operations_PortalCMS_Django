@@ -42,7 +42,7 @@
                             {% endwith %}
                             <p class="card-text mb-1"><span class="fw-bold text-dark">Effective Date:</span> {% if news.effective_date %}{{ news.effective_date|date:"F j, Y" }}{% else %}Not Specified{% endif %}</p>
                             <p class="card-text mb-3"><span class="fw-bold text-dark">Expiration Date:</span> {% if news.expiration_date %}{{ news.expiration_date|date:"F j, Y" }}{% else %}Not Specified{% endif %}</p>
-                            <p class="card-text">{{ news.content }}</p>
+                            <div class="card-text">{{ news.content }}</div>
                             <p class="text-muted">
                                 <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
                                 <small class="ms-2">• Author: {{ news.author.get_full_name|default:news.author.username }}</small>
