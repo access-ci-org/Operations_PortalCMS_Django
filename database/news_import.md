@@ -262,7 +262,13 @@ news_setup() {
 Run setup, replacing only the release directory name:
 
 ```bash
-news_setup '<NEW-EXACT-RELEASE>'
+news_setup \
+  '<NEW-EXACT-RELEASE>'
+```
+# EXAMPLE formatting
+```bash
+news_setup \
+  'news_apis_imports_testing-4e65ccf8baef-19d6e816f90f-1788866946'
 ```
 
 Keep this shell open and do not redefine the variables. Do not export `PYTHONPATH`.
