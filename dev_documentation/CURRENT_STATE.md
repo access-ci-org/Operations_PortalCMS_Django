@@ -227,15 +227,26 @@ creates or updates the CMS `PagePermission` rows for the focus pages.
 Current intended flow: page-specific editor creates a draft, submits it for
 review, and a `Focus_area_editors` member reviews/publishes.
 
-### RP Permission Sync
+### Portal Operations Groups
 
-`manage.py setup_rp_permissions` can map CIDER Resource Provider groups into
-Django auth groups and permissions. Treat this as optional and review the
-selected CIDER groups before a real run.
+There is no management command that creates operations or Resource Provider
+(RP) groups. Group creation is a manual, deliberate action: a superuser
+creates a specific Django group (Django admin or direct DB access) only when
+an actual permission need for it exists. Nothing pre-provisions groups
+speculatively.
 
-The current auth group table still contains older RP-style groups alongside
-current CIDER group records. The command is idempotent and supports `--dry-run`,
-but a real run writes Django groups, permissions, and group-permission links.
+RP group membership in particular is owned centrally by the Warehouse/
+Operations API and must never be duplicated here — a `setup_rp_permissions`
+command that both created per-Resource-Provider groups and, via a separate
+CILogon post-login signal handler, auto-synced (and even auto-removed) a
+user's Django group membership from CILogon claims was removed for exactly
+this reason. CILogon is authentication-only and has no influence on Django
+group membership; removing that signal handler fixed a real bug where
+manually-granted group membership was silently stripped on a user's next
+login.
+
+The current auth group table may still contain older per-RP groups created by
+that now-removed command; those are not cleaned up automatically.
 
 ## Operational Commands
 
@@ -246,7 +257,6 @@ Run Django management commands from the Django project directory
 |---|---|
 | `manage.py setup_groups` | Creates/updates news author/manager groups; creates focus-area auth groups; grants shared CMS/plugin/page permissions; gives `Focus_area_editors` publish/unlock rights; removes publish from page-specific focus groups |
 | `manage.py setup_focus_area_page_permissions` | Creates/updates CMS `PagePermission` rows for focus pages after the groups exist; supports `--dry-run` |
-| `manage.py setup_rp_permissions` | Maps selected CIDER RP groups into Django auth groups and permissions; dry-run before any real run |
 | `manage.py sync_cider_from_api` | Refreshes CIDER infrastructure, organization, group, category, and feature metadata; supports `--dry-run` |
 | `manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups` | Checks or prunes stale local CIDER group rows |
 | `manage.py import_drupal_news` | One-time Drupal cutover importer for both news feeds; it derives a non-email username candidate from each Drupal login, then a strict replacement dry-run can select the newest timestamped raw dump from an explicit directory and writes a versioned JSON plan binding the source, release, target, cutoff, adjustments, IDs, counts, relationships, per-record exact-username/fallback author resolution, original post dates, and expected outcome; apply consumes and revalidates that exact reviewed plan before guarded atomic replacement |

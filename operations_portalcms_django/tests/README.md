@@ -13,7 +13,6 @@ Do not run them against the database of record, RDS `portal1`, unless you explic
 Run individual scripts against an explicitly selected non-production config:
 
 ```bash
-APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_permissions.py
 APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_news_permissions.py
 APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_area_page_workflow.py
 ```
@@ -21,15 +20,6 @@ APP_CONFIG=/path/to/non-production-config.json uv run python tests/test_focus_ar
 There is no pytest configuration in this repo right now, and `pytest` is not listed in `pyproject.toml`.
 
 ## Test Coverage
-
-### test_permissions.py
-Tests CILogon group synchronization:
-- RP coordinator permissions
-- RP implementer permissions  
-- Multiple RP memberships
-- Group membership changes on re-login
-
-Side effects: creates or updates users such as `psc_coordinator`, `multi_role_user`, and `former_coordinator`, and changes group memberships. It does not clean all of those users up.
 
 ### test_news_permissions.py
 Tests news admin permissions:
