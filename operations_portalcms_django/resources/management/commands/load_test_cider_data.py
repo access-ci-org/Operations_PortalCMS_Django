@@ -165,4 +165,4 @@ class Command(BaseCommand):
         self.stdout.write(f'\nResource Provider Groups: {CiderGroups.objects.count()} total')
         self.stdout.write(f'Organizations: {CiderOrganizations.objects.count()} total')
         self.stdout.write(f'Infrastructure: {CiderInfrastructure.objects.count()} total')
-        self.stdout.write('\nNext step: Run setup_rp_permissions to create Django groups\n')
+        self.stdout.write('\n')

@@ -32,6 +32,17 @@ urlpatterns = [
     # Redirects for retired /pub/ FAQ pages -> new /faqs/ CMS pages
     path('pub/identity-faqs/', RedirectView.as_view(url='/faqs/account-setup-and-management/', permanent=True)),
     path('pub/ticketing-faqs/', RedirectView.as_view(url='/faqs/ticketing-system/', permanent=True)),
+    # Shareable link (used in docs) -> Jira Service Desk "Open Operations Request" form.
+    # Temporary (302) redirect: the Jira portal itself requires sign-in and its own
+    # redirect behavior isn't stable, so avoid client/proxy caching of this mapping.
+    path(
+        'open-operations-request',
+        RedirectView.as_view(
+            url='https://access-ci.atlassian.net/servicedesk/customer/portal/3/group/5/create/26',
+            permanent=False,
+        ),
+        name='open_operations_request',
+    ),
     path('', include('cms.urls')),  # CMS pages - keep this last as catch-all
 ]
 

@@ -103,8 +103,9 @@ class CiderGroups(models.Model):
     """Local projection of CIDER Resource Provider groups.
 
     Non-authoritative cache — see CiderInfrastructure docstring for details.
-    Populated exclusively by sync_cider_from_api. Used locally to drive
-    Django permission and auth group setup via setup_rp_permissions.
+    Populated exclusively by sync_cider_from_api. Resource Provider group
+    membership in Django is not derived from this data: RP groups are owned
+    centrally by the Warehouse/Operations API and must not be duplicated here.
     """
     group_id = models.IntegerField(primary_key=True)
     info_groupid = models.CharField(db_index=True, max_length=40, unique=True)

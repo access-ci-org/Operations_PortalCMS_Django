@@ -260,7 +260,7 @@ class ResourceViewTests(SimpleTestCase):
             None,
         )
 
-        response = views.software_discovery.__wrapped__(self.factory.get('/resources/software-discovery/?q=app'))
+        response = views.software_discovery.__wrapped__(self.factory.get('/software_discovery/?q=app'))
 
         self.assertEqual(response.template_name, 'portal/software_discovery.html')
         self.assertEqual(response.context_data['total_count'], 30)
