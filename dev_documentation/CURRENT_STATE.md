@@ -128,7 +128,7 @@ catch-all route.
 | Auth/CILogon | `/accounts/` | django-allauth |
 | ACCESS user admin | `/access_django_user_admin/` | `access_django_user_admin` |
 | Resource listings | `/resources/access-allocated/`, `/resources/access-online-services/` | `resources.urls` |
-| Software discovery | `/resources/software-discovery/`, `/resources/software/<software_id>/` | `resources.urls` |
+| Software discovery | `/software_discovery/`, `/resources/software/<software_id>/` | `resources.urls` |
 | Resource detail | `/node/<node_id>/` | `resources.urls` |
 | System Status News | `/infrastructure-news/` plus add/update/workflow routes | `infrastructure_news.urls` |
 | Integration News | `/integration-news/` plus add/update/workflow routes | `integration_news.urls` |
