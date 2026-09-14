@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import IntegrationNews
-from portal.utils import can_manage_news
 
 
 @admin.register(IntegrationNews)
@@ -43,18 +42,18 @@ class IntegrationNewsAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         if request.user.is_superuser:
             return True
-        return can_manage_news(request.user)
+        return request.user.has_perm('integration_news.add_integrationnews')
 
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        if obj and obj.author == request.user:
-            return True
-        return can_manage_news(request.user)
+        return request.user.has_perm('integration_news.change_integrationnews')
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser or request.user.is_staff:
+        if request.user.is_superuser:
             return True
-        if obj and obj.author == request.user:
+        if not request.user.has_perm('integration_news.delete_integrationnews'):
+            return False
+        if obj is None:
             return True
-        return False
+        return obj.author == request.user

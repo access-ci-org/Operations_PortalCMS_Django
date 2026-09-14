@@ -27,9 +27,6 @@ class IntegrationWorkflowMethodTests(SimpleTestCase):
 
     def test_workflow_state_changes_reject_get_requests(self):
         views = [
-            workflow.submit_integration_for_review,
-            workflow.approve_integration_news,
-            workflow.reject_integration_news,
             workflow.publish_integration_news,
             workflow.unpublish_integration_news,
         ]

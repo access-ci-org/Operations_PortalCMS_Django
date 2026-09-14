@@ -68,10 +68,7 @@ class IntegrationNews(models.Model):
         max_length=20,
         choices=[
             ('draft', 'Draft'),
-            ('pending_review', 'Pending Review'),
-            ('approved', 'Approved'),
             ('published', 'Published'),
-            ('rejected', 'Rejected'),
         ],
         default='published',
         help_text='Current workflow status',
@@ -95,7 +92,6 @@ class IntegrationNews(models.Model):
         verbose_name_plural = 'Integration News'
         db_table = 'portal_integrationnews'
         permissions = [
-            ('can_review_integrationnews', 'Can review Integration News'),
             ('can_publish_integrationnews', 'Can publish Integration News'),
         ]
 
