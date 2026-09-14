@@ -21,6 +21,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.dateparse import parse_date, parse_datetime
+from djangocms_text_ckeditor.html import clean_html
 from integration_news.models import IntegrationElement, IntegrationNews
 from resources.models import CiderInfrastructure
 
@@ -1669,7 +1670,11 @@ class Command(BaseCommand):
             obj = system_by_id[stable_id]
             expected_fields = {
                 "subject": record.get("subject") or "Untitled",
-                "content": record.get("content") or "",
+                # HTMLField.clean() runs clean_html() via full_clean() before save
+                # (see _import_system_record), which normalizes markup (html5lib
+                # reserialization, closing tags, quoted attributes). Compare against
+                # that same normalized form rather than the raw source string.
+                "content": clean_html(record.get("content") or "", full=False),
                 "infrastructure_news_type": record.get("infrastructure_news_type")
                 or "outage_full",
                 "affected_infrastructure": record.get("affected_infrastructure") or "",
@@ -1739,7 +1744,8 @@ class Command(BaseCommand):
                 expected_codes = [str(primary)] if primary else []
             expected_fields = {
                 "title": record.get("title") or "Untitled",
-                "content": record.get("content") or "",
+                # See the matching comment in the SystemStatusNews loop above.
+                "content": clean_html(record.get("content") or "", full=False),
                 "news_type": record.get("news_type") or "",
                 "affected_element": (
                     str(expected_codes[0]) if len(expected_codes) == 1 else ""

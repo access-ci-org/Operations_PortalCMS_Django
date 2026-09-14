@@ -111,6 +111,19 @@ family:
 - nid `797` is the historical Hive Gateway retirement. Its absent end date makes it look
   current to the generic cutoff rule, but its resource is no longer in active CIDER.
 
+The September 14 dump surfaced a `Replacement validation failed for SystemStatusNews
+nid=914 field content` error during `--apply`. This was not a bad-source-data case like
+`404`/`797` above and was not excluded: nid `914` is retained content (it already passed
+the cutoff filter before validation ran), so dropping it would have been a real content
+loss. The actual cause was a validator bug - `_validate_replacement` compared the raw
+Drupal source string against the saved value, but `_import_system_record` calls
+`obj.full_clean(...)` before saving, which runs `HTMLField.clean()` ->
+`djangocms_text_ckeditor.html.clean_html()` and rewrites almost any markup not already in
+html5lib's canonical serialized form (unclosed tags, unquoted attributes, etc. - common in
+older Drupal-exported HTML). Fixed in the validator itself (see
+`_validate_replacement` in `import_drupal_news.py`) by normalizing the expected content
+through the same `clean_html()` call before comparing, rather than excluding the record.
+
 One source correction remains necessary before the cutoff can be evaluated: correct only
 nid `928`'s start datetime from the exact source value
   `0026-01-07T12:50:36` to `2026-01-07T12:50:36` by supplying
