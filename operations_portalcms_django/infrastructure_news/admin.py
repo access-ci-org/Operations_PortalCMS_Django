@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import SystemStatusNews
-from portal.utils import can_manage_news, is_rp_user
 
 
 @admin.register(SystemStatusNews)
@@ -31,6 +30,11 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not change:
             obj.author = request.user
+            can_publish = request.user.is_superuser or request.user.has_perm(
+                'infrastructure_news.can_publish_systemstatusnews'
+            )
+            if not can_publish:
+                obj.status = 'draft'
         super().save_model(request, obj, form, change)
 
     def save_related(self, request, form, formsets, change):
@@ -49,28 +53,21 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         if request.user.is_superuser:
             return True
-        return can_manage_news(request.user)
+        return request.user.has_perm('infrastructure_news.add_systemstatusnews')
 
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        if obj and obj.author == request.user:
-            return True
-        return can_manage_news(request.user)
+        return request.user.has_perm('infrastructure_news.change_systemstatusnews')
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser or request.user.is_staff:
+        if request.user.is_superuser:
             return True
-        if obj and obj.author == request.user:
-            return True
-        return False
-
-    def formfield_for_manytomany(self, db_field, request, **kwargs):
-        formfield = super().formfield_for_manytomany(db_field, request, **kwargs)
-        if db_field.name == 'affected_infrastructure_items' and is_rp_user(request.user):
-            if not request.user.is_staff:
-                formfield.help_text = (
-                    'Select one or more CIDER resources. '
-                    'You can report on any infrastructure - cross-RP collaboration is encouraged.'
-                )
-        return formfield
+        if not request.user.has_perm('infrastructure_news.delete_systemstatusnews'):
+            return False
+        if obj is None:
+            # Disable bulk delete for non-superusers: delete is author-only, so a
+            # mixed selection would fail the whole batch with an opaque
+            # PermissionDenied. Single-item delete gives clear per-item feedback.
+            return False
+        return obj.author == request.user

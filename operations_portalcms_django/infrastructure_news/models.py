@@ -65,10 +65,7 @@ class SystemStatusNews(models.Model):
         max_length=20,
         choices=[
             ('draft', 'Draft'),
-            ('pending_review', 'Pending Review'),
-            ('approved', 'Approved'),
             ('published', 'Published'),
-            ('rejected', 'Rejected'),
         ],
         default='published',
         help_text='Current workflow status',
@@ -92,7 +89,6 @@ class SystemStatusNews(models.Model):
         verbose_name_plural = 'System and Infrastructure Status News'
         db_table = 'portal_systemstatusnews'
         permissions = [
-            ('can_review_systemstatusnews', 'Can review System Status News'),
             ('can_publish_systemstatusnews', 'Can publish System Status News'),
         ]
 

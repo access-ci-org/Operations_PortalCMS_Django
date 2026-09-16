@@ -29,9 +29,6 @@ class SystemStatusWorkflowMethodTests(SimpleTestCase):
 
     def test_workflow_state_changes_reject_get_requests(self):
         views = [
-            workflow.submit_systemstatus_for_review,
-            workflow.approve_systemstatus_news,
-            workflow.reject_systemstatus_news,
             workflow.publish_systemstatus_news,
             workflow.unpublish_systemstatus_news,
         ]

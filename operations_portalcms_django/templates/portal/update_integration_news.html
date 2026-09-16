@@ -68,8 +68,8 @@
         <button type="submit" name="publish" class="btn btn-success">Update and Publish</button>
         {% endif %}
         <a href="{% url 'integration_news:integration_news' %}" class="btn btn-secondary">Cancel</a>
-        {% if perms.integration_news.delete_integrationnews %}
-            <button type="submit" name="delete" class="btn btn-danger float-end">Delete</button>
+        {% if can_delete %}
+            <button type="submit" name="delete" class="btn btn-danger float-end" onclick="return confirm('Are you sure you want to permanently delete this news item?');">Delete</button>
         {% endif %}
     </form>
 </div>

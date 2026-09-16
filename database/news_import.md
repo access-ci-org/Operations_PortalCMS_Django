@@ -111,6 +111,19 @@ family:
 - nid `797` is the historical Hive Gateway retirement. Its absent end date makes it look
   current to the generic cutoff rule, but its resource is no longer in active CIDER.
 
+The September 14 dump surfaced a `Replacement validation failed for SystemStatusNews
+nid=914 field content` error during `--apply`. This was not a bad-source-data case like
+`404`/`797` above and was not excluded: nid `914` is retained content (it already passed
+the cutoff filter before validation ran), so dropping it would have been a real content
+loss. The actual cause was a validator bug - `_validate_replacement` compared the raw
+Drupal source string against the saved value, but `_import_system_record` calls
+`obj.full_clean(...)` before saving, which runs `HTMLField.clean()` ->
+`djangocms_text_ckeditor.html.clean_html()` and rewrites almost any markup not already in
+html5lib's canonical serialized form (unclosed tags, unquoted attributes, etc. - common in
+older Drupal-exported HTML). Fixed in the validator itself (see
+`_validate_replacement` in `import_drupal_news.py`) by normalizing the expected content
+through the same `clean_html()` call before comparing, rather than excluding the record.
+
 One source correction remains necessary before the cutoff can be evaluated: correct only
 nid `928`'s start datetime from the exact source value
   `0026-01-07T12:50:36` to `2026-01-07T12:50:36` by supplying
@@ -128,13 +141,16 @@ own report.
 Do not edit the dump. Its SHA-256 continues to identify the exact source artifact, while
 the report records the exclusion and correction separately.
 
-## Rehearsal on beta
+## Rehearsal on beta and the final cutover
 
-This procedure deliberately avoids a shell-wide `set -e` and top-level `exit`. Each phase
-is a function: a failed check prints `STOP`, returns to the `software` prompt, and leaves
-the rehearsal variables available for inspection with `news_state`. Run one phase at a
-time and do not continue after a nonzero return. Paste only fenced command blocks; prose
-such as “review” or “then” is not a shell command.
+Both a beta rehearsal and the final production cutover use this identical numbered
+procedure; only the `environment` argument to `news_setup` (`beta` or `production`)
+differs - see [Final cutover](#final-cutover) for what else that changes. This procedure
+deliberately avoids a shell-wide `set -e` and top-level `exit`. Each phase is a function: a
+failed check prints `STOP`, returns to the `software` prompt, and leaves the rehearsal
+variables available for inspection with `news_state`. Run one phase at a time and do not
+continue after a nonzero return. Paste only fenced command blocks; prose such as “review”
+or “then” is not a shell command.
 
 ### 1. Prerequisites
 
@@ -143,8 +159,9 @@ Before starting:
 - deploy the approved immutable release through the normal infrastructure workflow;
 - place one or more readable, timestamp-named MySQL dumps in
   `/soft/django-cms-01/var/news-import`;
-- independently confirm the beta database name and PostgreSQL write endpoint;
-- obtain separate approval for the beta database replacement; and
+- independently confirm the target database name and PostgreSQL write endpoint for the
+  environment you are about to pass to `news_setup`;
+- obtain separate approval for that database's replacement; and
 - confirm that `jlambertson` is the approved fallback Django user.
 
 The dump directory selector accepts only readable regular files named
@@ -181,6 +198,7 @@ news_require() {
 }
 
 news_state() {
+  printf 'Environment: %s\n' "${ENVIRONMENT:-<unset>}"
   printf 'Release: %s\n' "${RELEASE:-<unset>}"
   printf 'Python: %s\n' "${PYTHON:-<unset>}"
   printf 'Cutoff: %s\n' "${SYSTEM_NEWS_AS_OF:-<unset>}"
@@ -190,8 +208,9 @@ news_state() {
 }
 
 news_setup() {
-  local release_name="${1:-}"
-  local requested_cutoff="${2:-}"
+  local environment="${1:-}"
+  local release_name="${2:-}"
+  local requested_cutoff="${3:-}"
 
   case "$release_name" in
     ''|*'<'*|*'>'*|*/*)
@@ -208,20 +227,45 @@ news_setup() {
   MANAGE="$RELEASE/operations_portalcms_django/manage.py"
   BACKUP_SCRIPT="$RELEASE/database/pg_dump_portal.sh"
   APP_CONFIG="$APP_HOME/conf/portal.conf"
-
   SOURCE_DIRECTORY="$APP_HOME/var/news-import"
-  EXPECTED_DATABASE=portal_beta
-  EXPECTED_WRITE_HOST=opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com
   IMPORT_USER=jlambertson
 
+  # Each branch is a reviewed, hardcoded target - never accept a database or write
+  # host as a free-form argument. An unrecognized environment name is refused rather
+  # than falling through to any default.
+  case "$environment" in
+    beta)
+      ENVIRONMENT=beta
+      EXPECTED_DATABASE=portal_beta
+      EXPECTED_WRITE_HOST=opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com
+      RECORD_PREFIX=beta-rehearsal
+      BACKUP_NAME=portal_beta_pre_import.dump
+      BACKUP_PHRASE=CREATE_BETA_BACKUP
+      APPLY_PHRASE=APPLY_BETA_NEWS_IMPORT
+      ;;
+    production)
+      ENVIRONMENT=production
+      EXPECTED_DATABASE=portal1
+      EXPECTED_WRITE_HOST=opsdb-dev.cluster-clabf5kcvwmz.us-east-2.rds.amazonaws.com
+      RECORD_PREFIX=production-cutover
+      BACKUP_NAME=portal1_pre_import.dump
+      BACKUP_PHRASE=CREATE_PRODUCTION_BACKUP
+      APPLY_PHRASE=APPLY_PRODUCTION_NEWS_IMPORT
+      ;;
+    *)
+      news_fail "pass environment 'beta' or 'production' as the first argument"
+      return 1
+      ;;
+  esac
+
   RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')"
-  CHANGE_RECORD="$APP_HOME/var/news-import/beta-rehearsal-$RUN_ID"
+  CHANGE_RECORD="$APP_HOME/var/news-import/$RECORD_PREFIX-$RUN_ID"
   IMPORT_PLAN="$CHANGE_RECORD/import-plan.json"
   DRY_RUN_REPORT="$CHANGE_RECORD/import-dry-run.md"
   PRETTY_PLAN="$CHANGE_RECORD/import-plan.pretty.json"
   PLAN_CHECKSUM_FILE="$CHANGE_RECORD/import-plan.sha256"
   APPLY_REPORT="$CHANGE_RECORD/import-apply.md"
-  TARGET_BACKUP="$CHANGE_RECORD/portal_beta_pre_import.dump"
+  TARGET_BACKUP="$CHANGE_RECORD/$BACKUP_NAME"
   BACKUP_CHECKSUM_FILE="$CHANGE_RECORD/target-backup.sha256"
   if test -n "$requested_cutoff"; then
     SYSTEM_NEWS_AS_OF="$requested_cutoff"
@@ -229,8 +273,8 @@ news_setup() {
     SYSTEM_NEWS_AS_OF="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   fi
 
-  export APP_CONFIG RELEASE EXPECTED_DATABASE EXPECTED_WRITE_HOST
-  export IMPORT_USER CHANGE_RECORD IMPORT_PLAN
+  export APP_CONFIG RELEASE ENVIRONMENT EXPECTED_DATABASE EXPECTED_WRITE_HOST
+  export IMPORT_USER CHANGE_RECORD IMPORT_PLAN BACKUP_PHRASE APPLY_PHRASE
 
   news_require 'the operating-system user is not software' \
     test "$(id -un)" = software || return 1
@@ -259,20 +303,31 @@ news_setup() {
 }
 ```
 
-Run setup, replacing only the release directory name:
+Run setup for a beta rehearsal, replacing only the release directory name:
 
 ```bash
 news_setup \
+  beta \
   '<NEW-EXACT-RELEASE>'
 ```
 # EXAMPLE formatting
 ```bash
 news_setup \
-  'v0.7.3-cdf44c1206b8-19d6e816f90f-1788876708'
+  beta \
+  'ctt-1133-attaching-news-groups-perms-3dd75a7101a8-19d6e816f90f-1789491441'
+```
+
+For the final production cutover on the production CMS host, pass `production` instead -
+see [Final cutover](#final-cutover):
+
+```bash
+news_setup \
+  production \
+  '<APPROVED-PRODUCTION-RELEASE>'
 ```
 
 Keep this shell open and do not redefine the variables. Do not export `PYTHONPATH`.
-For a deterministic replay only, pass the previously reviewed cutoff as a second argument
+For a deterministic replay only, pass the previously reviewed cutoff as a third argument
 to `news_setup`; otherwise setup captures the current UTC time exactly once.
 
 ### 3. Confirm the importer release and target
@@ -348,8 +403,9 @@ news_preflight
 ```
 
 This reads settings but never prints credentials. Continue only after the output confirms
-plan and contract version 3, the release interpreter, `portal_beta`, the independently
-approved beta write host, and fallback user `jlambertson`.
+plan and contract version 3, the release interpreter, the expected database for the
+environment passed to `news_setup` (`portal_beta` or `portal1`), the independently
+approved write host, and fallback user `jlambertson`.
 
 ### 4. Run the strict dry-run
 
@@ -510,7 +566,7 @@ The Django Treebeard compatibility warning is separate from the importer report.
 rolls back, so querying PostgreSQL at this point shows the existing rows rather than the
 staged replacement.
 
-### 6. Preview and take the separately approved beta backup
+### 6. Preview and take the separately approved backup
 
 The backup is a separate database operation and requires its own human authorization. Its
 script runs as a child process, so its internal `exit` cannot close the login shell. First
@@ -536,16 +592,19 @@ news_backup_preview() {
 news_backup_preview
 ```
 
-The preview must show the independently approved beta database and host. If the backup
-script's configured read host is not that approved target, stop; do not override or infer a
-different endpoint during the change.
+The preview must show the independently approved database and host for the environment
+passed to `news_setup`. If the backup script's configured read host is not that approved
+target, stop; do not override or infer a different endpoint during the change.
 
-After visually confirming the preview and obtaining the separate backup approval, run:
+After visually confirming the preview and obtaining the separate backup approval, run
+(the required phrase is `CREATE_BETA_BACKUP` for a beta rehearsal or
+`CREATE_PRODUCTION_BACKUP` for the production cutover - `news_setup` bound the correct one
+to `$BACKUP_PHRASE`):
 
 ```bash
 news_backup() {
-  if test "${1:-}" != CREATE_BETA_BACKUP; then
-    news_fail 'call: news_backup CREATE_BETA_BACKUP'
+  if test "${1:-}" != "$BACKUP_PHRASE"; then
+    news_fail "call: news_backup $BACKUP_PHRASE"
     return 1
   fi
   news_require 'target backup path already exists' \
@@ -555,11 +614,11 @@ news_backup() {
     --source-db "$EXPECTED_DATABASE" \
     --output "$TARGET_BACKUP"
   then
-    news_fail 'beta backup failed'
+    news_fail "$ENVIRONMENT backup failed"
     return 1
   fi
 
-  news_require 'beta backup is missing or empty' \
+  news_require "$ENVIRONMENT backup is missing or empty" \
     test -s "$TARGET_BACKUP" || return 1
   if ! sha256sum "$TARGET_BACKUP" > "$BACKUP_CHECKSUM_FILE"; then
     news_fail 'could not write the backup checksum'
@@ -570,11 +629,21 @@ news_backup() {
     return 1
   fi
 
-  printf 'Beta backup: OK\n'
+  printf '%s backup: OK\n' "$ENVIRONMENT"
   printf 'Backup: %s\n' "$TARGET_BACKUP"
 }
+```
 
+Type the phrase that matches the environment passed to `news_setup` - this must be a
+deliberate, typed choice, not copied from a variable:
+
+```bash
+# beta rehearsal:
 news_backup CREATE_BETA_BACKUP
+```
+```bash
+# production cutover:
+news_backup CREATE_PRODUCTION_BACKUP
 ```
 
 ### 7. Bind and apply only the reviewed plan
@@ -585,7 +654,7 @@ Record and verify the plan checksum only after review and backup:
 news_prepare_apply() {
   news_require 'reviewed plan is missing or empty' \
     test -s "$IMPORT_PLAN" || return 1
-  news_require 'beta backup is missing or empty' \
+  news_require "$ENVIRONMENT backup is missing or empty" \
     test -s "$TARGET_BACKUP" || return 1
   news_require 'backup checksum record is missing' \
     test -s "$BACKUP_CHECKSUM_FILE" || return 1
@@ -615,8 +684,8 @@ Apply requires a final explicit phrase and refuses to overwrite an existing appl
 
 ```bash
 news_apply() {
-  if test "${1:-}" != APPLY_BETA_NEWS_IMPORT; then
-    news_fail 'call: news_apply APPLY_BETA_NEWS_IMPORT'
+  if test "${1:-}" != "$APPLY_PHRASE"; then
+    news_fail "call: news_apply $APPLY_PHRASE"
     return 1
   fi
   news_require 'run news_prepare_apply first' \
@@ -643,8 +712,18 @@ news_apply() {
   printf 'Apply: OK\n'
   printf 'Apply report: %s\n' "$APPLY_REPORT"
 }
+```
 
+Type the phrase that matches the environment passed to `news_setup` - this must be a
+deliberate, typed choice, not copied from a variable:
+
+```bash
+# beta rehearsal:
 news_apply APPLY_BETA_NEWS_IMPORT
+```
+```bash
+# production cutover:
+news_apply APPLY_PRODUCTION_NEWS_IMPORT
 ```
 
 Do not repeat source, cutoff, exclusion, correction, target, count, notification or import
@@ -697,9 +776,9 @@ news_verify
 
 Confirm counts, relationships, authors and timestamps against the reviewed plan and apply
 report. Manually check representative exact-match, fallback, multi-resource,
-multi-element and HTML-heavy records in both beta pages and JSON APIs. Confirm displayed
-post dates are the Drupal dates and that no migration email or Slack notification was
-sent.
+multi-element and HTML-heavy records in both the environment's pages and JSON APIs.
+Confirm displayed post dates are the Drupal dates and that no migration email or Slack
+notification was sent.
 
 ### 9. Failure and retry behavior
 
@@ -717,27 +796,41 @@ further work; never guess paths from an older run.
 
 Repeat the full rehearsal after any code change, new dump, dependency-lock change or target
 configuration change. For a determinism test, use the same newest dump and call
-`news_setup '<NEW-EXACT-RELEASE>' '<PRIOR-PLAN-CUTOFF>'`, but always create a new evidence
-directory and plan.
+`news_setup '<ENVIRONMENT>' '<NEW-EXACT-RELEASE>' '<PRIOR-PLAN-CUTOFF>'`, but always create
+a new evidence directory and plan.
 
 ## Final cutover
 
-The final cutover uses the same command sequence and flags as the successful beta
-rehearsals, with these controlled substitutions:
+The final cutover uses the exact same functions, sequence and flags as a beta rehearsal
+(steps 1-8 above). The only difference is the `environment` argument to `news_setup`:
+
+```bash
+news_setup \
+  production \
+  '<APPROVED-PRODUCTION-RELEASE>'
+```
+
+`news_setup production` binds the reviewed, hardcoded production target (`portal1` at the
+approved write endpoint), a `production-cutover-<RUN_ID>` change-record directory, and the
+`CREATE_PRODUCTION_BACKUP` / `APPLY_PRODUCTION_NEWS_IMPORT` confirmation phrases - it does
+not accept a database or host as a free-form argument. Everything else in this runbook
+follows unchanged, with these additional requirements specific to the cutover itself:
 
 - Use the final frozen MySQL dump taken after Drupal becomes read-only.
-- Pin the specifically approved production release and its `.venv`.
+- Pin the specifically approved production release and confirm it is exactly the active
+  release before running `news_setup`.
 - Run as `software` on the production CMS host.
-- Use the host-specific production `APP_CONFIG`.
-- Set `EXPECTED_DATABASE` to the approved production database and
-  `EXPECTED_WRITE_HOST` to its approved write endpoint.
-- Use a durable production change-record directory.
-- Take and verify a PostgreSQL backup from the same write host immediately before apply.
-- Require the active maintenance window and separate final data-change authorization.
+- Take and verify the production PostgreSQL backup (`news_backup CREATE_PRODUCTION_BACKUP`)
+  immediately before apply; this is not optional the way it may be skipped in a quick beta
+  retry.
+- Require the active maintenance window and separate final data-change authorization before
+  `news_apply APPLY_PRODUCTION_NEWS_IMPORT`.
 
-Do not reuse a beta plan, plan SHA-256, report, config file or backup. Run a new strict
-dry-run against the final frozen dump, review its new JSON plan and Markdown report, record
-the exact plan-file SHA-256, then apply only that plan.
+Do not reuse a beta plan, plan SHA-256, report, config file or backup - `news_setup
+production` always starts a new change-record directory, so this happens automatically as
+long as a fresh `news_setup` call is made. Run a new strict dry-run against the final
+frozen dump, review its new JSON plan and Markdown report, record the exact plan-file
+SHA-256, then apply only that plan.
 
 If the command fails, its PostgreSQL transaction rolls back. Do not retry until the error
 is understood. If it commits but acceptance fails, keep Drupal read-only, stop additional

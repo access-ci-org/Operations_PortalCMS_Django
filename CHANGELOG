@@ -1,3 +1,10 @@
+v0.7.7 jlambertson 2026-09-15
+- added real permissions in news authors groups
+- removed older complex pub workflow code
+- removed some older rp group code from previous effort
+- removed bulk delete from non super users
+- removed some other obsolete perm groups
+
 v0.7.6 jlambertson 2026-09-11
 - updated software discovery pathing to match current site
 

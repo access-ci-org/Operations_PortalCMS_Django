@@ -186,27 +186,29 @@ focus-area setup command.
 
 Both news apps use the same status model:
 
-`draft` -> `pending_review` -> `approved` -> `published`
+`draft` -> `published`
 
-Items may also move to `rejected`; published items can be unpublished back to
-`draft` by the author or a superuser.
+There is no review step. Any member of the feed's publisher group can save a
+new item as a draft or publish it immediately, and can unpublish a published
+item back to `draft`. Workflow state-changing endpoints require login and
+POST. Change, publish, and unpublish all require the app-specific custom
+permission (delete additionally requires the acting user to be the item's
+author, or a superuser):
 
-Workflow state-changing endpoints require login and POST. Review and publish
-actions require the app-specific custom permissions:
+| News type | Publish permission |
+|---|---|
+| System Status News | `infrastructure_news.can_publish_systemstatusnews` |
+| Integration News | `integration_news.can_publish_integrationnews` |
 
-| News type | Review permission | Publish permission |
-|---|---|---|
-| System Status News | `infrastructure_news.can_review_systemstatusnews` | `infrastructure_news.can_publish_systemstatusnews` |
-| Integration News | `integration_news.can_review_integrationnews` | `integration_news.can_publish_integrationnews` |
-
-Two-tier author/manager groups are created by `manage.py setup_groups`:
+Each feed has exactly one group, holding the full add/change/delete/view/publish
+permission set - there is no separate author-only tier. These follow the same
+manual, deliberate creation policy as other Portal Operations groups (see
+below); `manage.py setup_groups` does not create or manage them:
 
 | Group | Role |
 |---|---|
-| `System Status Authors` | create and edit; submit for review to publish |
-| `System Status Managers` | create, edit, delete, review, and publish |
-| `Integration News Authors` | create and edit; submit for review to publish |
-| `Integration News Managers` | create, edit, delete, review, and publish |
+| `urn:group:access-ci.org:operations.access-ci.org:infrastructure-news-publisher` | Full control of System Status News: draft, edit, publish, unpublish, delete own items |
+| `urn:group:access-ci.org:operations.access-ci.org:integration-news-publisher` | Full control of Integration News: draft, edit, publish, unpublish, delete own items |
 
 ### Focus-Area Page Workflow
 
@@ -255,7 +257,7 @@ Run Django management commands from the Django project directory
 
 | Command | Current use |
 |---|---|
-| `manage.py setup_groups` | Creates/updates news author/manager groups; creates focus-area auth groups; grants shared CMS/plugin/page permissions; gives `Focus_area_editors` publish/unlock rights; removes publish from page-specific focus groups |
+| `manage.py setup_groups` | Creates focus-area auth groups; grants shared CMS/plugin/page permissions; gives `Focus_area_editors` publish/unlock rights; removes publish from page-specific focus groups. Does not touch news publisher groups - see News Workflow above |
 | `manage.py setup_focus_area_page_permissions` | Creates/updates CMS `PagePermission` rows for focus pages after the groups exist; supports `--dry-run` |
 | `manage.py sync_cider_from_api` | Refreshes CIDER infrastructure, organization, group, category, and feature metadata; supports `--dry-run` |
 | `manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups` | Checks or prunes stale local CIDER group rows |

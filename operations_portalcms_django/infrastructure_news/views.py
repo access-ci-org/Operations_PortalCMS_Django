@@ -24,14 +24,13 @@ def system_status_news(request):
 
     if request.user.is_authenticated and (
         request.user.has_perm('infrastructure_news.change_systemstatusnews') or
-        request.user.has_perm('infrastructure_news.can_review_systemstatusnews') or
         request.user.has_perm('infrastructure_news.can_publish_systemstatusnews')
     ):
         news_items = SystemStatusNews.objects.filter(is_active=True)
     else:
         news_items = services.get_public_news_queryset()
 
-    news_items = news_items.select_related('author', 'reviewer').prefetch_related(infrastructure_prefetch)
+    news_items = news_items.select_related('author').prefetch_related(infrastructure_prefetch)
     paginator = Paginator(news_items, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -39,7 +38,6 @@ def system_status_news(request):
         'page': 'system_status_news',
         'system_status_news': page_obj,
         'page_obj': page_obj,
-        'can_review': request.user.has_perm('infrastructure_news.can_review_systemstatusnews') if request.user.is_authenticated else False,
         'can_publish': request.user.has_perm('infrastructure_news.can_publish_systemstatusnews') if request.user.is_authenticated else False,
     })
 
@@ -62,7 +60,7 @@ def add_system_status_news(request):
                 messages.success(request, 'System and infrastructure status news published successfully!')
             else:
                 news.status = 'draft'
-                messages.success(request, 'System and infrastructure status news created as draft. Submit for review when ready.')
+                messages.success(request, 'System and infrastructure status news created as draft. Publish when ready.')
             news.save()
             form.save_related_fields(news)
             return redirect('infrastructure_news:system_status_news')
@@ -82,8 +80,19 @@ def update_system_status_news(request, pk):
     """Update existing system and infrastructure status news item"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
     can_publish = request.user.is_superuser or request.user.has_perm('infrastructure_news.can_publish_systemstatusnews')
+    can_delete = request.user.is_superuser or (
+        request.user.has_perm('infrastructure_news.delete_systemstatusnews') and news.author == request.user
+    )
 
     if request.method == 'POST':
+        if 'delete' in request.POST:
+            if not can_delete:
+                messages.error(request, 'You cannot delete this news item.')
+                return redirect('infrastructure_news:update_system_status_news', pk=pk)
+            news.delete()
+            messages.success(request, 'System and infrastructure status news deleted successfully!')
+            return redirect('infrastructure_news:system_status_news')
+
         form = SystemStatusNewsForm(request.POST, instance=news)
         if form.is_valid():
             news = form.save(commit=False)
@@ -106,6 +115,7 @@ def update_system_status_news(request, pk):
         'news': news,
         'form': form,
         'can_publish': can_publish,
+        'can_delete': can_delete,
     })
 
 

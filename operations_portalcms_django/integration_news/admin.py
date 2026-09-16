@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import IntegrationNews
-from portal.utils import can_manage_news
 
 
 @admin.register(IntegrationNews)
@@ -27,6 +26,11 @@ class IntegrationNewsAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not change:
             obj.author = request.user
+            can_publish = request.user.is_superuser or request.user.has_perm(
+                'integration_news.can_publish_integrationnews'
+            )
+            if not can_publish:
+                obj.status = 'draft'
         super().save_model(request, obj, form, change)
 
     def save_related(self, request, form, formsets, change):
@@ -43,18 +47,21 @@ class IntegrationNewsAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         if request.user.is_superuser:
             return True
-        return can_manage_news(request.user)
+        return request.user.has_perm('integration_news.add_integrationnews')
 
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        if obj and obj.author == request.user:
-            return True
-        return can_manage_news(request.user)
+        return request.user.has_perm('integration_news.change_integrationnews')
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser or request.user.is_staff:
+        if request.user.is_superuser:
             return True
-        if obj and obj.author == request.user:
-            return True
-        return False
+        if not request.user.has_perm('integration_news.delete_integrationnews'):
+            return False
+        if obj is None:
+            # Disable bulk delete for non-superusers: delete is author-only, so a
+            # mixed selection would fail the whole batch with an opaque
+            # PermissionDenied. Single-item delete gives clear per-item feedback.
+            return False
+        return obj.author == request.user

@@ -22,14 +22,13 @@ def integration_news(request):
 
     if request.user.is_authenticated and (
         request.user.has_perm('integration_news.change_integrationnews') or
-        request.user.has_perm('integration_news.can_review_integrationnews') or
         request.user.has_perm('integration_news.can_publish_integrationnews')
     ):
         news_items = IntegrationNews.objects.filter(is_active=True)
     else:
         news_items = IntegrationNews.objects.filter(is_active=True, status='published')
 
-    news_items = news_items.select_related('author', 'reviewer').prefetch_related(element_prefetch)
+    news_items = news_items.select_related('author').prefetch_related(element_prefetch)
     paginator = Paginator(news_items, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -37,7 +36,6 @@ def integration_news(request):
         'page': 'integration_news',
         'integration_news': page_obj,
         'page_obj': page_obj,
-        'can_review': request.user.has_perm('integration_news.can_review_integrationnews') if request.user.is_authenticated else False,
         'can_publish': request.user.has_perm('integration_news.can_publish_integrationnews') if request.user.is_authenticated else False,
     })
 
@@ -64,7 +62,7 @@ def add_integration_news(request):
                 messages.success(request, 'Integration news published successfully!')
             else:
                 news.status = 'draft'
-                messages.success(request, 'Integration news created as draft. Submit for review when ready.')
+                messages.success(request, 'Integration news created as draft. Publish when ready.')
             news.save()
             form.save_related_fields(news)
             return redirect('integration_news:integration_news')
@@ -84,8 +82,19 @@ def update_integration_news(request, pk):
     """Update existing integration news item"""
     news = get_object_or_404(IntegrationNews, pk=pk)
     can_publish = request.user.is_superuser or request.user.has_perm('integration_news.can_publish_integrationnews')
+    can_delete = request.user.is_superuser or (
+        request.user.has_perm('integration_news.delete_integrationnews') and news.author == request.user
+    )
 
     if request.method == 'POST':
+        if 'delete' in request.POST:
+            if not can_delete:
+                messages.error(request, 'You cannot delete this news item.')
+                return redirect('integration_news:update_integration_news', pk=pk)
+            news.delete()
+            messages.success(request, 'Integration news deleted successfully!')
+            return redirect('integration_news:integration_news')
+
         form = IntegrationNewsForm(request.POST, instance=news)
         if form.is_valid():
             news = form.save(commit=False)
@@ -115,6 +124,7 @@ def update_integration_news(request, pk):
         'news': news,
         'form': form,
         'can_publish': can_publish,
+        'can_delete': can_delete,
     })
 
 
