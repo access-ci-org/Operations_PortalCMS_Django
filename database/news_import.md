@@ -314,7 +314,7 @@ news_setup \
 ```bash
 news_setup \
   beta \
-  'ctt-1133-attaching-news-groups-perms-4ec2e4cc2f67-19d6e816f90f-1789415998'
+  'ctt-1133-attaching-news-groups-perms-3dd75a7101a8-19d6e816f90f-1789491441'
 ```
 
 For the final production cutover on the production CMS host, pass `production` instead -

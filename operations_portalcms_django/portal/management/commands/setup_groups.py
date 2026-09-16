@@ -1,108 +1,30 @@
 """
-Management command to set up user groups and permissions for Operations Portal
+Management command to set up focus-area editor groups and permissions for
+Operations Portal.
+
+News permission groups (integration-news-publisher, infrastructure-news-publisher)
+are not managed here: like other Portal Operations groups, they are created
+manually and deliberately (Django admin or direct DB access) only when an actual
+permission need exists - see dev_documentation/CURRENT_STATE.md.
+
 Run with: python manage.py setup_groups
 """
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from infrastructure_news.models import SystemStatusNews
-from integration_news.models import IntegrationNews
 from cms.models import Page
 
 
 class Command(BaseCommand):
-    help = 'Creates user groups and assigns permissions for Operations Portal'
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--migrate-legacy-memberships',
-            action='store_true',
-            help='Copy users from legacy editor groups into the new manager groups.',
-        )
-        parser.add_argument(
-            '--delete-legacy-groups',
-            action='store_true',
-            help='Delete legacy editor groups after the new groups are configured.',
-        )
+    help = 'Creates focus-area editor groups and permissions for Operations Portal'
 
     def handle(self, *args, **options):
-        # Get content types
-        system_status_ct = ContentType.objects.get_for_model(SystemStatusNews)
-        integration_ct = ContentType.objects.get_for_model(IntegrationNews)
         version_ct = ContentType.objects.get(app_label='djangocms_versioning', model='version')
         unlock_version = Permission.objects.get(
             content_type=version_ct,
             codename='delete_versionlock',
         )
 
-        def get_permissions(content_type, codenames):
-            permissions = []
-            for codename in codenames:
-                permissions.append(
-                    Permission.objects.get(content_type=content_type, codename=codename)
-                )
-            return permissions
-
-        group_definitions = [
-            (
-                'System Status Authors',
-                get_permissions(
-                    system_status_ct,
-                    ['view_systemstatusnews', 'add_systemstatusnews', 'change_systemstatusnews'],
-                ),
-                'Can create and edit System Status news; must submit for review to publish',
-            ),
-            (
-                'System Status Managers',
-                get_permissions(
-                    system_status_ct,
-                    [
-                        'view_systemstatusnews',
-                        'add_systemstatusnews',
-                        'change_systemstatusnews',
-                        'delete_systemstatusnews',
-                        'can_review_systemstatusnews',
-                        'can_publish_systemstatusnews',
-                    ],
-                ) + [unlock_version],
-                'Can fully manage, review, and publish System Status news',
-            ),
-            (
-                'Integration News Authors',
-                get_permissions(
-                    integration_ct,
-                    ['view_integrationnews', 'add_integrationnews', 'change_integrationnews'],
-                ),
-                'Can create and edit Integration News; must submit for review to publish',
-            ),
-            (
-                'Integration News Managers',
-                get_permissions(
-                    integration_ct,
-                    [
-                        'view_integrationnews',
-                        'add_integrationnews',
-                        'change_integrationnews',
-                        'delete_integrationnews',
-                        'can_review_integrationnews',
-                        'can_publish_integrationnews',
-                    ],
-                ) + [unlock_version],
-                'Can fully manage, review, and publish Integration News',
-            ),
-        ]
-
-        self.stdout.write(self.style.SUCCESS('\n=== Configuring News Groups ==='))
-        configured_groups = {}
-        for group_name, permissions, description in group_definitions:
-            group, _ = Group.objects.get_or_create(name=group_name)
-            group.permissions.set(permissions)
-            configured_groups[group_name] = group
-            self.stdout.write(self.style.SUCCESS(
-                f'✓ {group_name} configured with {len(permissions)} permissions'
-            ))
-            self.stdout.write(f'  {description}')
-        
         # Configure Focus Area Editor Groups with CMS permissions
         self.stdout.write(self.style.SUCCESS('\n=== Configuring Focus Area Editor Groups ==='))
         page_ct = ContentType.objects.get_for_model(Page)
@@ -137,7 +59,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             '✓ Focus_area_editors: can edit, publish, AND unlock draft locks (reviewer role)'
         ))
-        
+
         # Page-specific focus area editors - can change but NOT publish
         specific_groups = [
             'Focus_Cybersecurity_Editors',
@@ -153,50 +75,6 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(
                 f'✓ {group_name}: can edit but NOT publish (must submit for review)'
             ))
-
-        legacy_group_targets = {
-            'System Status Editors': ['System Status Managers'],
-            'System Status Publishers': ['System Status Managers'],
-            'Integration News Editors': ['Integration News Managers'],
-            'Integration News Publishers': ['Integration News Managers'],
-            'All News Editors': ['System Status Managers', 'Integration News Managers'],
-        }
-
-        if options['migrate_legacy_memberships']:
-            self.stdout.write(self.style.SUCCESS('\n=== Migrating Legacy Group Memberships ==='))
-            for legacy_name, target_names in legacy_group_targets.items():
-                try:
-                    legacy_group = Group.objects.get(name=legacy_name)
-                except Group.DoesNotExist:
-                    self.stdout.write(f'- {legacy_name}: not found, skipping')
-                    continue
-
-                users = list(legacy_group.user_set.all())
-                for user in users:
-                    for target_name in target_names:
-                        user.groups.add(configured_groups[target_name])
-                self.stdout.write(self.style.SUCCESS(
-                    f'✓ {legacy_name}: migrated {len(users)} user(s) to {", ".join(target_names)}'
-                ))
-
-        if options['delete_legacy_groups']:
-            self.stdout.write(self.style.WARNING('\n=== Deleting Legacy Editor Groups ==='))
-            for legacy_name in legacy_group_targets:
-                deleted_count, _ = Group.objects.filter(name=legacy_name).delete()
-                if deleted_count:
-                    self.stdout.write(self.style.SUCCESS(f'✓ Deleted {legacy_name}'))
-                else:
-                    self.stdout.write(f'- {legacy_name}: not found, skipping')
-        else:
-            self.stdout.write(self.style.WARNING(
-                '\nLegacy editor groups are not modified or deleted by this command.'
-            ))
-            self.stdout.write(
-                'Use --migrate-legacy-memberships to copy users into the new manager groups.'
-            )
-            self.stdout.write(
-                'Use --delete-legacy-groups to remove the legacy groups after testing.'
-            )
 
         self.stdout.write(self.style.SUCCESS(
             '\nTo assign users to groups, use Django Admin at /admin/auth/group/'
