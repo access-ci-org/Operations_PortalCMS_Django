@@ -323,7 +323,7 @@ see [Final cutover](#final-cutover):
 ```bash
 news_setup \
   production \
-  '<APPROVED-PRODUCTION-RELEASE>'
+  'v0.7.7-983d3b8508fb-19d6e816f90f-1789573909'
 ```
 
 Keep this shell open and do not redefine the variables. Do not export `PYTHONPATH`.
