@@ -63,6 +63,14 @@ class ApiTimestampFormattingTests(SimpleTestCase):
         self.assertEqual(_format_timestamp(None), '')
 
 
+class InfrastructureNewsUrlTests(SimpleTestCase):
+    def test_page_url_name_resolves_to_infrastructure_news_view_path(self):
+        self.assertEqual(
+            reverse('infrastructure_news:system_status_news'),
+            '/infrastructure_news_view',
+        )
+
+
 class ApiInfrastructureNewsTests(TestCase):
     def setUp(self):
         # @cache_page on the view caches the full response process-wide, independent
@@ -176,7 +184,7 @@ class ApiInfrastructureNewsTests(TestCase):
         self.assertEqual(missing_timestamp_item['end_timestamp'], '')
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
-        page_response = self.client.get('/infrastructure-news/')
+        page_response = self.client.get('/infrastructure_news_view')
         api_response = self.client.get('/api/infrastructure_news_v1')
 
         page_outage_ids = {
@@ -195,7 +203,7 @@ class ApiInfrastructureNewsTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_anonymous_page_shows_published_author_name_without_email(self):
-        response = self.client.get('/infrastructure-news/')
+        response = self.client.get('/infrastructure_news_view')
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Author: API Test Author')

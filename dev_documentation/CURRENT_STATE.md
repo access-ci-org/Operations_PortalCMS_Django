@@ -130,8 +130,8 @@ catch-all route.
 | Resource listings | `/resources/access-allocated/`, `/resources/access-online-services/` | `resources.urls` |
 | Software discovery | `/software_discovery/`, `/resources/software/<software_id>/` | `resources.urls` |
 | Resource detail | `/node/<node_id>/` | `resources.urls` |
-| System Status News | `/infrastructure-news/` plus add/update/workflow routes | `infrastructure_news.urls` |
-| Integration News | `/integration-news/` plus add/update/workflow routes | `integration_news.urls` |
+| System Status News | `/infrastructure_news_view` plus add/update/workflow routes | `infrastructure_news.urls` |
+| Integration News | `/integration_news` plus add/update/workflow routes | `integration_news.urls` |
 | Permission fallback | `/unprivileged/` | `portal.urls` |
 | CMS page workflow helpers | `/cms-versioning/version/<version_id>/submit-for-review/`, `/unlock/` | `portal.urls` |
 | CMS pages | catch-all route | `cms.urls` |

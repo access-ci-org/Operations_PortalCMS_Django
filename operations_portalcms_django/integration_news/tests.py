@@ -41,6 +41,14 @@ class IntegrationWorkflowMethodTests(SimpleTestCase):
                 self.assertEqual(response.status_code, 405)
 
 
+class IntegrationNewsUrlTests(SimpleTestCase):
+    def test_page_url_name_resolves_to_integration_news_path(self):
+        self.assertEqual(
+            reverse('integration_news:integration_news'),
+            '/integration_news',
+        )
+
+
 class IntegrationNewsAuthorDisplayTests(TestCase):
     def test_anonymous_page_shows_published_author_name_without_email(self):
         author = User.objects.create_user(
@@ -58,7 +66,7 @@ class IntegrationNewsAuthorDisplayTests(TestCase):
             is_active=True,
         )
 
-        response = self.client.get('/integration-news/')
+        response = self.client.get('/integration_news')
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Author: Integration Test Author')
@@ -180,7 +188,7 @@ class ApiIntegrationNewsTests(TestCase):
         )
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
-        page_response = self.client.get('/integration-news/')
+        page_response = self.client.get('/integration_news')
         api_response = self.client.get('/api/integration_news')
 
         page_news_ids = {
