@@ -1,8 +1,10 @@
 Operations PortalCMS GitHub Actions Security and Best Practices
 Repository: access-ci-org/Operations_PortalCMS_Django
-Status: skeleton-only; workflows are intentionally inactive except manual no-op summaries.
+Status: ci.yml and deploy-production.yml are active. Outstanding GitHub-side
+settings (environments, rulesets, runner labels) are tracked separately in
+.github/workflows/GITHUB_SETUP_REQUIRED.txt.
 
-Reviewed skeleton scope:
+Reviewed scope:
 - .github/workflows/ci.yml
 - .github/workflows/deploy-production.yml
 

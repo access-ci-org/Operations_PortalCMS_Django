@@ -1,3 +1,7 @@
+v0.8.0 jlambertson 2026-09-18
+- skeleton for ci/cd Github Actions for the CMS for future devving
+- changed urls for the add and update of both the news feeds
+
 v0.7.11 jlambertson 2026-09-17
 - updating the urls for the 2 django views
 

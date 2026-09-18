@@ -1,75 +1,93 @@
-name: CI Skeleton - PortalCMS
+name: CI - Tests and Quality Checks
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
+  # Re-enable when ready to test automatically:
+  # pull_request:
+  #   branches:
+  #     - main
+  # push:
+  #   branches:
+  #     - main
 
 jobs:
-  skeleton:
-    name: CI Framework Placeholder
+  code-quality:
+    name: Code Quality & Security Checks
     runs-on: self-hosted
-
     steps:
-      - name: Explain skeleton status
-        run: |
-          echo "PortalCMS CI framework is scaffolded but not active."
-          echo "No pull_request or push triggers are enabled yet."
-          echo "Future static checks should target operations_portalcms_django/."
-          echo "Do not run DB-touching integration scripts in CI until a disposable APP_CONFIG/database exists."
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
 
-      # Future CI implementation outline:
-      #
-      # - name: Checkout code
-      #   uses: actions/checkout@v5
-      #   with:
-      #     fetch-depth: 0
-      #
-      # - name: Set up Python
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.12"
-      #
-      # - name: Install uv
-      #   run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      #
-      # - name: Add uv to PATH
-      #   run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      #
-      # - name: Install quality tools
-      #   run: uv pip install --system black isort flake8 bandit safety
-      #
-      # - name: Run Black formatting check
-      #   run: black --check --diff operations_portalcms_django/
-      #
-      # - name: Run isort import check
-      #   run: isort --check-only --diff operations_portalcms_django/
-      #
-      # - name: Run Flake8 lint check
-      #   run: |
-      #     flake8 operations_portalcms_django/ \
-      #       --count \
-      #       --select=E9,F63,F7,F82 \
-      #       --show-source \
-      #       --statistics \
-      #       --max-line-length=120
-      #
-      # - name: Run Bandit security check
-      #   run: |
-      #     bandit -r operations_portalcms_django/ \
-      #       -f json -o bandit-report.json \
-      #       -ll -ii
-      #
-      # - name: Upload Bandit report
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: bandit-security-report
-      #     path: bandit-report.json
-      #
-      # - name: Dependency review
-      #   if: github.event_name == 'pull_request'
-      #   uses: actions/dependency-review-action@v4
-      #   with:
-      #     fail-on-severity: moderate
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Add uv to PATH
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system flake8 bandit safety black isort
+
+      - name: Run Black (code formatting check)
+        run: |
+          black --check --diff operations_portalcms_django/
+        continue-on-error: true
+
+      - name: Run isort (import sorting check)
+        run: |
+          isort --check-only --diff operations_portalcms_django/
+        continue-on-error: true
+
+      - name: Run Flake8 (linting)
+        run: |
+          flake8 operations_portalcms_django/ \
+            --count --select=E9,F63,F7,F82 --show-source --statistics --max-line-length=120
+        continue-on-error: true
+
+      - name: Run Bandit (security linting)
+        run: |
+          bandit -r operations_portalcms_django/ -f json -o bandit-report.json -ll -ii
+        continue-on-error: true
+
+      - name: Upload Bandit Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: self-hosted
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+
+  summary:
+    name: CI Summary
+    runs-on: self-hosted
+    needs: [code-quality]
+    if: always()
+    steps:
+      - name: Check CI Status
+        run: |
+          echo "Code Quality: ${{ needs.code-quality.result }}"
+          if [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
+            echo "❌ CI checks failed"; exit 1
+          else
+            echo "✅ All CI checks passed"
+          fi

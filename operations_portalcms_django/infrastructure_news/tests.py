@@ -70,6 +70,18 @@ class InfrastructureNewsUrlTests(SimpleTestCase):
             '/infrastructure_news_view',
         )
 
+    def test_add_url_name_resolves_to_infrastructure_news_path(self):
+        self.assertEqual(
+            reverse('infrastructure_news:add_system_status_news'),
+            '/infrastructure_news/add/',
+        )
+
+    def test_update_url_name_resolves_to_infrastructure_news_path(self):
+        self.assertEqual(
+            reverse('infrastructure_news:update_system_status_news', args=[286]),
+            '/infrastructure_news/update/286/',
+        )
+
 
 class ApiInfrastructureNewsTests(TestCase):
     def setUp(self):

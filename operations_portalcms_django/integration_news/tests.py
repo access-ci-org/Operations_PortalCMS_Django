@@ -48,6 +48,18 @@ class IntegrationNewsUrlTests(SimpleTestCase):
             '/integration_news',
         )
 
+    def test_add_url_name_resolves_to_integration_news_path(self):
+        self.assertEqual(
+            reverse('integration_news:add_integration_news'),
+            '/integration_news/add/',
+        )
+
+    def test_update_url_name_resolves_to_integration_news_path(self):
+        self.assertEqual(
+            reverse('integration_news:update_integration_news', args=[286]),
+            '/integration_news/update/286/',
+        )
+
 
 class IntegrationNewsAuthorDisplayTests(TestCase):
     def test_anonymous_page_shows_published_author_name_without_email(self):

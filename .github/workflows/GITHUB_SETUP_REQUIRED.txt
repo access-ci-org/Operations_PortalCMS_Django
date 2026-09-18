@@ -1,0 +1,77 @@
+Operations PortalCMS GitHub Actions - Outstanding GitHub-Side Setup
+Repository: access-ci-org/Operations_PortalCMS_Django
+
+Status: ci.yml and deploy-production.yml are now active workflow files (see git
+history). The items below are repo/org SETTINGS, not files, so they cannot be
+applied by committing code. Each must be configured directly in GitHub
+(Settings UI, gh CLI, or the REST/GraphQL API) before deploy-production.yml
+can run a real production deployment.
+
+====================================================================
+1) Production environment
+====================================================================
+- Create a "production" environment (Settings > Environments) if it does not
+  already exist.
+- Restrict deployment to tags matching v*.*.* only (deployment branches and
+  tags rule).
+- Add required reviewers if a manual approval gate is wanted before the
+  deploy-production job runs.
+- Add ANSIBLE_VAULT_PASSWORD and INFRASTRUCTURE_REPO_TOKEN_PORTAL as
+  environment secrets here if they should be scoped to this environment
+  only, rather than at the repository level (they are currently repository
+  secrets per the user's confirmation on 2026-09-17).
+
+====================================================================
+2) Tag protection ruleset for v*.*.*
+====================================================================
+- Create a tag ruleset restricting creation/update/deletion of tags matching
+  v*.*.* to specific actors/teams.
+- Disallow deletion of matching tags.
+- Prefer annotated or signed tags for production releases.
+- deploy-production.yml already enforces "tag must be reachable from main"
+  in its validate-tag job, but that is a workflow-side check, not a
+  substitute for the GitHub-side ruleset (a ruleset stops a bad tag from
+  being created in the first place).
+
+====================================================================
+3) Branch ruleset / protection on main
+====================================================================
+- Require pull requests before merging to main.
+- Require the ci.yml "CI Summary" job as a required status check.
+- Require CODEOWNERS review for changes under .github/ (CODEOWNERS file
+  already lists @jyssy @jpnavarro @ericblau for this path).
+- Dismiss stale approvals on new commits.
+- Require conversation resolution before merge.
+
+====================================================================
+4) Self-hosted runner labels
+====================================================================
+- pre-deployment-checks and deploy-production in deploy-production.yml
+  target: runs-on: [self-hosted, linux, deployment, portalcms]
+- Confirm a self-hosted runner is registered with all four labels
+  (especially the app-specific "portalcms" label - this is not shared with
+  Operations_ServiceIndex_Django's runner, which uses "serviceindex").
+  Without a matching runner, those jobs queue indefinitely and never fail
+  loudly.
+- ci.yml's code-quality/dependency-review/summary jobs only require the
+  generic "self-hosted" label.
+
+====================================================================
+5) SSH host key trust
+====================================================================
+- deploy-production.yml deliberately does NOT set
+  ANSIBLE_HOST_KEY_CHECKING=False or StrictHostKeyChecking=no.
+- The self-hosted runner's known_hosts must already trust
+  cms1.operations.access-ci.org before the first real run, or every SSH/
+  Ansible step will fail closed.
+- If there is no existing trust relationship, add a "populate known_hosts"
+  step (e.g. from an SSH_KNOWN_HOSTS secret populated via ssh-keyscan -H run
+  from the bastion) rather than disabling verification.
+
+====================================================================
+Not required to change
+====================================================================
+- .github/CODEOWNERS is already correct for this purpose.
+- No equivalent ruleset/environment work is needed for beta/dev - that path
+  stays fully manual from the bastion against cms2.operations.access-ci.org
+  and is intentionally not represented in GitHub Actions.

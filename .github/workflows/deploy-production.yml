@@ -1,75 +1,244 @@
-name: Deploy Production Skeleton - PortalCMS
+name: Deploy to Production
 
 on:
   workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Git tag to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+      skip_backup:
+        description: 'Skip pre-deployment backup'
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*.*.*'
 
 permissions:
   contents: read
 
 jobs:
-  skeleton:
-    name: Production Deployment Framework Placeholder
+  validate-tag:
+    name: Validate Release Tag
     runs-on: self-hosted
-
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
     steps:
-      - name: Explain skeleton status
-        run: |
-          echo "PortalCMS production deployment framework is scaffolded but inactive."
-          echo "No deployment, checkout, SSH, Ansible, release, migration, or cert commands run from this workflow."
-          echo "Future production host: cms1.operations.access-ci.org"
-          echo "Future production URL: https://operations.access-ci.org"
-          echo "Future infrastructure repo: access-ci-org/Operations_CMS_Infrastructure"
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: access-ci-org/Operations_PortalCMS_Django
+          fetch-depth: 0
 
-      # Future production deployment implementation outline:
-      #
-      # Triggers to add later:
-      #   push:
-      #     tags:
-      #       - "v*.*.*"
-      #
-      # workflow_dispatch inputs to add later:
-      #   version_tag:
-      #     description: "Git tag to deploy to production, for example v1.0.0"
-      #     required: true
-      #     type: string
-      #   skip_backup:
-      #     description: "Skip pre-deployment backup"
-      #     required: false
-      #     type: boolean
-      #     default: false
-      #
-      # jobs to add later:
-      # - validate-tag:
-      #     Validate tag exists in access-ci-org/Operations_PortalCMS_Django.
-      #     Validate semantic version shape.
-      #     Validate tag is reachable from main.
-      #
-      # - create-release:
-      #     Elevate permissions to contents: write only for this job.
-      #     Create or update the GitHub release from the validated tag.
-      #
-      # - pre-deployment-checks:
-      #     runs-on: [self-hosted, linux, deployment, portalcms]
-      #     Checkout access-ci-org/Operations_CMS_Infrastructure using INFRASTRUCTURE_REPO_TOKEN_PORTAL.
-      #     Verify production host reachability without disabling SSH host verification.
-      #     Verify Ansible can reach only cms1.operations.access-ci.org.
-      #
-      # - deploy-production:
-      #     environment:
-      #       name: production
-      #       url: https://operations.access-ci.org
-      #     Create a pre-deployment backup unless skip_backup is true.
-      #     Run the CMS infrastructure playbook with an explicit production limit:
-      #       ansible-playbook \
-      #         -i hosts \
-      #         application_playbook.yml \
-      #         --limit=cms1.operations.access-ci.org \
-      #         -e "app_tag=${{ needs.validate-tag.outputs.tag }}"
-      #     Then run migrations, collectstatic, restart the portal service, and smoke test:
-      #       https://operations.access-ci.org
-      #
-      # - rollback-on-failure:
-      #     Provide rollback instructions only; do not auto-rollback without an approved policy.
-      #
-      # Future Let's Encrypt work belongs in access-ci-org/Operations_CMS_Infrastructure.
-      # Production certificate/domain target: operations.access-ci.org.
+      - name: Validate tag exists
+        id: validate
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.version_tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+
+          if ! git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "❌ Tag '$TAG' does not exist!"
+            git tag -l | tail -10
+            exit 1
+          fi
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "⚠️  Warning: Tag '$TAG' doesn't follow semantic versioning (vX.Y.Z)"
+          fi
+
+          # Guardrail: tag must be contained in the main branch
+          git fetch origin main --quiet
+          if ! git merge-base --is-ancestor "$TAG" "origin/main"; then
+            echo "❌ Tag '$TAG' is not reachable from the main branch."
+            echo "Only tags created from main are allowed for production deploys."
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Get tag info
+        run: |
+          TAG="${{ steps.validate.outputs.tag }}"
+          echo "## Release Information" >> "$GITHUB_STEP_SUMMARY"
+          git show --no-patch --format="- **Commit**: %H%n- **Author**: %an (%ae)%n- **Date**: %ai%n- **Message**: %s" "$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  create-release:
+    name: Create GitHub Release
+    needs: validate-tag
+    runs-on: self-hosted
+    permissions:
+      contents: write
+    steps:
+      - name: Create release from tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate-tag.outputs.tag }}
+          generate_release_notes: true
+
+  pre-deployment-checks:
+    name: Pre-Deployment Checks
+    needs: [validate-tag, create-release]
+    runs-on: [self-hosted, linux, deployment, portalcms]
+    steps:
+      - name: Checkout Infrastructure Repository
+        uses: actions/checkout@v4
+        with:
+          repository: access-ci-org/Operations_CMS_Infrastructure
+          path: infrastructure
+          token: ${{ secrets.INFRASTRUCTURE_REPO_TOKEN_PORTAL }}
+
+      - name: Check production server health
+        run: |
+          ssh cms1.operations.access-ci.org "echo '✅ Production server is accessible'"
+
+      - name: Check current deployment
+        run: |
+          CURRENT_VERSION=$(ssh cms1.operations.access-ci.org "readlink -f /soft/django-cms-01/PROD | xargs basename" || echo "unknown")
+          echo "**Current Version**: $CURRENT_VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "**New Version**: ${{ needs.validate-tag.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify Ansible connectivity
+        working-directory: infrastructure/ansible
+        run: |
+          ansible -i hosts cms1.operations.access-ci.org -m ping
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [validate-tag, pre-deployment-checks]
+    runs-on: [self-hosted, linux, deployment, portalcms]
+    environment:
+      name: production
+      url: https://operations.access-ci.org
+    steps:
+      - name: Deployment initiated
+        run: echo "🚀 Starting production deployment..."
+
+      - name: Checkout Django Application at Tag
+        uses: actions/checkout@v4
+        with:
+          repository: access-ci-org/Operations_PortalCMS_Django
+          ref: ${{ needs.validate-tag.outputs.tag }}
+          path: django-app
+
+      - name: Checkout Infrastructure Repository
+        uses: actions/checkout@v4
+        with:
+          repository: access-ci-org/Operations_CMS_Infrastructure
+          path: infrastructure
+          token: ${{ secrets.INFRASTRUCTURE_REPO_TOKEN_PORTAL }}
+
+      - name: Create backup (optional)
+        if: ${{ !inputs.skip_backup }}
+        run: |
+          BACKUP_DIR="/soft/backups/$(date +%Y%m%d-%H%M%S)-pre-${{ needs.validate-tag.outputs.tag }}"
+          ssh cms1.operations.access-ci.org \
+            "sudo mkdir -p /soft/backups && sudo cp -r /soft/django-cms-01/PROD $BACKUP_DIR"
+
+      - name: Run Ansible Deployment
+        working-directory: infrastructure/ansible
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          ansible-playbook \
+            -i hosts application_playbook.yml \
+            --vault-password-file=<(printf '%s' "$ANSIBLE_VAULT_PASSWORD") \
+            --limit=cms1.operations.access-ci.org \
+            -e "app_tag=${{ needs.validate-tag.outputs.tag }}" \
+            -vv \
+            || { echo "❌ Production deployment failed!"; exit 1; }
+
+      - name: Run database migrations
+        run: |
+          ssh cms1.operations.access-ci.org \
+            "cd /soft/django-cms-01 && sudo -u software ./sbin/manage.prod.sh migrate --noinput"
+
+      - name: Collect static files
+        run: |
+          ssh cms1.operations.access-ci.org \
+            "cd /soft/django-cms-01 && sudo -u software ./sbin/manage.prod.sh collectstatic --noinput"
+
+      - name: Restart application service
+        run: |
+          ssh cms1.operations.access-ci.org \
+            "sudo systemctl restart portal.service && sleep 5 && sudo systemctl status portal.service"
+
+      - name: Verify deployment
+        id: verify
+        run: |
+          sleep 15
+
+          SERVICE_STATUS=$(ssh cms1.operations.access-ci.org "systemctl is-active portal.service" || echo "failed")
+          if [[ "$SERVICE_STATUS" != "active" ]]; then
+            echo "❌ portal.service is not active (status: $SERVICE_STATUS)"
+            exit 1
+          fi
+
+          HEALTHZ_CODE=$(ssh cms1.operations.access-ci.org "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/healthz/ --max-time 30" || echo "000")
+          if [[ "$HEALTHZ_CODE" != "200" ]]; then
+            echo "❌ Loopback /healthz/ check returned HTTP $HEALTHZ_CODE"
+            exit 1
+          fi
+
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://operations.access-ci.org --max-time 30 || echo "000")
+          if [[ "$HTTP_CODE" =~ ^(200|301|302)$ ]]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "Service is responding (HTTP $HTTP_CODE)"
+          else
+            echo "status=warning" >> "$GITHUB_OUTPUT"
+            echo "Service returned HTTP $HTTP_CODE on public URL"
+          fi
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Environment**: production" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Target Host**: cms1.operations.access-ci.org" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Tag**: ${{ needs.validate-tag.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Status**: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+
+  post-deployment-tests:
+    name: Post-Deployment Smoke Tests
+    needs: [validate-tag, deploy-production]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test production endpoint
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://operations.access-ci.org --max-time 30 || echo "000")
+          if [[ ! "$HTTP_CODE" =~ ^(200|301|302)$ ]]; then
+            echo "❌ Production smoke test failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ Production smoke test passed (HTTP $HTTP_CODE)"
+
+  notify-success:
+    name: Notify Success
+    needs: [validate-tag, deploy-production, post-deployment-tests]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Success notification
+        run: echo "✅ Production deployment successful for ${{ needs.validate-tag.outputs.tag }}!"
+
+  rollback-on-failure:
+    name: Rollback Instructions
+    needs: [validate-tag, deploy-production]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Rollback instructions
+        run: |
+          echo "## Rollback Required" >> "$GITHUB_STEP_SUMMARY"
+          echo "Production deployment of ${{ needs.validate-tag.outputs.tag }} failed." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "To roll back manually from the bastion:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "sudo -u software ln -sfn /soft/django-cms-01/tags/<previous-tag> /soft/django-cms-01/PROD" >> "$GITHUB_STEP_SUMMARY"
+          echo "sudo systemctl restart portal.service" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "No automatic rollback is performed." >> "$GITHUB_STEP_SUMMARY"
