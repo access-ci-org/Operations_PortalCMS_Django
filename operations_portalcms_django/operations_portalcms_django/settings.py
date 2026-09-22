@@ -387,7 +387,204 @@ CMS_TEMPLATES = [
 ]
 CMS_PERMISSION = True
 CMS_PUBLIC_FOR = 'all'
-CMS_PLACEHOLDER_CONF = {}
+
+# Keep the contributor-facing plugin palette small and specific to each slot.
+# Placeholder identifiers must stay aligned with the names used in templates;
+# the ``name`` values below are display labels only.
+_BASIC_CONTENT_PLUGINS = [
+    'TextPlugin',
+    'PicturePlugin',
+    'LinkPlugin',
+    'FilePlugin',
+    'VideoPlayerPlugin',
+    'VideoSourcePlugin',
+    'VideoTrackPlugin',
+]
+_BASIC_PLUGIN_LABELS = {
+    'TextPlugin': 'Add text',
+    'PicturePlugin': 'Add an image',
+    'LinkPlugin': 'Add a link',
+    'FilePlugin': 'Add a downloadable file',
+    'VideoPlayerPlugin': 'Add a video',
+    'VideoSourcePlugin': 'Add a video source',
+    'VideoTrackPlugin': 'Add captions or subtitles',
+}
+_BASIC_PLUGIN_MODULES = {
+    'TextPlugin': 'Basic content',
+    'PicturePlugin': 'Media',
+    'LinkPlugin': 'Basic content',
+    'FilePlugin': 'Media',
+    'VideoPlayerPlugin': 'Media',
+    'VideoSourcePlugin': 'Media',
+    'VideoTrackPlugin': 'Media',
+}
+_NESTED_PLUGIN_RULES = {
+    'child_classes': {
+        'VideoPlayerPlugin': ['VideoSourcePlugin', 'VideoTrackPlugin'],
+    },
+    'parent_classes': {
+        'VideoSourcePlugin': ['VideoPlayerPlugin'],
+        'VideoTrackPlugin': ['VideoPlayerPlugin'],
+    },
+}
+
+CMS_PLACEHOLDER_CONF = {
+    'content': {
+        'name': 'Page content',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'feature_content': {
+        'name': 'Feature text',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'feature_image': {
+        'name': 'Feature image (one image)',
+        'plugins': ['PicturePlugin'],
+        'plugin_labels': {'PicturePlugin': 'Add the feature image'},
+        'plugin_modules': {'PicturePlugin': 'Media'},
+        'limits': {'global': 1},
+    },
+    'main_content': {
+        'name': 'Main page content',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'hero_image': {
+        'name': 'Hero image (one image)',
+        'plugins': ['PicturePlugin'],
+        'plugin_labels': {'PicturePlugin': 'Add the hero image'},
+        'plugin_modules': {'PicturePlugin': 'Media'},
+        'limits': {'global': 1},
+    },
+    'section_1_heading': {
+        'name': 'Section 1 heading',
+        'plugins': ['TextPlugin'],
+        'plugin_labels': {'TextPlugin': 'Add the section heading'},
+        'plugin_modules': {'TextPlugin': 'Basic content'},
+        'limits': {'global': 1},
+    },
+    'section_1_content': {
+        'name': 'Section 1 content',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'section_2_heading': {
+        'name': 'Section 2 heading',
+        'plugins': ['TextPlugin'],
+        'plugin_labels': {'TextPlugin': 'Add the section heading'},
+        'plugin_modules': {'TextPlugin': 'Basic content'},
+        'limits': {'global': 1},
+    },
+    'section_2_content': {
+        'name': 'Section 2 content',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'section_3_heading': {
+        'name': 'Section 3 heading (optional)',
+        'plugins': ['TextPlugin'],
+        'plugin_labels': {'TextPlugin': 'Add the section heading'},
+        'plugin_modules': {'TextPlugin': 'Basic content'},
+        'limits': {'global': 1},
+    },
+    'section_3_content': {
+        'name': 'Section 3 content (optional)',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'section_4_heading': {
+        'name': 'Section 4 heading (optional)',
+        'plugins': ['TextPlugin'],
+        'plugin_labels': {'TextPlugin': 'Add the section heading'},
+        'plugin_modules': {'TextPlugin': 'Basic content'},
+        'limits': {'global': 1},
+    },
+    'section_4_content': {
+        'name': 'Section 4 content (optional)',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'section_5_heading': {
+        'name': 'Section 5 heading (optional)',
+        'plugins': ['TextPlugin'],
+        'plugin_labels': {'TextPlugin': 'Add the section heading'},
+        'plugin_modules': {'TextPlugin': 'Basic content'},
+        'limits': {'global': 1},
+    },
+    'section_5_content': {
+        'name': 'Section 5 content (optional)',
+        'plugins': _BASIC_CONTENT_PLUGINS,
+        'plugin_labels': _BASIC_PLUGIN_LABELS,
+        'plugin_modules': _BASIC_PLUGIN_MODULES,
+        **_NESTED_PLUGIN_RULES,
+    },
+    'additional_links': {
+        'name': 'Additional links (optional)',
+        'plugins': ['TextPlugin', 'LinkPlugin'],
+        'plugin_labels': {
+            'TextPlugin': 'Add introductory text',
+            'LinkPlugin': 'Add a link',
+        },
+        'plugin_modules': {
+            'TextPlugin': 'Basic content',
+            'LinkPlugin': 'Basic content',
+        },
+    },
+    'featured_image': {
+        'name': 'Featured image (one image)',
+        'plugins': ['PicturePlugin'],
+        'plugin_labels': {'PicturePlugin': 'Add the featured image'},
+        'plugin_modules': {'PicturePlugin': 'Media'},
+        'limits': {'global': 1},
+    },
+    'tags': {
+        'name': 'Tags (optional)',
+        'plugins': ['TextPlugin'],
+        'plugin_labels': {'TextPlugin': 'Add tags'},
+        'plugin_modules': {'TextPlugin': 'Basic content'},
+        'limits': {'global': 1},
+    },
+    'author_info': {
+        'name': 'Author information (optional)',
+        'plugins': ['TextPlugin', 'PicturePlugin'],
+        'plugin_labels': {
+            'TextPlugin': 'Add author details',
+            'PicturePlugin': 'Add an author image',
+        },
+        'plugin_modules': {
+            'TextPlugin': 'Basic content',
+            'PicturePlugin': 'Media',
+        },
+    },
+    'related_posts': {
+        'name': 'Related posts (optional)',
+        'plugins': ['TextPlugin', 'LinkPlugin'],
+        'plugin_labels': {
+            'TextPlugin': 'Add introductory text',
+            'LinkPlugin': 'Add a related link',
+        },
+        'plugin_modules': {
+            'TextPlugin': 'Basic content',
+            'LinkPlugin': 'Basic content',
+        },
+    },
+}
 DJANGOCMS_VERSIONING_LOCK_VERSIONS = True
 DJANGOCMS_VERSIONING_ON_PUBLISH_REDIRECT = 'published'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
