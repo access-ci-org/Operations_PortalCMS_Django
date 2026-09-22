@@ -1,3 +1,5 @@
+v0.8.1 jlambertson 2026-09-22
+- updated cms plugins for easier usage
 v0.8.0 jlambertson 2026-09-18
 - skeleton for ci/cd Github Actions for the CMS for future devving
 - changed urls for the add and update of both the news feeds
