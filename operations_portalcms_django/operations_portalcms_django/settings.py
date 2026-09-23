@@ -610,6 +610,12 @@ THUMBNAIL_ALIASES = {
 }
 
 # Text Editor Settings
+CKEDITOR_SETTINGS = {
+    # The legacy text editor does not complete the django CMS 5 data-bridge
+    # callback when adding nested plugins. Hide that add control while keeping
+    # the editor integration loaded for existing embedded plugin content.
+    'removeButtons': 'cmsplugins',
+}
 TEXT_SAVE_IMAGE_FUNCTION = 'djangocms_text_ckeditor.picture_save.create_picture_plugin'
 TEXT_ADDITIONAL_TAGS = ('iframe',)
 TEXT_ADDITIONAL_ATTRIBUTES = ('scrolling', 'allowfullscreen', 'frameborder')
