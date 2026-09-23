@@ -420,6 +420,9 @@ _BASIC_PLUGIN_MODULES = {
 }
 _NESTED_PLUGIN_RULES = {
     'child_classes': {
+        # Keep images as standalone blocks. The legacy CKEditor integration
+        # does not reliably insert PicturePlugin children at the text cursor.
+        'TextPlugin': ['LinkPlugin', 'FilePlugin', 'VideoPlayerPlugin'],
         'VideoPlayerPlugin': ['VideoSourcePlugin', 'VideoTrackPlugin'],
     },
     'parent_classes': {
@@ -571,6 +574,7 @@ CMS_PLACEHOLDER_CONF = {
             'TextPlugin': 'Basic content',
             'PicturePlugin': 'Media',
         },
+        **_NESTED_PLUGIN_RULES,
     },
     'related_posts': {
         'name': 'Related posts (optional)',
@@ -606,6 +610,12 @@ THUMBNAIL_ALIASES = {
 }
 
 # Text Editor Settings
+CKEDITOR_SETTINGS = {
+    # The legacy text editor does not complete the django CMS 5 data-bridge
+    # callback when adding nested plugins. Hide that add control while keeping
+    # the editor integration loaded for existing embedded plugin content.
+    'removeButtons': 'cmsplugins',
+}
 TEXT_SAVE_IMAGE_FUNCTION = 'djangocms_text_ckeditor.picture_save.create_picture_plugin'
 TEXT_ADDITIONAL_TAGS = ('iframe',)
 TEXT_ADDITIONAL_ATTRIBUTES = ('scrolling', 'allowfullscreen', 'frameborder')
