@@ -35,8 +35,9 @@ class Command(BaseCommand):
         use_structure = Permission.objects.get(content_type=ContentType.objects.get(app_label='cms', model='placeholder'), codename='use_structure')
         add_cmsplugin = Permission.objects.get(content_type=ContentType.objects.get(app_label='cms', model='cmsplugin'), codename='add_cmsplugin')
         change_cmsplugin = Permission.objects.get(content_type=ContentType.objects.get(app_label='cms', model='cmsplugin'), codename='change_cmsplugin')
-        add_text = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_text_ckeditor', model='text'), codename='add_text')
-        change_text = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_text_ckeditor', model='text'), codename='change_text')
+        text_ct = ContentType.objects.get(app_label='djangocms_text', model='text')
+        add_text = Permission.objects.get(content_type=text_ct, codename='add_text')
+        change_text = Permission.objects.get(content_type=text_ct, codename='change_text')
         add_picture = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_picture', model='picture'), codename='add_picture')
         change_picture = Permission.objects.get(content_type=ContentType.objects.get(app_label='djangocms_picture', model='picture'), codename='change_picture')
 

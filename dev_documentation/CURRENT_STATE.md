@@ -42,6 +42,9 @@ Current Verification Snapshot.
 - Django: `>=5.2,<5.3`
 - django CMS: `>=5.0,<5.1`
 - django CMS versioning: installed and active
+- Rich text: `djangocms-text` with its CKEditor 4 compatibility frontend;
+  embedded CMS content is limited to the configured Image, Link, File, and
+  Video plugins
 - django CMS moderation: not enabled
 - Authentication: django-allauth CILogon provider plus local Django auth backend
 - Package manager: `uv`
@@ -258,11 +261,27 @@ Run Django management commands from the Django project directory
 | Command | Current use |
 |---|---|
 | `manage.py setup_groups` | Creates focus-area auth groups; grants shared CMS/plugin/page permissions; gives `Focus_area_editors` publish/unlock rights; removes publish from page-specific focus groups. Does not touch news publisher groups - see News Workflow above |
+| `manage.py transfer_text_plugin_permissions --dry-run` | Reports group permission grants needed when moving from the legacy Text plugin app label to `djangocms_text`; direct user grants are reported but deliberately not transferred |
+| `manage.py transfer_text_plugin_permissions` | Copies legacy Text permissions to the equivalent `djangocms_text` permissions for existing Django groups. It does not change group membership, remove legacy permissions, or interact with CILogon |
 | `manage.py setup_focus_area_page_permissions` | Creates/updates CMS `PagePermission` rows for focus pages after the groups exist; supports `--dry-run` |
 | `manage.py sync_cider_from_api` | Refreshes CIDER infrastructure, organization, group, category, and feature metadata; supports `--dry-run` |
 | `manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups` | Checks or prunes stale local CIDER group rows |
 | `manage.py import_drupal_news` | One-time Drupal cutover importer for both news feeds; it derives a non-email username candidate from each Drupal login, then a strict replacement dry-run can select the newest timestamped raw dump from an explicit directory and writes a versioned JSON plan binding the source, release, target, cutoff, adjustments, IDs, counts, relationships, per-record exact-username/fallback author resolution, original post dates, and expected outcome; apply consumes and revalidates that exact reviewed plan before guarded atomic replacement |
 | `database/verify_db.sh` | Read-only RDS schema, ownership, count, and migration-state verification |
+
+The first deployment that replaces the legacy Text plugin must use this order:
+
+1. Take and verify a database backup before deployment. The upstream
+   `djangocms_text` migration copies legacy Text rows and then drops the legacy
+   Text table; rollback therefore requires restoring the backup.
+2. Deploy the application and dependency environment together and run the
+   normal migrations.
+3. Before removing any stale content types, run
+   `transfer_text_plugin_permissions --dry-run`, review the counts, and then
+   run `transfer_text_plugin_permissions`. This copies permissions between
+   Django groups only and never changes group membership.
+4. Validate existing Text content and embedded Image, File, Link, and Video
+   plugins before promoting the release.
 
 After pulling changes that include migrations, run `migrate` before starting the
 app. Current migration state preserves existing data and table names; the

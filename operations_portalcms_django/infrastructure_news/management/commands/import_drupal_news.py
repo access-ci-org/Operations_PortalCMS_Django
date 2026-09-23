@@ -21,7 +21,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.dateparse import parse_date, parse_datetime
-from djangocms_text_ckeditor.html import clean_html
+from djangocms_text.html import clean_html
 from integration_news.models import IntegrationElement, IntegrationNews
 from resources.models import CiderInfrastructure
 

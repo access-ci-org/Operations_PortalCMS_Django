@@ -1,4 +1,7 @@
-v0.8.2 jlambertson 2026-09-22
+v0.8.3 jlambertson 2026-09-24
+- fixing cms plugins in cms text editor
+
+v0.8.2 jlambertson 2026-09-23
 - removing broken plugin dropdown in text editor
 
 v0.8.1 jlambertson 2026-09-22

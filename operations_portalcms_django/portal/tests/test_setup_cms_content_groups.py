@@ -192,6 +192,9 @@ class SetupCMSContentGroupsTests(TestCase):
         permission_keys = set(get_editor_permission_keys())
 
         self.assertIn(
+            ('djangocms_text', 'text', 'change_text'), permission_keys
+        )
+        self.assertIn(
             ("djangocms_file", "folder", "change_folder"), permission_keys
         )
         self.assertIn(

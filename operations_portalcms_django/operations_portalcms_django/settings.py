@@ -219,7 +219,8 @@ INSTALLED_APPS = [
     'infrastructure_news.apps.InfrastructureNewsConfig',
     'integration_news.apps.IntegrationNewsConfig',
     # Django CMS plugins
-    'djangocms_text_ckeditor',
+    'djangocms_text',
+    'djangocms_text.contrib.text_ckeditor4',
     'djangocms_picture',
     'djangocms_file',
     'djangocms_link',
@@ -420,9 +421,14 @@ _BASIC_PLUGIN_MODULES = {
 }
 _NESTED_PLUGIN_RULES = {
     'child_classes': {
-        # Keep images as standalone blocks. The legacy CKEditor integration
-        # does not reliably insert PicturePlugin children at the text cursor.
-        'TextPlugin': ['LinkPlugin', 'FilePlugin', 'VideoPlayerPlugin'],
+        # Keep the embedded-content menu focused on the same common content
+        # types that contributors can add as standalone blocks.
+        'TextPlugin': [
+            'PicturePlugin',
+            'LinkPlugin',
+            'FilePlugin',
+            'VideoPlayerPlugin',
+        ],
         'VideoPlayerPlugin': ['VideoSourcePlugin', 'VideoTrackPlugin'],
     },
     'parent_classes': {
@@ -610,15 +616,49 @@ THUMBNAIL_ALIASES = {
 }
 
 # Text Editor Settings
+TEXT_EDITOR = 'djangocms_text.contrib.text_ckeditor4.ckeditor4'
 CKEDITOR_SETTINGS = {
-    # The legacy text editor does not complete the django CMS 5 data-bridge
-    # callback when adding nested plugins. Hide that add control while keeping
-    # the editor integration loaded for existing embedded plugin content.
-    'removeButtons': 'cmsplugins',
+    # Keep the contributor toolbar small while retaining the supported django
+    # CMS 5 embedded-plugin control. HTMLField editors (including News Content)
+    # deliberately omit CMSPlugins because they are not backed by a placeholder.
+    'toolbar_CMS': [
+        ['Undo', 'Redo'],
+        ['CMSPlugins', '-', 'ShowBlocks'],
+        ['Format', 'Styles'],
+        ['Bold', 'Italic', 'Underline', '-', 'RemoveFormat'],
+        ['Link', 'Unlink'],
+        ['NumberedList', 'BulletedList'],
+        ['Outdent', 'Indent', '-', 'Blockquote'],
+        ['Maximize'],
+    ],
+    'toolbar_HTMLField': [
+        ['Undo', 'Redo'],
+        ['ShowBlocks'],
+        ['Format', 'Styles'],
+        ['Bold', 'Italic', 'Underline', '-', 'RemoveFormat'],
+        ['Link', 'Unlink'],
+        ['NumberedList', 'BulletedList'],
+        ['Outdent', 'Indent', '-', 'Blockquote'],
+        ['Maximize'],
+    ],
 }
-TEXT_SAVE_IMAGE_FUNCTION = 'djangocms_text_ckeditor.picture_save.create_picture_plugin'
-TEXT_ADDITIONAL_TAGS = ('iframe',)
-TEXT_ADDITIONAL_ATTRIBUTES = ('scrolling', 'allowfullscreen', 'frameborder')
+# Do not convert pasted base64 images. Contributors should select an Image
+# plugin so media remains managed by django-filer.
+TEXT_SAVE_IMAGE_FUNCTION = None
+TEXT_ADDITIONAL_ATTRIBUTES = {
+    'iframe': {
+        'src',
+        'title',
+        'width',
+        'height',
+        'scrolling',
+        'allow',
+        'allowfullscreen',
+        'frameborder',
+        'referrerpolicy',
+        'loading',
+    },
+}
 
 
 # Static files (CSS, JavaScript, Images)
