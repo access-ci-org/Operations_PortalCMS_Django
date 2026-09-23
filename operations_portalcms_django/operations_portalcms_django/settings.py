@@ -420,6 +420,9 @@ _BASIC_PLUGIN_MODULES = {
 }
 _NESTED_PLUGIN_RULES = {
     'child_classes': {
+        # Keep images as standalone blocks. The legacy CKEditor integration
+        # does not reliably insert PicturePlugin children at the text cursor.
+        'TextPlugin': ['LinkPlugin', 'FilePlugin', 'VideoPlayerPlugin'],
         'VideoPlayerPlugin': ['VideoSourcePlugin', 'VideoTrackPlugin'],
     },
     'parent_classes': {
@@ -571,6 +574,7 @@ CMS_PLACEHOLDER_CONF = {
             'TextPlugin': 'Basic content',
             'PicturePlugin': 'Media',
         },
+        **_NESTED_PLUGIN_RULES,
     },
     'related_posts': {
         'name': 'Related posts (optional)',
