@@ -76,37 +76,88 @@ authorized operator:
   the one credential file that is not yet automated anywhere; see
   [Supply portal_owner authentication](#2-supply-portal_owner-authentication) below.
 
-With that in place, every restore is:
+Before each real restore, stop the application using the target database and disconnect
+other clients. With that in place, use this canonical deployed-host runbook:
 
 ```bash
-sudo -i -u software                      # or: alias software="sudo -i -u software"
+sudo -iu software
 cd /soft/django-cms-01/PROD
 
+# List the available portal1 backups, then preview and retrieve the latest one.
+uv run database/portal_db_retrieve.py -l --profile newbackup
+uv run database/portal_db_retrieve.py -r --profile newbackup --target-db portal_dev --dry-run
 uv run database/portal_db_retrieve.py -r --profile newbackup --target-db portal_dev
 
-./database/pg_restore_portal.sh \
-  --input database/dumps/<path printed above> \
-  --source-db portal1 --target-db portal_dev --clean-restore --dry-run
+# Use the exact decompressed .sql or .dump path printed as "Dump ready".
+DUMP="database/dumps/django.portal1.dump.<epoch>.sql"
 
 ./database/pg_restore_portal.sh \
-  --input database/dumps/<path printed above> \
-  --source-db portal1 --target-db portal_dev --clean-restore
+  --input "$DUMP" \
+  --source-db portal1 \
+  --target-db portal_dev \
+  --clean-restore \
+  --dry-run
+
+./database/pg_restore_portal.sh \
+  --input "$DUMP" \
+  --source-db portal1 \
+  --target-db portal_dev \
+  --clean-restore
+
+# STOP: validate portal_dev before continuing. Restore portal_beta only during a
+# coordinated beta maintenance window, with its application and clients stopped.
+./database/pg_restore_portal.sh \
+  --input "$DUMP" \
+  --source-db portal1 \
+  --target-db portal_beta \
+  --clean-restore \
+  --dry-run
+
+./database/pg_restore_portal.sh \
+  --input "$DUMP" \
+  --source-db portal1 \
+  --target-db portal_beta \
+  --clean-restore
 ```
 
 No `APP_CONFIG=` and no `PGPASSFILE=` prefix is needed anywhere in that sequence:
 `pg_restore_portal.sh` auto-discovers `APP_CONFIG` at `/soft/django-cms-01/conf/portal.conf`
 whenever it is run from inside the deployed release (`ROOT_DIR/../../conf/portal.conf`),
-and libpq auto-discovers `/home/software/.pgpass` whenever `PGPASSFILE` is unset. Swap
-`portal_beta` for `portal_dev` throughout as needed.
+and libpq auto-discovers `/home/software/.pgpass` whenever `PGPASSFILE` is unset.
+
+The retrieval dry run selects and displays the S3 object it would download, but it does
+not download, decompress, or classify the artifact. Set `DUMP` only after the real
+retrieval, using the exact `.sql` or `.dump` path printed as `Dump ready`. The restore
+dry run inspects that local artifact and prints the planned commands, but it does not
+authenticate to PostgreSQL or confirm live credentials, ownership, privileges, or active
+connections.
+
+Do not continue to `portal_beta` merely because the `portal_dev` restore command
+completed. Review the automatic `verify_db.sh` output, use the approved deployed Django
+management workflow to check the restored database against the checked-out code's
+migration state, and complete representative public-page, administration, authentication,
+news/resource, and media smoke checks. Resolve any failure, warning, pending migration,
+or application problem before scheduling the coordinated beta restore. Applying a
+migration remains a separate, human-approved action.
 
 The steps below explain what each of those commands does and why, and cover the
 off-host/local case where the auto-discovery above does not apply.
 
-### 1. Retrieve the latest portal1 dump
+### 1. List, preview, and retrieve the latest portal1 dump
 
 On the deployed server, as `software`:
 
 ```bash
+uv run database/portal_db_retrieve.py \
+  -l \
+  --profile newbackup
+
+uv run database/portal_db_retrieve.py \
+  -r \
+  --profile newbackup \
+  --target-db portal_dev \
+  --dry-run
+
 uv run database/portal_db_retrieve.py \
   -r \
   --profile newbackup \
@@ -124,7 +175,15 @@ uv run database/portal_db_retrieve.py \
 
 The compressed S3 artifact is classified from its decompressed content. Plain SQL is
 saved with a `.sql` suffix; PostgreSQL custom archives are saved with `.dump`.
-Retrieval prints a content-appropriate restore command but does not run it.
+Retrieval prints a content-appropriate restore command but does not run it. Copy the
+exact decompressed path from the `Dump ready` line into a shell variable:
+
+```bash
+DUMP="database/dumps/django.portal1.dump.<epoch>.sql"
+```
+
+The suffix may instead be `.dump`; use what retrieval actually printed rather than
+assuming the format from the S3 object's name.
 
 The current warehouse-management S3 producer runs plain `pg_dump` with
 `-n portal_django` and without `--create`. Its artifact is therefore scoped to the
@@ -166,7 +225,7 @@ Use the exact decompressed path printed by retrieval:
 
 ```bash
 ./database/pg_restore_portal.sh \
-  --input database/dumps/django.portal1.dump.<epoch>.sql \
+  --input "$DUMP" \
   --source-db portal1 \
   --target-db portal_dev \
   --clean-restore \
@@ -189,7 +248,7 @@ After reviewing the dry run:
 
 ```bash
 ./database/pg_restore_portal.sh \
-  --input database/dumps/django.portal1.dump.<epoch>.sql \
+  --input "$DUMP" \
   --source-db portal1 \
   --target-db portal_dev \
   --clean-restore
@@ -217,6 +276,40 @@ same complete dump.
 
 Plain SQL is restored with `psql`. PostgreSQL custom archives are restored with
 `pg_restore`; the script selects the tool from the file contents rather than its name.
+
+### 5. Validate portal_dev before restoring portal_beta
+
+The restore runs `verify_db.sh` automatically unless `--no-verify` is supplied. Review
+that output rather than relying only on the restore command's completion. Then check the
+restored database's migration state against the checked-out release and complete the
+representative application and media smoke checks listed in the canonical runbook.
+
+Do not apply pending migrations as part of this restore procedure. Migration execution
+requires separate human approval. Do not proceed to beta until the restored dev database
+and application behavior are accepted.
+
+### 6. Restore portal_beta during a coordinated maintenance window
+
+Stop the beta application and disconnect other clients first. Reuse the exact artifact
+that passed validation in `portal_dev`, then inspect and execute the beta restore:
+
+```bash
+./database/pg_restore_portal.sh \
+  --input "$DUMP" \
+  --source-db portal1 \
+  --target-db portal_beta \
+  --clean-restore \
+  --dry-run
+
+./database/pg_restore_portal.sh \
+  --input "$DUMP" \
+  --source-db portal1 \
+  --target-db portal_beta \
+  --clean-restore
+```
+
+Review the automatic verification output for `portal_beta` before returning the beta
+application to service.
 
 ## Creating a compatible plain-SQL dump locally
 
@@ -372,11 +465,15 @@ files.
 
 ## Safety checklist
 
-- Keep `--source-db portal1` and `--target-db portal_dev` explicit.
+- Keep `--source-db portal1` and the exact `--target-db portal_dev` or
+  `--target-db portal_beta` explicit.
 - On a deployed host, run as `software` from `/soft/django-cms-01/PROD`; see
   [Run as `software` on a deployed host](#run-as-software-on-a-deployed-host-recommended).
-- Stop any application connected to `portal_dev` before clean restore.
+- Stop the application and disconnect other clients from the target database before
+  each clean restore.
 - Inspect `--dry-run` before the real restore.
+- Validate `portal_dev`, including migration state and application/media smoke checks,
+  before restoring the same artifact into `portal_beta` during a coordinated window.
 - Use `portal_owner`'s password file (`/home/software/.pgpass`, or `PGPASSFILE`
   off-host); do not expose passwords in commands or logs.
 - Do not commit files under `database/dumps/` or `database/mediarestore/`.
