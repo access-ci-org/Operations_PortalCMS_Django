@@ -21,22 +21,30 @@ See [dev_documentation/CURRENT_STATE.md](dev_documentation/CURRENT_STATE.md) for
 
 ```
 Operations_PortalCMS_Django/
-├── operations_portalcms_django/      # Django project root (manage.py here)
-│   ├── operations_portalcms_django/  # Settings package (settings.py, urls.py, wsgi.py)
-│   ├── portal/                       # Core app: views, toolbars, CMS workflow, utils
-│   ├── infrastructure_news/          # System Status News models, views, admin
-│   ├── integration_news/             # Integration News models, views, admin
-│   ├── resources/                    # CIDER models and public resource views
-│   ├── templates/                    # HTML templates (base.html, portal/, web/, etc.)
-│   ├── static/                       # Static files (CSS, JS, images)
-│   ├── media/                        # User-uploaded files
-│   ├── tests/                        # Standalone integration/check scripts
-│   └── manage.py
-├── database/                         # Backup, restore, clone, and DB verification scripts
-├── dev_documentation/                # Operational docs and local dev config example (see CURRENT_STATE.md) (these files can be copied into the root dir to run locally for development or, preferreed, one should use the [Operations_Django_Development](https://github.com/access-ci-org/Operations_Django_Development) repo)
-├── manage.py                     # Django management script
-└── pyproject.toml                # Python dependencies
+├── operations_portalcms_django/      # Django project root
+│   ├── manage.py                      # Django management entry point
+│   ├── operations_portalcms_django/  # Settings, root URLs, ASGI, and WSGI
+│   ├── portal/                       # Core CMS, authentication, permissions, and health checks
+│   ├── infrastructure_news/          # System Status News and Drupal import workflow
+│   ├── integration_news/             # Integration News models and publishing workflow
+│   ├── resources/                    # CIDER-backed resource models and views
+│   ├── templates/                    # Site, account, admin, portal, and web templates
+│   ├── static/                       # Source CSS, JavaScript, and images
+│   ├── media/                        # django-filer media used by the application
+│   └── tests/                        # Cross-app integration and configuration tests
+├── database/                     # Database/media backup, restore, retrieval, and verification tools
+├── dev_documentation/            # Current-state and development documentation
+├── media_documentation/          # django CMS media documentation
+├── .github/                      # CI and deployment workflow definitions
+├── AGENTS.md                     # Repository-specific agent guidance
+├── CHANGELOG                     # Project change history
+└── README.md                     # This project overview
 ```
+
+For the supported local development environment, use the
+[Operations_Django_Development](https://github.com/access-ci-org/Operations_Django_Development)
+repository. Runtime and deployment configuration is maintained separately and is not
+part of this source tree.
 
 ## Technology Stack
 
