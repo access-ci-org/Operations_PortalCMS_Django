@@ -1,3 +1,6 @@
+v0.8.3 jlambertson 2026-09-25
+- removing hardcoded urls in urls.py to be replaced with redirects module in admin
+
 v0.8.2 jlambertson 2026-09-22
 - removing broken plugin dropdown in text editor
 
