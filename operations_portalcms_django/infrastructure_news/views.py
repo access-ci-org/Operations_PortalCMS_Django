@@ -1,122 +1,137 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.cache import cache_page
-from django.views.decorators.http import require_safe
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
+from django.db.models import Prefetch
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
-from django.db.models import Prefetch
-from .models import SystemStatusNews
-from .forms import SystemStatusNewsForm
+from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_safe
+
 from . import services
+from .forms import SystemStatusNewsForm
+from .models import SystemStatusNews
 
 
 def system_status_news(request):
     """System and Infrastructure Status News listing page"""
     infrastructure_prefetch = Prefetch(
-        'affected_infrastructure_items',
-        queryset=SystemStatusNews.affected_infrastructure_items.rel.model.objects.order_by(
-            'resource_descriptive_name'
-        ),
+        "affected_infrastructure_items",
+        queryset=SystemStatusNews.affected_infrastructure_items.rel.model.objects.order_by("resource_descriptive_name"),
     )
 
     if request.user.is_authenticated and (
-        request.user.has_perm('infrastructure_news.change_systemstatusnews') or
-        request.user.has_perm('infrastructure_news.can_publish_systemstatusnews')
+        request.user.has_perm("infrastructure_news.change_systemstatusnews")
+        or request.user.has_perm("infrastructure_news.can_publish_systemstatusnews")
     ):
         news_items = SystemStatusNews.objects.filter(is_active=True)
     else:
         news_items = services.get_public_news_queryset()
 
-    news_items = news_items.select_related('author').prefetch_related(infrastructure_prefetch)
+    news_items = news_items.select_related("author").prefetch_related(infrastructure_prefetch)
     paginator = Paginator(news_items, 20)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    page_obj = paginator.get_page(request.GET.get("page"))
 
-    return render(request, 'portal/infrastructure_news.html', {
-        'page': 'system_status_news',
-        'system_status_news': page_obj,
-        'page_obj': page_obj,
-        'can_publish': request.user.has_perm('infrastructure_news.can_publish_systemstatusnews') if request.user.is_authenticated else False,
-    })
+    return render(
+        request,
+        "portal/infrastructure_news.html",
+        {
+            "page": "system_status_news",
+            "system_status_news": page_obj,
+            "page_obj": page_obj,
+            "can_publish": (
+                request.user.has_perm("infrastructure_news.can_publish_systemstatusnews")
+                if request.user.is_authenticated
+                else False
+            ),
+        },
+    )
 
 
 @login_required
-@permission_required('infrastructure_news.add_systemstatusnews', login_url=reverse_lazy('portal:unprivileged'))
+@permission_required("infrastructure_news.add_systemstatusnews", login_url=reverse_lazy("portal:unprivileged"))
 def add_system_status_news(request):
     """Add new system and infrastructure status news item"""
-    can_publish = request.user.is_superuser or request.user.has_perm('infrastructure_news.can_publish_systemstatusnews')
+    can_publish = request.user.is_superuser or request.user.has_perm("infrastructure_news.can_publish_systemstatusnews")
 
-    if request.method == 'POST':
+    if request.method == "POST":
         form = SystemStatusNewsForm(request.POST)
         if form.is_valid():
             news = form.save(commit=False)
             news.author = request.user
-            if 'publish' in request.POST and can_publish:
-                news.status = 'published'
+            if "publish" in request.POST and can_publish:
+                news.status = "published"
                 news.published_by = request.user
                 news.published_at = timezone.now()
-                messages.success(request, 'System and infrastructure status news published successfully!')
+                messages.success(request, "System and infrastructure status news published successfully!")
             else:
-                news.status = 'draft'
-                messages.success(request, 'System and infrastructure status news created as draft. Publish when ready.')
+                news.status = "draft"
+                messages.success(request, "System and infrastructure status news created as draft. Publish when ready.")
             news.save()
             form.save_related_fields(news)
-            return redirect('infrastructure_news:system_status_news')
+            return redirect("infrastructure_news:system_status_news")
     else:
         form = SystemStatusNewsForm()
 
-    return render(request, 'portal/add_system_status_news.html', {
-        'page': 'system_status_news',
-        'form': form,
-        'can_publish': can_publish,
-    })
+    return render(
+        request,
+        "portal/add_system_status_news.html",
+        {
+            "page": "system_status_news",
+            "form": form,
+            "can_publish": can_publish,
+        },
+    )
 
 
 @login_required
-@permission_required('infrastructure_news.change_systemstatusnews', login_url=reverse_lazy('portal:unprivileged'))
+@permission_required("infrastructure_news.change_systemstatusnews", login_url=reverse_lazy("portal:unprivileged"))
 def update_system_status_news(request, pk):
     """Update existing system and infrastructure status news item"""
     news = get_object_or_404(SystemStatusNews, pk=pk)
-    can_publish = request.user.is_superuser or request.user.has_perm('infrastructure_news.can_publish_systemstatusnews')
+    can_publish = request.user.is_superuser or request.user.has_perm("infrastructure_news.can_publish_systemstatusnews")
     can_delete = request.user.is_superuser or (
-        request.user.has_perm('infrastructure_news.delete_systemstatusnews') and news.author == request.user
+        request.user.has_perm("infrastructure_news.delete_systemstatusnews") and news.author == request.user
     )
 
-    if request.method == 'POST':
-        if 'delete' in request.POST:
+    if request.method == "POST":
+        if "delete" in request.POST:
             if not can_delete:
-                messages.error(request, 'You cannot delete this news item.')
-                return redirect('infrastructure_news:update_system_status_news', pk=pk)
+                messages.error(request, "You cannot delete this news item.")
+                return redirect("infrastructure_news:update_system_status_news", pk=pk)
             news.delete()
-            messages.success(request, 'System and infrastructure status news deleted successfully!')
-            return redirect('infrastructure_news:system_status_news')
+            messages.success(request, "System and infrastructure status news deleted successfully!")
+            return redirect("infrastructure_news:system_status_news")
 
         form = SystemStatusNewsForm(request.POST, instance=news)
         if form.is_valid():
             news = form.save(commit=False)
-            if 'publish' in request.POST and can_publish:
-                news.status = 'published'
+            if "publish" in request.POST and can_publish:
+                news.status = "published"
                 news.published_by = request.user
                 news.published_at = timezone.now()
                 news.save()
-                messages.success(request, 'System and infrastructure status news updated and published successfully!')
+                messages.success(request, "System and infrastructure status news updated and published successfully!")
             else:
                 news.save()
-                messages.success(request, 'System and infrastructure status news updated successfully!')
+                messages.success(request, "System and infrastructure status news updated successfully!")
             form.save_related_fields(news)
-            return redirect('infrastructure_news:system_status_news')
+            return redirect("infrastructure_news:system_status_news")
     else:
         form = SystemStatusNewsForm(instance=news)
 
-    return render(request, 'portal/update_system_status_news.html', {
-        'page': 'system_status_news',
-        'news': news,
-        'form': form,
-        'can_publish': can_publish,
-        'can_delete': can_delete,
-    })
+    return render(
+        request,
+        "portal/update_system_status_news.html",
+        {
+            "page": "system_status_news",
+            "news": news,
+            "form": form,
+            "can_publish": can_publish,
+            "can_delete": can_delete,
+        },
+    )
 
 
 @require_safe
@@ -127,7 +142,8 @@ def api_infrastructure_news(request):
     The payload matches the legacy Drupal /api/infrastructure_news endpoint for
     downstream consumers.
     """
-    if request.method not in ('GET', 'HEAD'):
+    if request.method not in ("GET", "HEAD"):
         from django.http import HttpResponseNotAllowed
-        return HttpResponseNotAllowed(['GET', 'HEAD'])
+
+        return HttpResponseNotAllowed(["GET", "HEAD"])
     return JsonResponse(services.get_public_news_feed(request), safe=False)

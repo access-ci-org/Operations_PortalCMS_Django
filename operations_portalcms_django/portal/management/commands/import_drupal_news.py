@@ -7,5 +7,4 @@ two implementations that can drift.
 
 from infrastructure_news.management.commands.import_drupal_news import Command
 
-
 __all__ = ["Command"]

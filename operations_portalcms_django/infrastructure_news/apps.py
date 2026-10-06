@@ -2,6 +2,6 @@ from django.apps import AppConfig
 
 
 class InfrastructureNewsConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'infrastructure_news'
-    verbose_name = 'Infrastructure News'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "infrastructure_news"
+    verbose_name = "Infrastructure News"

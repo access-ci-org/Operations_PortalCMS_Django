@@ -3,6 +3,7 @@
 The raw-dump path is a guarded, atomic, one-time cutover workflow designed for
 repeatable rehearsals before the final Drupal-to-Django replacement.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -22,8 +23,6 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.dateparse import parse_date, parse_datetime
 from djangocms_text_ckeditor.html import clean_html
-from integration_news.models import IntegrationElement, IntegrationNews
-from resources.models import CiderInfrastructure
 
 from infrastructure_news.drupal_mysql import (
     AUTHOR_USERNAME_DERIVATIONS,
@@ -33,6 +32,8 @@ from infrastructure_news.drupal_mysql import (
     sha256_file,
 )
 from infrastructure_news.models import SystemStatusNews
+from integration_news.models import IntegrationElement, IntegrationNews
+from resources.models import CiderInfrastructure
 
 DEFAULT_INPUT = Path("database/drupal_backups/generated/drupal_news_normalized_for_django.json")
 DEFAULT_REPORT = Path("database/drupal_backups/generated/drupal_news_import_dry_run.md")
@@ -40,8 +41,7 @@ IMPORT_PLAN_SCHEMA = "access-ci.drupal-news-import-plan"
 IMPORT_PLAN_VERSION = 3
 IMPORT_CONTRACT_VERSION = 3
 MYSQL_BACKUP_NAME_RE = re.compile(
-    r"^backup_database-(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
-    r"(?:Z|[+-]\d{2}:\d{2}))\.mysql\.gz$"
+    r"^backup_database-(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}" r"(?:Z|[+-]\d{2}:\d{2}))\.mysql\.gz$"
 )
 KNOWN_SOURCE_CORRECTIONS = {
     "infrastructure-928-start-year": {
@@ -53,6 +53,7 @@ KNOWN_SOURCE_CORRECTIONS = {
 
 
 # Import outcome tracking
+
 
 @dataclass
 class ImportResult:
@@ -93,6 +94,7 @@ class ImportResult:
 
 
 # Source metadata parsing
+
 
 def _as_dt(value: Optional[str]) -> Optional[datetime]:
     if not value:
@@ -171,9 +173,7 @@ def _source_author_uid(record: Dict[str, Any]) -> Optional[int]:
 
 
 def _source_posted_at(record: Dict[str, Any]) -> Optional[datetime]:
-    return _as_dt(
-        (record.get("source_metadata", {}) or {}).get("drupal_created_at")
-    )
+    return _as_dt((record.get("source_metadata", {}) or {}).get("drupal_created_at"))
 
 
 class Command(BaseCommand):
@@ -262,10 +262,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--apply",
             action="store_true",
-            help=(
-                "Apply a previously reviewed replacement plan. Requires --plan-file "
-                "and --confirm-plan-sha256."
-            ),
+            help=("Apply a previously reviewed replacement plan. Requires --plan-file " "and --confirm-plan-sha256."),
         )
         parser.add_argument(
             "--plan-file",
@@ -276,10 +273,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--confirm-plan-sha256",
-            help=(
-                "Required for --apply. Expected SHA-256 of the exact reviewed JSON "
-                "plan file."
-            ),
+            help=("Required for --apply. Expected SHA-256 of the exact reviewed JSON " "plan file."),
         )
         parser.add_argument(
             "--confirm-database",
@@ -345,9 +339,7 @@ class Command(BaseCommand):
         # Load the reviewed plan for apply mode; otherwise resolve source options.
         if apply:
             if plan_path is None or not options.get("confirm_plan_sha256"):
-                raise CommandError(
-                    "--apply requires --plan-file and --confirm-plan-sha256."
-                )
+                raise CommandError("--apply requires --plan-file and --confirm-plan-sha256.")
             conflicting_options = [
                 name
                 for name in (
@@ -379,10 +371,7 @@ class Command(BaseCommand):
             if conflicting_options:
                 raise CommandError(
                     "--apply loads bound import options from --plan-file; remove: "
-                    + ", ".join(
-                        f"--{name.replace('_', '-')}"
-                        for name in conflicting_options
-                    )
+                    + ", ".join(f"--{name.replace('_', '-')}" for name in conflicting_options)
                 )
             plan_data, plan_file_sha256 = self._load_import_plan(
                 plan_path=plan_path,
@@ -395,8 +384,7 @@ class Command(BaseCommand):
             target_contract = contract["target"]
             if contract["python_executable"] != sys.executable:
                 raise CommandError(
-                    "Refusing apply: import plan was produced by a different Python "
-                    "executable/release."
+                    "Refusing apply: import plan was produced by a different Python " "executable/release."
                 )
 
             source_kind = source_contract["kind"]
@@ -405,30 +393,17 @@ class Command(BaseCommand):
             dry_run = False
             replace = bool(option_contract["replace"])
             strict = bool(option_contract["strict"])
-            excluded_system_nids = list(
-                adjustment_contract["excluded_system_nids"]
-            )
-            source_correction_names = [
-                correction["name"]
-                for correction in adjustment_contract["source_corrections"]
-            ]
+            excluded_system_nids = list(adjustment_contract["excluded_system_nids"])
+            source_correction_names = [correction["name"] for correction in adjustment_contract["source_corrections"]]
             system_news_as_of_raw = adjustment_contract["system_news_as_of"]
             options["confirm_database"] = target_contract["database"]
             options["confirm_host"] = target_contract["host"]
             options["confirm_source_sha256"] = source_contract["sha256"]
             options["confirm_system_count"] = plan_data["expected"]["system_records"]
-            options["confirm_integration_count"] = plan_data["expected"][
-                "integration_records"
-            ]
-            options["suppress_notifications"] = bool(
-                option_contract["suppress_notifications"]
-            )
-            options["allow_na_affected_element"] = bool(
-                option_contract["allow_na_affected_element"]
-            )
-            options["create_import_user"] = bool(
-                option_contract["create_import_user"]
-            )
+            options["confirm_integration_count"] = plan_data["expected"]["integration_records"]
+            options["suppress_notifications"] = bool(option_contract["suppress_notifications"])
+            options["allow_na_affected_element"] = bool(option_contract["allow_na_affected_element"])
+            options["create_import_user"] = bool(option_contract["create_import_user"])
             options["import_user"] = option_contract["import_user"]
         else:
             mysql_dump = options.get("mysql_dump")
@@ -439,9 +414,7 @@ class Command(BaseCommand):
                         "--mysql-dump-directory is only valid with --dry-run; "
                         "apply uses the exact source bound in --plan-file."
                     )
-                input_path = self._select_newest_mysql_dump(
-                    Path(mysql_dump_directory)
-                )
+                input_path = self._select_newest_mysql_dump(Path(mysql_dump_directory))
                 mysql_dump = str(input_path)
             else:
                 input_path = Path(mysql_dump or options.get("input") or DEFAULT_INPUT)
@@ -458,14 +431,9 @@ class Command(BaseCommand):
 
         if replace and not system_news_as_of_raw:
             raise CommandError(
-                "--replace requires --system-news-as-of so past Infrastructure News "
-                "is excluded deterministically."
+                "--replace requires --system-news-as-of so past Infrastructure News " "is excluded deterministically."
             )
-        system_news_as_of = (
-            self._parse_system_news_as_of(system_news_as_of_raw)
-            if system_news_as_of_raw
-            else None
-        )
+        system_news_as_of = self._parse_system_news_as_of(system_news_as_of_raw) if system_news_as_of_raw else None
 
         if len(excluded_system_nids) != len(set(excluded_system_nids)):
             raise CommandError("Duplicate --exclude-system-nid values are not permitted.")
@@ -482,21 +450,14 @@ class Command(BaseCommand):
             for name in source_correction_names
         }
         if plan_data is not None:
-            expected_corrections = plan_data["contract"]["adjustments"][
-                "source_corrections"
-            ]
-            actual_corrections = [
-                {"name": name, **KNOWN_SOURCE_CORRECTIONS[name]}
-                for name in source_correction_names
-            ]
+            expected_corrections = plan_data["contract"]["adjustments"]["source_corrections"]
+            actual_corrections = [{"name": name, **KNOWN_SOURCE_CORRECTIONS[name]} for name in source_correction_names]
             if expected_corrections != actual_corrections:
                 raise CommandError(
                     "Refusing apply: named source-correction definitions changed "
                     "since the dry-run plan was produced."
                 )
-        overlapping_adjustments = sorted(
-            set(excluded_system_nids) & set(start_datetime_corrections)
-        )
+        overlapping_adjustments = sorted(set(excluded_system_nids) & set(start_datetime_corrections))
         if overlapping_adjustments:
             raise CommandError(
                 "A SystemStatusNews nid cannot be both excluded and corrected: "
@@ -509,63 +470,42 @@ class Command(BaseCommand):
             raise CommandError("--confirm-plan-sha256 is only valid with --apply.")
         if replace and dry_run:
             if plan_path is None:
-                raise CommandError(
-                    "A replacement --dry-run requires --plan-file."
-                )
+                raise CommandError("A replacement --dry-run requires --plan-file.")
             if not strict:
-                raise CommandError(
-                    "A replacement --dry-run that writes a plan requires --strict."
-                )
+                raise CommandError("A replacement --dry-run that writes a plan requires --strict.")
             if plan_path.exists():
-                raise CommandError(
-                    f"Refusing to overwrite existing import plan: {plan_path}"
-                )
+                raise CommandError(f"Refusing to overwrite existing import plan: {plan_path}")
             resolved_plan = plan_path.resolve()
             if resolved_plan in {input_path.resolve(), report_path.resolve()}:
-                raise CommandError(
-                    "--plan-file must differ from the source and Markdown report paths."
-                )
+                raise CommandError("--plan-file must differ from the source and Markdown report paths.")
         elif plan_path is not None and not apply:
-            raise CommandError(
-                "--plan-file is only valid with a replacement --dry-run or --apply."
-            )
+            raise CommandError("--plan-file is only valid with a replacement --dry-run or --apply.")
         if mysql_dump and not replace:
             raise CommandError(
-                "--mysql-dump requires --replace; raw cutover data must replace both "
-                "news feeds atomically."
+                "--mysql-dump requires --replace; raw cutover data must replace both " "news feeds atomically."
             )
         if mysql_dump and options.get("create_import_user"):
             raise CommandError(
-                "Raw-dump cutover imports require an existing --import-user; "
-                "--create-import-user is not permitted."
+                "Raw-dump cutover imports require an existing --import-user; " "--create-import-user is not permitted."
             )
         if mysql_dump and not options.get("suppress_notifications"):
-            raise CommandError(
-                "Raw-dump imports require --suppress-notifications."
-            )
+            raise CommandError("Raw-dump imports require --suppress-notifications.")
         if replace:
             self._validate_replace_target(
                 confirm_database=options.get("confirm_database"),
                 confirm_host=options.get("confirm_host"),
             )
             if plan_data is not None:
-                configured_port = str(
-                    settings.DATABASES["default"].get("PORT") or ""
-                )
-                planned_port = str(
-                    plan_data["contract"]["target"].get("port") or ""
-                )
+                configured_port = str(settings.DATABASES["default"].get("PORT") or "")
+                planned_port = str(plan_data["contract"]["target"].get("port") or "")
                 if configured_port != planned_port:
                     raise CommandError(
-                        "Refusing apply: configured database port differs from "
-                        "the reviewed import plan."
+                        "Refusing apply: configured database port differs from " "the reviewed import plan."
                     )
             if dry_run and apply:
                 raise CommandError("Choose either --dry-run or --apply, not both.")
             if not dry_run and not apply:
-                raise CommandError(
-                    "A replacement write requires --apply. Use --dry-run to review the plan first."
-                )
+                raise CommandError("A replacement write requires --apply. Use --dry-run to review the plan first.")
 
         if apply and not options.get("confirm_source_sha256"):
             raise CommandError("Reviewed import plan does not bind a source SHA-256.")
@@ -579,14 +519,8 @@ class Command(BaseCommand):
         source_sha256 = sha256_file(input_path)
         confirmed_sha256 = options.get("confirm_source_sha256")
         if confirmed_sha256 and confirmed_sha256.lower() != source_sha256:
-            confirmation_source = (
-                "the reviewed import plan"
-                if plan_data is not None
-                else "--confirm-source-sha256"
-            )
-            raise CommandError(
-                f"Refusing import: source SHA-256 does not match {confirmation_source}."
-            )
+            confirmation_source = "the reviewed import plan" if plan_data is not None else "--confirm-source-sha256"
+            raise CommandError(f"Refusing import: source SHA-256 does not match {confirmation_source}.")
 
         # Parse source records and apply only explicitly requested corrections.
         source_warnings: List[str] = []
@@ -630,8 +564,7 @@ class Command(BaseCommand):
         integration_records = payload.get("IntegrationNews", [])
         if replace and (not isinstance(system_records, list) or not system_records):
             raise CommandError(
-                "Replacement requires a nonempty SystemStatusNews source list "
-                "before cutoff filtering."
+                "Replacement requires a nonempty SystemStatusNews source list " "before cutoff filtering."
             )
         if not mysql_dump and (excluded_system_nids or start_datetime_corrections):
             (
@@ -645,20 +578,16 @@ class Command(BaseCommand):
             )
         cutoff_excluded_system_nids: List[int] = []
         if system_news_as_of is not None:
-            system_records, cutoff_excluded_system_nids = (
-                self._filter_system_records_as_of(
-                    records=system_records,
-                    cutoff=system_news_as_of,
-                )
+            system_records, cutoff_excluded_system_nids = self._filter_system_records_as_of(
+                records=system_records,
+                cutoff=system_news_as_of,
             )
 
         if apply:
             expected_system_count = options.get("confirm_system_count")
             expected_integration_count = options.get("confirm_integration_count")
             if expected_system_count is None or expected_integration_count is None:
-                raise CommandError(
-                    "Reviewed import plan does not bind both retained feed counts."
-                )
+                raise CommandError("Reviewed import plan does not bind both retained feed counts.")
             if expected_system_count != len(system_records):
                 raise CommandError(
                     "Refusing import: SystemStatusNews source count differs from "
@@ -698,18 +627,15 @@ class Command(BaseCommand):
         result.cutoff_excluded_system_nids = cutoff_excluded_system_nids
         result.source_corrections = source_corrections_applied
         result.system_relationships = sum(
-            len(
-                (record.get("source_metadata", {}) or {}).get(
-                    "affected_infrastructure_nodes"
-                )
-                or []
-            )
+            len((record.get("source_metadata", {}) or {}).get("affected_infrastructure_nodes") or [])
             for record in system_records
         )
         result.integration_relationships = sum(
-            len(record.get("affected_elements") or [])
-            if record.get("affected_elements") is not None
-            else int(bool(record.get("affected_element")))
+            (
+                len(record.get("affected_elements") or [])
+                if record.get("affected_elements") is not None
+                else int(bool(record.get("affected_element")))
+            )
             for record in integration_records
         )
         result.warnings.extend(source_warnings)
@@ -722,21 +648,17 @@ class Command(BaseCommand):
                     create_missing=bool(options["create_import_user"]),
                     result=result,
                 )
-                system_authors, result.system_attribution = (
-                    self._resolve_record_authors(
-                        records=system_records,
-                        feed_name="SystemStatusNews",
-                        fallback_user=fallback_user,
-                        require_posted_at=replace,
-                    )
+                system_authors, result.system_attribution = self._resolve_record_authors(
+                    records=system_records,
+                    feed_name="SystemStatusNews",
+                    fallback_user=fallback_user,
+                    require_posted_at=replace,
                 )
-                integration_authors, result.integration_attribution = (
-                    self._resolve_record_authors(
-                        records=integration_records,
-                        feed_name="IntegrationNews",
-                        fallback_user=fallback_user,
-                        require_posted_at=replace,
-                    )
+                integration_authors, result.integration_attribution = self._resolve_record_authors(
+                    records=integration_records,
+                    feed_name="IntegrationNews",
+                    fallback_user=fallback_user,
+                    require_posted_at=replace,
                 )
                 if plan_data is not None:
                     self._validate_plan_staging(
@@ -792,8 +714,7 @@ class Command(BaseCommand):
 
                 if strict and result.warnings:
                     raise CommandError(
-                        f"Strict mode enabled and warnings found ({len(result.warnings)}). "
-                        "See report for details."
+                        f"Strict mode enabled and warnings found ({len(result.warnings)}). " "See report for details."
                     )
 
                 if plan_data is not None:
@@ -850,43 +771,27 @@ class Command(BaseCommand):
         try:
             resolved_directory = directory.resolve(strict=True)
         except OSError as exc:
-            raise CommandError(
-                f"MySQL dump directory cannot be resolved: {directory}"
-            ) from exc
+            raise CommandError(f"MySQL dump directory cannot be resolved: {directory}") from exc
         if not resolved_directory.is_dir():
-            raise CommandError(
-                f"MySQL dump directory is not a directory: {resolved_directory}"
-            )
+            raise CommandError(f"MySQL dump directory is not a directory: {resolved_directory}")
         if not os.access(resolved_directory, os.R_OK | os.X_OK):
-            raise CommandError(
-                f"MySQL dump directory is not readable: {resolved_directory}"
-            )
+            raise CommandError(f"MySQL dump directory is not readable: {resolved_directory}")
 
         candidates: List[tuple[datetime, Path]] = []
         for candidate in sorted(resolved_directory.glob("backup_database-*.mysql.gz")):
             match = MYSQL_BACKUP_NAME_RE.fullmatch(candidate.name)
             if match is None:
-                raise CommandError(
-                    f"Malformed MySQL backup filename in {resolved_directory}: "
-                    f"{candidate.name}"
-                )
+                raise CommandError(f"Malformed MySQL backup filename in {resolved_directory}: " f"{candidate.name}")
             if candidate.is_symlink() or not candidate.is_file():
-                raise CommandError(
-                    f"MySQL backup candidate is not a regular file: {candidate}"
-                )
+                raise CommandError(f"MySQL backup candidate is not a regular file: {candidate}")
             if not os.access(candidate, os.R_OK):
-                raise CommandError(
-                    f"MySQL backup candidate is not readable: {candidate}"
-                )
+                raise CommandError(f"MySQL backup candidate is not readable: {candidate}")
             parsed = parse_datetime(match.group("timestamp"))
             if parsed is None or parsed.tzinfo is None:
                 raise CommandError(
-                    f"MySQL backup filename has an invalid timezone-aware timestamp: "
-                    f"{candidate.name}"
+                    f"MySQL backup filename has an invalid timezone-aware timestamp: " f"{candidate.name}"
                 )
-            candidates.append(
-                (parsed.astimezone(timezone.utc), candidate.resolve(strict=True))
-            )
+            candidates.append((parsed.astimezone(timezone.utc), candidate.resolve(strict=True)))
 
         if not candidates:
             raise CommandError(
@@ -895,9 +800,7 @@ class Command(BaseCommand):
                 f"{resolved_directory}."
             )
         newest_timestamp = max(timestamp for timestamp, _ in candidates)
-        newest_paths = [
-            path for timestamp, path in candidates if timestamp == newest_timestamp
-        ]
+        newest_paths = [path for timestamp, path in candidates if timestamp == newest_timestamp]
         if len(newest_paths) != 1:
             raise CommandError(
                 "Multiple MySQL backups represent the same newest instant: "
@@ -939,12 +842,8 @@ class Command(BaseCommand):
                 "options": {
                     "replace": True,
                     "strict": True,
-                    "suppress_notifications": bool(
-                        options["suppress_notifications"]
-                    ),
-                    "allow_na_affected_element": bool(
-                        options["allow_na_affected_element"]
-                    ),
+                    "suppress_notifications": bool(options["suppress_notifications"]),
+                    "allow_na_affected_element": bool(options["allow_na_affected_element"]),
                     "create_import_user": bool(options["create_import_user"]),
                     "import_user": str(options["import_user"]),
                 },
@@ -952,8 +851,7 @@ class Command(BaseCommand):
                     "system_news_as_of": result.system_news_as_of,
                     "excluded_system_nids": sorted(excluded_system_nids),
                     "source_corrections": [
-                        {"name": name, **KNOWN_SOURCE_CORRECTIONS[name]}
-                        for name in sorted(source_correction_names)
+                        {"name": name, **KNOWN_SOURCE_CORRECTIONS[name]} for name in sorted(source_correction_names)
                     ],
                 },
             },
@@ -989,13 +887,9 @@ class Command(BaseCommand):
             with plan_path.open("x", encoding="utf-8") as plan_handle:
                 plan_handle.write(serialized)
         except FileExistsError as exc:
-            raise CommandError(
-                f"Refusing to overwrite existing import plan: {plan_path}"
-            ) from exc
+            raise CommandError(f"Refusing to overwrite existing import plan: {plan_path}") from exc
         except OSError as exc:
-            raise CommandError(
-                f"Unable to write import plan {plan_path}: {exc}"
-            ) from exc
+            raise CommandError(f"Unable to write import plan {plan_path}: {exc}") from exc
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     def _load_import_plan(
@@ -1008,16 +902,11 @@ class Command(BaseCommand):
             raise CommandError(f"Import plan does not exist: {plan_path}")
         actual_sha256 = sha256_file(plan_path)
         if actual_sha256 != confirmed_sha256.lower():
-            raise CommandError(
-                "Refusing apply: import plan SHA-256 does not match "
-                "--confirm-plan-sha256."
-            )
+            raise CommandError("Refusing apply: import plan SHA-256 does not match " "--confirm-plan-sha256.")
         try:
             plan_data = json.loads(plan_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            raise CommandError(
-                f"Unable to read JSON import plan {plan_path}: {exc}"
-            ) from exc
+            raise CommandError(f"Unable to read JSON import plan {plan_path}: {exc}") from exc
         self._validate_import_plan_schema(plan_data)
         return plan_data, actual_sha256
 
@@ -1061,10 +950,8 @@ class Command(BaseCommand):
                 isinstance(plan_data, dict)
                 and set(plan_data) == top_level_keys
                 and set(plan_data["contract"]) == contract_keys
-                and set(plan_data["contract"]["source"])
-                == {"kind", "path", "sha256"}
-                and set(plan_data["contract"]["target"])
-                == {"database", "host", "port"}
+                and set(plan_data["contract"]["source"]) == {"kind", "path", "sha256"}
+                and set(plan_data["contract"]["target"]) == {"database", "host", "port"}
                 and set(plan_data["contract"]["options"])
                 == {
                     "replace",
@@ -1099,18 +986,13 @@ class Command(BaseCommand):
             raise CommandError("Import plan contract version is not supported.")
         if self._import_plan_contract_sha256(plan_data) != plan_data["contract_sha256"]:
             raise CommandError("Import plan contract integrity check failed.")
-        if (
-            not isinstance(contract["python_executable"], str)
-            or not Path(contract["python_executable"]).is_absolute()
-        ):
+        if not isinstance(contract["python_executable"], str) or not Path(contract["python_executable"]).is_absolute():
             raise CommandError("Import plan Python executable is invalid.")
 
         source = contract["source"]
         if source["kind"] not in {"mysql-dump", "normalized-json"}:
             raise CommandError("Import plan contains an unsupported source kind.")
-        if not isinstance(source["path"], str) or not Path(
-            source["path"]
-        ).is_absolute():
+        if not isinstance(source["path"], str) or not Path(source["path"]).is_absolute():
             raise CommandError("Import plan source path must be absolute.")
         if not self._is_sha256(source["sha256"]):
             raise CommandError("Import plan source SHA-256 is invalid.")
@@ -1134,12 +1016,8 @@ class Command(BaseCommand):
             raise CommandError("Import plan contains a non-boolean execution option.")
         if not options["replace"] or not options["strict"]:
             raise CommandError("Import plan must bind strict atomic replacement.")
-        if source["kind"] == "mysql-dump" and (
-            not options["suppress_notifications"] or options["create_import_user"]
-        ):
-            raise CommandError(
-                "Raw-dump import plan violates notification or import-user safeguards."
-            )
+        if source["kind"] == "mysql-dump" and (not options["suppress_notifications"] or options["create_import_user"]):
+            raise CommandError("Raw-dump import plan violates notification or import-user safeguards.")
         if not isinstance(options["import_user"], str) or not options["import_user"]:
             raise CommandError("Import plan import user is invalid.")
 
@@ -1152,8 +1030,7 @@ class Command(BaseCommand):
         )
         corrections = adjustments["source_corrections"]
         if not isinstance(corrections, list) or any(
-            not isinstance(correction, dict)
-            or set(correction) != {"name", "nid", "source", "replacement"}
+            not isinstance(correction, dict) or set(correction) != {"name", "nid", "source", "replacement"}
             for correction in corrections
         ):
             raise CommandError("Import plan source corrections are malformed.")
@@ -1166,14 +1043,10 @@ class Command(BaseCommand):
             }
             for correction in corrections
         ):
-            raise CommandError(
-                "Import plan source-correction definition is not currently supported."
-            )
+            raise CommandError("Import plan source-correction definition is not currently supported.")
         correction_names = [correction["name"] for correction in corrections]
         if correction_names != sorted(set(correction_names)):
-            raise CommandError(
-                "Import plan source corrections must be sorted and unique."
-            )
+            raise CommandError("Import plan source corrections must be sorted and unique.")
 
         expected = plan_data["expected"]
         count_fields = (
@@ -1183,18 +1056,12 @@ class Command(BaseCommand):
             "integration_relationships",
         )
         if any(
-            isinstance(expected[name], bool)
-            or not isinstance(expected[name], int)
-            or expected[name] < 0
+            isinstance(expected[name], bool) or not isinstance(expected[name], int) or expected[name] < 0
             for name in count_fields
         ):
             raise CommandError("Import plan contains an invalid expected count.")
-        self._validate_plan_id_list(
-            expected["system_ids"], "SystemStatusNews IDs", allow_empty=True
-        )
-        self._validate_plan_id_list(
-            expected["integration_ids"], "IntegrationNews IDs", allow_empty=False
-        )
+        self._validate_plan_id_list(expected["system_ids"], "SystemStatusNews IDs", allow_empty=True)
+        self._validate_plan_id_list(expected["integration_ids"], "IntegrationNews IDs", allow_empty=False)
         self._validate_plan_id_list(
             expected["excluded_system_nids"],
             "applied SystemStatusNews exclusions",
@@ -1206,13 +1073,11 @@ class Command(BaseCommand):
             allow_empty=True,
         )
         if not isinstance(expected["source_corrections_applied"], list) or any(
-            not isinstance(value, str)
-            for value in expected["source_corrections_applied"]
+            not isinstance(value, str) for value in expected["source_corrections_applied"]
         ):
             raise CommandError("Import plan applied corrections are malformed.")
         if any(
-            isinstance(value, bool) or not isinstance(value, int) or value < 0
-            for value in expected["outcome"].values()
+            isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in expected["outcome"].values()
         ):
             raise CommandError("Import plan expected outcome is malformed.")
         if expected["system_records"] != len(expected["system_ids"]):
@@ -1231,14 +1096,9 @@ class Command(BaseCommand):
             options["import_user"],
             "IntegrationNews",
         )
-        if (
-            expected["excluded_system_nids"]
-            != adjustments["excluded_system_nids"]
-        ):
+        if expected["excluded_system_nids"] != adjustments["excluded_system_nids"]:
             raise CommandError("Import plan explicit exclusion sets differ.")
-        if set(expected["excluded_system_nids"]) & set(
-            expected["cutoff_excluded_system_nids"]
-        ):
+        if set(expected["excluded_system_nids"]) & set(expected["cutoff_excluded_system_nids"]):
             raise CommandError("Import plan exclusion sets overlap.")
         if len(expected["source_corrections_applied"]) != len(corrections):
             raise CommandError("Import plan source correction counts differ.")
@@ -1269,28 +1129,18 @@ class Command(BaseCommand):
             "posted_at",
         }
         if not isinstance(values, list) or len(values) != len(expected_ids):
-            raise CommandError(
-                f"Import plan {feed_name} attribution count is invalid."
-            )
+            raise CommandError(f"Import plan {feed_name} attribution count is invalid.")
 
         attribution_ids: List[int] = []
         for value in values:
             if not isinstance(value, dict) or set(value) != keys:
-                raise CommandError(
-                    f"Import plan {feed_name} attribution shape is invalid."
-                )
+                raise CommandError(f"Import plan {feed_name} attribution shape is invalid.")
             nid = value["nid"]
             uid = value["drupal_uid"]
             if isinstance(nid, bool) or not isinstance(nid, int) or nid <= 0:
-                raise CommandError(
-                    f"Import plan {feed_name} attribution nid is invalid."
-                )
-            if uid is not None and (
-                isinstance(uid, bool) or not isinstance(uid, int) or uid < 0
-            ):
-                raise CommandError(
-                    f"Import plan {feed_name} Drupal author uid is invalid."
-                )
+                raise CommandError(f"Import plan {feed_name} attribution nid is invalid.")
+            if uid is not None and (isinstance(uid, bool) or not isinstance(uid, int) or uid < 0):
+                raise CommandError(f"Import plan {feed_name} Drupal author uid is invalid.")
             if any(
                 not isinstance(value[name], str)
                 for name in (
@@ -1302,66 +1152,42 @@ class Command(BaseCommand):
                     "posted_at",
                 )
             ):
-                raise CommandError(
-                    f"Import plan {feed_name} attribution values are invalid."
-                )
+                raise CommandError(f"Import plan {feed_name} attribution values are invalid.")
             if value["username_derivation"] not in AUTHOR_USERNAME_DERIVATIONS:
-                raise CommandError(
-                    f"Import plan {feed_name} username derivation is invalid."
-                )
+                raise CommandError(f"Import plan {feed_name} username derivation is invalid.")
             has_candidate = bool(value["username_candidate"])
             derivation_has_candidate = value["username_derivation"] in {
                 "plain",
                 "local-part",
             }
             if has_candidate != derivation_has_candidate:
-                raise CommandError(
-                    f"Import plan {feed_name} username derivation is inconsistent."
-                )
+                raise CommandError(f"Import plan {feed_name} username derivation is inconsistent.")
             if "@" in value["username_candidate"]:
-                raise CommandError(
-                    f"Import plan {feed_name} username candidate contains an email domain."
-                )
+                raise CommandError(f"Import plan {feed_name} username candidate contains an email domain.")
             if not value["django_username"]:
-                raise CommandError(
-                    f"Import plan {feed_name} Django username is empty."
-                )
+                raise CommandError(f"Import plan {feed_name} Django username is empty.")
             posted_at = parse_datetime(value["posted_at"])
             if posted_at is None or posted_at.tzinfo is None:
-                raise CommandError(
-                    f"Import plan {feed_name} post date is invalid."
-                )
+                raise CommandError(f"Import plan {feed_name} post date is invalid.")
             if value["resolution"] == "drupal-username":
                 if (
                     not value["username_candidate"]
                     or value["username_candidate"] != value["django_username"]
                     or value["fallback_reason"]
                 ):
-                    raise CommandError(
-                        f"Import plan {feed_name} matched attribution is inconsistent."
-                    )
+                    raise CommandError(f"Import plan {feed_name} matched attribution is inconsistent.")
             elif value["resolution"] == "fallback":
-                if (
-                    value["django_username"] != fallback_username
-                    or value["fallback_reason"]
-                    not in {
-                        "missing-drupal-username",
-                        "no-django-username-match",
-                    }
-                ):
-                    raise CommandError(
-                        f"Import plan {feed_name} fallback attribution is inconsistent."
-                    )
+                if value["django_username"] != fallback_username or value["fallback_reason"] not in {
+                    "missing-drupal-username",
+                    "no-django-username-match",
+                }:
+                    raise CommandError(f"Import plan {feed_name} fallback attribution is inconsistent.")
             else:
-                raise CommandError(
-                    f"Import plan {feed_name} attribution resolution is invalid."
-                )
+                raise CommandError(f"Import plan {feed_name} attribution resolution is invalid.")
             attribution_ids.append(nid)
 
         if attribution_ids != expected_ids:
-            raise CommandError(
-                f"Import plan {feed_name} attribution IDs differ from record IDs."
-            )
+            raise CommandError(f"Import plan {feed_name} attribution IDs differ from record IDs.")
 
     def _validate_plan_id_list(
         self,
@@ -1372,24 +1198,13 @@ class Command(BaseCommand):
         if (
             not isinstance(values, list)
             or (not values and not allow_empty)
-            or any(
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or value <= 0
-                for value in values
-            )
+            or any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in values)
             or values != sorted(set(values))
         ):
-            raise CommandError(
-                f"Import plan {label} must be sorted unique positive integers."
-            )
+            raise CommandError(f"Import plan {label} must be sorted unique positive integers.")
 
     def _import_plan_contract_sha256(self, plan_data: Dict[str, Any]) -> str:
-        digest_payload = {
-            key: value
-            for key, value in plan_data.items()
-            if key != "contract_sha256"
-        }
+        digest_payload = {key: value for key, value in plan_data.items() if key != "contract_sha256"}
         canonical = json.dumps(
             digest_payload,
             sort_keys=True,
@@ -1430,10 +1245,7 @@ class Command(BaseCommand):
         }
         mismatches = [name for name, value in actual.items() if expected[name] != value]
         if mismatches:
-            raise CommandError(
-                "Refusing apply: staged import differs from the reviewed plan: "
-                + ", ".join(mismatches)
-            )
+            raise CommandError("Refusing apply: staged import differs from the reviewed plan: " + ", ".join(mismatches))
 
     def _validate_plan_outcome(
         self,
@@ -1445,8 +1257,7 @@ class Command(BaseCommand):
         mismatches = [name for name, value in actual.items() if expected[name] != value]
         if mismatches:
             raise CommandError(
-                "Refusing apply: database outcome differs from the reviewed plan: "
-                + ", ".join(mismatches)
+                "Refusing apply: database outcome differs from the reviewed plan: " + ", ".join(mismatches)
             )
 
     def _result_outcome_contract(self, result: ImportResult) -> Dict[str, int]:
@@ -1478,9 +1289,7 @@ class Command(BaseCommand):
         nid_counts: Dict[int, int] = {}
         for index, record in enumerate(records):
             if not isinstance(record, dict):
-                raise CommandError(
-                    f"SystemStatusNews record {index} must be a JSON object."
-                )
+                raise CommandError(f"SystemStatusNews record {index} must be a JSON object.")
             raw_nid = (record.get("source_metadata", {}) or {}).get("drupal_nid")
             try:
                 nid = int(raw_nid)
@@ -1524,8 +1333,7 @@ class Command(BaseCommand):
                 record = dict(record)
                 record["start_datetime"] = replacement
                 corrections_applied.append(
-                    f"SystemStatusNews nid={nid} start_datetime: "
-                    f"{expected_source!r} -> {replacement!r}"
+                    f"SystemStatusNews nid={nid} start_datetime: " f"{expected_source!r} -> {replacement!r}"
                 )
                 corrected_nids.add(nid)
             adjusted_records.append(record)
@@ -1536,9 +1344,7 @@ class Command(BaseCommand):
                 "Requested SystemStatusNews exclusions were not present in the input: "
                 + ", ".join(str(value) for value in missing_exclusions)
             )
-        missing_corrections = sorted(
-            set(start_datetime_corrections) - corrected_nids
-        )
+        missing_corrections = sorted(set(start_datetime_corrections) - corrected_nids)
         if missing_corrections:
             raise CommandError(
                 "Requested SystemStatusNews corrections were not applied: "
@@ -1550,8 +1356,7 @@ class Command(BaseCommand):
         parsed = parse_datetime(value)
         if parsed is None or parsed.tzinfo is None:
             raise CommandError(
-                "--system-news-as-of must be a timezone-aware ISO-8601 timestamp "
-                "such as 2026-09-01T12:00:00Z."
+                "--system-news-as-of must be a timezone-aware ISO-8601 timestamp " "such as 2026-09-01T12:00:00Z."
             )
         return parsed.astimezone(timezone.utc)
 
@@ -1567,30 +1372,25 @@ class Command(BaseCommand):
         excluded_nids: List[int] = []
         for index, record in enumerate(records):
             if not isinstance(record, dict):
-                raise CommandError(
-                    f"SystemStatusNews record {index} must be a JSON object."
-                )
+                raise CommandError(f"SystemStatusNews record {index} must be a JSON object.")
 
             try:
                 nid = int(_nid(record))
             except (TypeError, ValueError) as exc:
                 raise CommandError(
-                    f"SystemStatusNews record {index} requires a numeric Drupal nid "
-                    "for cutoff reporting."
+                    f"SystemStatusNews record {index} requires a numeric Drupal nid " "for cutoff reporting."
                 ) from exc
 
             start = _as_dt(record.get("start_datetime"))
             if start is None:
                 raise CommandError(
-                    f"SystemStatusNews nid={nid} requires a valid start_datetime "
-                    "for --system-news-as-of filtering."
+                    f"SystemStatusNews nid={nid} requires a valid start_datetime " "for --system-news-as-of filtering."
                 )
             raw_end = record.get("end_datetime")
             end = _as_dt(raw_end)
             if raw_end and end is None:
                 raise CommandError(
-                    f"SystemStatusNews nid={nid} has an invalid end_datetime for "
-                    "--system-news-as-of filtering."
+                    f"SystemStatusNews nid={nid} has an invalid end_datetime for " "--system-news-as-of filtering."
                 )
 
             is_current = start <= cutoff and (end is None or end >= cutoff)
@@ -1608,9 +1408,7 @@ class Command(BaseCommand):
         confirm_host: Optional[str],
     ) -> None:
         if not confirm_database or not confirm_host:
-            raise CommandError(
-                "--replace requires both --confirm-database and --confirm-host."
-            )
+            raise CommandError("--replace requires both --confirm-database and --confirm-host.")
 
         configured = settings.DATABASES["default"]
         actual_database = str(configured.get("NAME") or "")
@@ -1636,35 +1434,23 @@ class Command(BaseCommand):
         if not isinstance(records, list):
             raise CommandError(f"Replacement requires a {feed_name} list.")
         if not records and not allow_empty:
-            raise CommandError(
-                f"Replacement requires a nonempty {feed_name} list."
-            )
+            raise CommandError(f"Replacement requires a nonempty {feed_name} list.")
 
         ids: set[int] = set()
         for index, record in enumerate(records):
             if not isinstance(record, dict):
-                raise CommandError(
-                    f"{feed_name} record {index} must be a JSON object."
-                )
+                raise CommandError(f"{feed_name} record {index} must be a JSON object.")
             raw_id = (record.get("source_metadata", {}) or {}).get("drupal_nid")
             if isinstance(raw_id, bool):
-                raise CommandError(
-                    f"{feed_name} record {index} has invalid Drupal nid {raw_id!r}."
-                )
+                raise CommandError(f"{feed_name} record {index} has invalid Drupal nid {raw_id!r}.")
             try:
                 stable_id = int(raw_id)
             except (TypeError, ValueError):
-                raise CommandError(
-                    f"{feed_name} record {index} has invalid Drupal nid {raw_id!r}."
-                )
+                raise CommandError(f"{feed_name} record {index} has invalid Drupal nid {raw_id!r}.")
             if stable_id <= 0:
-                raise CommandError(
-                    f"{feed_name} record {index} has nonpositive Drupal nid {stable_id}."
-                )
+                raise CommandError(f"{feed_name} record {index} has nonpositive Drupal nid {stable_id}.")
             if stable_id in ids:
-                raise CommandError(
-                    f"{feed_name} contains duplicate Drupal nid {stable_id}."
-                )
+                raise CommandError(f"{feed_name} contains duplicate Drupal nid {stable_id}.")
             ids.add(stable_id)
         return ids
 
@@ -1678,27 +1464,16 @@ class Command(BaseCommand):
         system_authors: Dict[int, User],
         integration_authors: Dict[int, User],
     ) -> None:
-        actual_system_ids = set(
-            SystemStatusNews.objects.values_list("outage_id", flat=True)
-        )
-        actual_integration_ids = set(
-            IntegrationNews.objects.values_list("integration_news_id", flat=True)
-        )
+        actual_system_ids = set(SystemStatusNews.objects.values_list("outage_id", flat=True))
+        actual_integration_ids = set(IntegrationNews.objects.values_list("integration_news_id", flat=True))
 
         if actual_system_ids != expected_system_ids:
-            raise CommandError(
-                "Replacement validation failed for SystemStatusNews stable IDs."
-            )
+            raise CommandError("Replacement validation failed for SystemStatusNews stable IDs.")
         if actual_integration_ids != expected_integration_ids:
-            raise CommandError(
-                "Replacement validation failed for IntegrationNews stable IDs."
-            )
+            raise CommandError("Replacement validation failed for IntegrationNews stable IDs.")
 
         system_by_id = {
-            item.outage_id: item
-            for item in SystemStatusNews.objects.prefetch_related(
-                "affected_infrastructure_items"
-            )
+            item.outage_id: item for item in SystemStatusNews.objects.prefetch_related("affected_infrastructure_items")
         }
         for record in system_records:
             stable_id = int(_nid(record))
@@ -1710,56 +1485,37 @@ class Command(BaseCommand):
                 # reserialization, closing tags, quoted attributes). Compare against
                 # that same normalized form rather than the raw source string.
                 "content": clean_html(record.get("content") or "", full=False),
-                "infrastructure_news_type": record.get("infrastructure_news_type")
-                or "outage_full",
+                "infrastructure_news_type": record.get("infrastructure_news_type") or "outage_full",
                 "affected_infrastructure": record.get("affected_infrastructure") or "",
                 "start_datetime": _as_dt(record.get("start_datetime")),
                 "end_datetime": _as_dt(record.get("end_datetime")),
-                "send_email": False
-                if suppress_notifications
-                else bool(record.get("send_email", False)),
-                "post_to_slack": False
-                if suppress_notifications
-                else bool(record.get("post_to_slack", False)),
+                "send_email": False if suppress_notifications else bool(record.get("send_email", False)),
+                "post_to_slack": False if suppress_notifications else bool(record.get("post_to_slack", False)),
                 "is_active": bool(record.get("is_active", True)),
                 "status": record.get("status") or "published",
                 "author_id": system_authors[stable_id].pk,
                 "created_at": _source_posted_at(record),
                 "published_at": (
-                    _source_posted_at(record)
-                    if (record.get("status") or "published") == "published"
-                    else None
+                    _source_posted_at(record) if (record.get("status") or "published") == "published" else None
                 ),
                 "review_comments": _provenance_tag(record),
             }
             for field_name, expected in expected_fields.items():
                 if getattr(obj, field_name) != expected:
                     raise CommandError(
-                        "Replacement validation failed for SystemStatusNews "
-                        f"nid={stable_id} field {field_name}."
+                        "Replacement validation failed for SystemStatusNews " f"nid={stable_id} field {field_name}."
                     )
 
             expected_resources = {
                 str(node.get("resource_id"))
-                for node in (
-                    (record.get("source_metadata", {}) or {}).get(
-                        "affected_infrastructure_nodes"
-                    )
-                    or []
-                )
+                for node in ((record.get("source_metadata", {}) or {}).get("affected_infrastructure_nodes") or [])
                 if isinstance(node, dict) and node.get("resource_id")
             }
             if not expected_resources and obj.affected_infrastructure:
                 expected_resources = {
-                    value.strip()
-                    for value in obj.affected_infrastructure.split(",")
-                    if value.strip()
+                    value.strip() for value in obj.affected_infrastructure.split(",") if value.strip()
                 }
-            actual_resources = set(
-                obj.affected_infrastructure_items.values_list(
-                    "info_resourceid", flat=True
-                )
-            )
+            actual_resources = set(obj.affected_infrastructure_items.values_list("info_resourceid", flat=True))
             if actual_resources != expected_resources:
                 raise CommandError(
                     "Replacement validation failed for SystemStatusNews "
@@ -1767,8 +1523,7 @@ class Command(BaseCommand):
                 )
 
         integration_by_id = {
-            item.integration_news_id: item
-            for item in IntegrationNews.objects.prefetch_related("affected_elements")
+            item.integration_news_id: item for item in IntegrationNews.objects.prefetch_related("affected_elements")
         }
         for record in integration_records:
             stable_id = int(_nid(record))
@@ -1782,9 +1537,7 @@ class Command(BaseCommand):
                 # See the matching comment in the SystemStatusNews loop above.
                 "content": clean_html(record.get("content") or "", full=False),
                 "news_type": record.get("news_type") or "",
-                "affected_element": (
-                    str(expected_codes[0]) if len(expected_codes) == 1 else ""
-                ),
+                "affected_element": (str(expected_codes[0]) if len(expected_codes) == 1 else ""),
                 "effective_date": _as_date(record.get("effective_date")),
                 "expiration_date": _as_date(record.get("expiration_date")),
                 "is_active": bool(record.get("is_active", True)),
@@ -1792,21 +1545,16 @@ class Command(BaseCommand):
                 "author_id": integration_authors[stable_id].pk,
                 "created_at": _source_posted_at(record),
                 "published_at": (
-                    _source_posted_at(record)
-                    if (record.get("status") or "published") == "published"
-                    else None
+                    _source_posted_at(record) if (record.get("status") or "published") == "published" else None
                 ),
                 "review_comments": _provenance_tag(record),
             }
             for field_name, expected in expected_fields.items():
                 if getattr(obj, field_name) != expected:
                     raise CommandError(
-                        "Replacement validation failed for IntegrationNews "
-                        f"nid={stable_id} field {field_name}."
+                        "Replacement validation failed for IntegrationNews " f"nid={stable_id} field {field_name}."
                     )
-            actual_codes = set(
-                obj.affected_elements.values_list("code", flat=True)
-            )
+            actual_codes = set(obj.affected_elements.values_list("code", flat=True))
             if actual_codes != set(expected_codes):
                 raise CommandError(
                     "Replacement validation failed for IntegrationNews "
@@ -1836,8 +1584,7 @@ class Command(BaseCommand):
             return user
 
         raise CommandError(
-            f"Import user '{username}' does not exist. "
-            "Re-run with --create-import-user or set --import-user."
+            f"Import user '{username}' does not exist. " "Re-run with --create-import-user or set --import-user."
         )
 
     def _resolve_record_authors(
@@ -1847,17 +1594,10 @@ class Command(BaseCommand):
         fallback_user: User,
         require_posted_at: bool,
     ) -> tuple[Dict[int, User], List[Dict[str, Any]]]:
-        source_usernames = {
-            _source_author(record)
-            for record in records
-            if _source_author(record)
-        }
+        source_usernames = {_source_author(record) for record in records if _source_author(record)}
         # The final dictionary lookup deliberately remains case-sensitive even
         # if the database uses a case-insensitive collation for username.
-        matched_users = {
-            user.username: user
-            for user in User.objects.filter(username__in=source_usernames)
-        }
+        matched_users = {user.username: user for user in User.objects.filter(username__in=source_usernames)}
 
         authors: Dict[int, User] = {}
         attribution: List[Dict[str, Any]] = []
@@ -1868,9 +1608,7 @@ class Command(BaseCommand):
             source_derivation = _source_author_derivation(record)
             posted_at = _source_posted_at(record)
             if require_posted_at and posted_at is None:
-                raise CommandError(
-                    f"{feed_name} nid={stable_id} has no valid original post date."
-                )
+                raise CommandError(f"{feed_name} nid={stable_id} has no valid original post date.")
 
             matched_user = matched_users.get(source_username)
             if source_username and matched_user is not None:
@@ -1880,11 +1618,7 @@ class Command(BaseCommand):
             else:
                 author = fallback_user
                 resolution = "fallback"
-                fallback_reason = (
-                    "missing-drupal-username"
-                    if not source_username
-                    else "no-django-username-match"
-                )
+                fallback_reason = "missing-drupal-username" if not source_username else "no-django-username-match"
 
             authors[stable_id] = author
             attribution.append(
@@ -1940,9 +1674,7 @@ class Command(BaseCommand):
                 pass
 
         # Backward compatibility for earlier imports that stored Drupal provenance
-        legacy = SystemStatusNews.objects.filter(
-            review_comments__contains=f"[drupal_nid:{nid_raw};"
-        ).first()
+        legacy = SystemStatusNews.objects.filter(review_comments__contains=f"[drupal_nid:{nid_raw};").first()
         if legacy:
             return legacy
 
@@ -1965,9 +1697,7 @@ class Command(BaseCommand):
                 pass
 
         # Backward compatibility for earlier imports that stored Drupal provenance
-        legacy = IntegrationNews.objects.filter(
-            review_comments__contains=f"[drupal_nid:{nid_raw};"
-        ).first()
+        legacy = IntegrationNews.objects.filter(review_comments__contains=f"[drupal_nid:{nid_raw};").first()
         if legacy:
             return legacy
 
@@ -2018,16 +1748,13 @@ class Command(BaseCommand):
             obj.full_clean(validate_unique=False, validate_constraints=False)
         except ValidationError as exc:
             raise CommandError(
-                f"SystemStatusNews nid={_nid(record)} failed model validation: "
-                f"{exc.message_dict}"
+                f"SystemStatusNews nid={_nid(record)} failed model validation: " f"{exc.message_dict}"
             ) from exc
 
         if not dry_run:
             obj.save()
             if source_posted_at is not None:
-                SystemStatusNews.objects.filter(pk=obj.pk).update(
-                    created_at=source_posted_at
-                )
+                SystemStatusNews.objects.filter(pk=obj.pk).update(created_at=source_posted_at)
                 obj.created_at = source_posted_at
 
         if creating:
@@ -2049,25 +1776,14 @@ class Command(BaseCommand):
         matched_infra = list(CiderInfrastructure.objects.filter(info_resourceid__in=resource_ids))
         matched_counts: Dict[str, int] = {}
         for infrastructure in matched_infra:
-            matched_counts[infrastructure.info_resourceid] = (
-                matched_counts.get(infrastructure.info_resourceid, 0) + 1
-            )
-        duplicate_ids = sorted(
-            resource_id
-            for resource_id, count in matched_counts.items()
-            if count > 1
-        )
+            matched_counts[infrastructure.info_resourceid] = matched_counts.get(infrastructure.info_resourceid, 0) + 1
+        duplicate_ids = sorted(resource_id for resource_id, count in matched_counts.items() if count > 1)
         if duplicate_ids:
-            result.add_warning(
-                f"SystemStatusNews nid={_nid(record)} has non-unique CIDER matches: "
-                f"{duplicate_ids}"
-            )
+            result.add_warning(f"SystemStatusNews nid={_nid(record)} has non-unique CIDER matches: " f"{duplicate_ids}")
         matched_ids = {infra.info_resourceid for infra in matched_infra}
         missing_ids = sorted(set(resource_ids) - matched_ids)
         if missing_ids:
-            result.add_warning(
-                f"SystemStatusNews nid={_nid(record)} has unmatched infrastructure IDs: {missing_ids}"
-            )
+            result.add_warning(f"SystemStatusNews nid={_nid(record)} has unmatched infrastructure IDs: {missing_ids}")
 
         if not resource_ids:
             result.system_na_infrastructure += 1
@@ -2116,14 +1832,10 @@ class Command(BaseCommand):
 
         if explicit_codes is not None:
             if not isinstance(explicit_codes, list):
-                raise CommandError(
-                    f"IntegrationNews nid={_nid(record)} affected_elements must be a list."
-                )
+                raise CommandError(f"IntegrationNews nid={_nid(record)} affected_elements must be a list.")
             selected_codes = [str(code) for code in explicit_codes]
             if len(selected_codes) != len(set(selected_codes)):
-                raise CommandError(
-                    f"IntegrationNews nid={_nid(record)} contains duplicate affected elements."
-                )
+                raise CommandError(f"IntegrationNews nid={_nid(record)} contains duplicate affected elements.")
             obj.affected_element = selected_codes[0] if len(selected_codes) == 1 else ""
             if not selected_codes:
                 result.integration_na_element += 1
@@ -2151,16 +1863,13 @@ class Command(BaseCommand):
             obj.full_clean(validate_unique=False, validate_constraints=False)
         except ValidationError as exc:
             raise CommandError(
-                f"IntegrationNews nid={_nid(record)} failed model validation: "
-                f"{exc.message_dict}"
+                f"IntegrationNews nid={_nid(record)} failed model validation: " f"{exc.message_dict}"
             ) from exc
 
         if not dry_run:
             obj.save()
             if source_posted_at is not None:
-                IntegrationNews.objects.filter(pk=obj.pk).update(
-                    created_at=source_posted_at
-                )
+                IntegrationNews.objects.filter(pk=obj.pk).update(created_at=source_posted_at)
                 obj.created_at = source_posted_at
 
         if creating:
@@ -2172,9 +1881,7 @@ class Command(BaseCommand):
         for code in selected_codes:
             element = integration_elements.get(code)
             if element is None:
-                result.add_warning(
-                    f"IntegrationNews nid={_nid(record)} references unknown integration code '{code}'."
-                )
+                result.add_warning(f"IntegrationNews nid={_nid(record)} references unknown integration code '{code}'.")
                 continue
             m2m_elements.append(element)
 
@@ -2205,10 +1912,8 @@ class Command(BaseCommand):
             f"- Python executable: `{sys.executable}`",
             f"- Target database: `{settings.DATABASES['default'].get('NAME') or ''}`",
             f"- Target write host: `{settings.DATABASES['default'].get('HOST') or ''}`",
-            "- Import plan file: "
-            + (f"`{result.plan_file}`" if result.plan_file else "None"),
-            "- Import plan SHA-256: "
-            + (f"`{result.plan_sha256}`" if result.plan_sha256 else "None"),
+            "- Import plan file: " + (f"`{result.plan_file}`" if result.plan_file else "None"),
+            "- Import plan SHA-256: " + (f"`{result.plan_sha256}`" if result.plan_sha256 else "None"),
             "",
             "## Summary",
             "",
@@ -2226,25 +1931,17 @@ class Command(BaseCommand):
             + (f"`{result.system_news_as_of}`" if result.system_news_as_of else "None"),
             "- Cutoff-excluded past `SystemStatusNews` Drupal nids: "
             + (
-                ", ".join(
-                    f"`{nid}`" for nid in result.cutoff_excluded_system_nids
-                )
+                ", ".join(f"`{nid}`" for nid in result.cutoff_excluded_system_nids)
                 if result.cutoff_excluded_system_nids
                 else "None"
             ),
             "- Excluded `SystemStatusNews` Drupal nids: "
-            + (
-                ", ".join(f"`{nid}`" for nid in result.excluded_system_nids)
-                if result.excluded_system_nids
-                else "None"
-            ),
+            + (", ".join(f"`{nid}`" for nid in result.excluded_system_nids) if result.excluded_system_nids else "None"),
             "- Applied exact-match corrections:",
         ]
 
         if result.source_corrections:
-            lines.extend(
-                [f"  - {correction}" for correction in result.source_corrections]
-            )
+            lines.extend([f"  - {correction}" for correction in result.source_corrections])
         else:
             lines.append("  - None")
 
@@ -2259,9 +1956,7 @@ class Command(BaseCommand):
             ("SystemStatusNews", result.system_attribution),
             ("IntegrationNews", result.integration_attribution),
         ):
-            matched = sum(
-                value["resolution"] == "drupal-username" for value in values
-            )
+            matched = sum(value["resolution"] == "drupal-username" for value in values)
             fallback = len(values) - matched
             lines.extend(
                 [
@@ -2286,26 +1981,28 @@ class Command(BaseCommand):
             if not values:
                 lines.append("- None")
 
-        lines.extend([
-            "",
-            "## Planned/Applied Changes",
-            "",
-            f"- `SystemStatusNews` deleted: `{result.deleted_system}`",
-            f"- `IntegrationNews` deleted: `{result.deleted_integration}`",
-            f"- `SystemStatusNews` created: `{result.created_system}`",
-            f"- `SystemStatusNews` updated: `{result.updated_system}`",
-            f"- `IntegrationNews` created: `{result.created_integration}`",
-            f"- `IntegrationNews` updated: `{result.updated_integration}`",
-            "",
-            "## N/A Handling",
-            "",
-            f"- `SystemStatusNews` records with no mapped infrastructure (`N/A`): `{result.system_na_infrastructure}`",
-            f"- `IntegrationNews` records with no affected element (`N/A`): `{result.integration_na_element}`",
-            f"- Ambiguous integration mappings accepted as `N/A`: `{result.unresolved_allowed_na}`",
-            "",
-            "## Warnings",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Planned/Applied Changes",
+                "",
+                f"- `SystemStatusNews` deleted: `{result.deleted_system}`",
+                f"- `IntegrationNews` deleted: `{result.deleted_integration}`",
+                f"- `SystemStatusNews` created: `{result.created_system}`",
+                f"- `SystemStatusNews` updated: `{result.updated_system}`",
+                f"- `IntegrationNews` created: `{result.created_integration}`",
+                f"- `IntegrationNews` updated: `{result.updated_integration}`",
+                "",
+                "## N/A Handling",
+                "",
+                f"- `SystemStatusNews` records with no mapped infrastructure (`N/A`): `{result.system_na_infrastructure}`",
+                f"- `IntegrationNews` records with no affected element (`N/A`): `{result.integration_na_element}`",
+                f"- Ambiguous integration mappings accepted as `N/A`: `{result.unresolved_allowed_na}`",
+                "",
+                "## Warnings",
+                "",
+            ]
+        )
 
         if result.warnings:
             lines.extend([f"- {warning}" for warning in result.warnings])
@@ -2326,10 +2023,7 @@ class Command(BaseCommand):
         mode = "DRY RUN" if dry_run else "IMPORT"
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS(f"{mode} COMPLETE"))
-        self.stdout.write(
-            f"Deleted -> System: {result.deleted_system}, "
-            f"Integration: {result.deleted_integration}"
-        )
+        self.stdout.write(f"Deleted -> System: {result.deleted_system}, " f"Integration: {result.deleted_integration}")
         self.stdout.write(
             f"Created/Updated -> System: {result.created_system}/{result.updated_system}, "
             f"Integration: {result.created_integration}/{result.updated_integration}"
@@ -2352,16 +2046,12 @@ class Command(BaseCommand):
             ("System", result.system_attribution),
             ("Integration", result.integration_attribution),
         ):
-            matched = sum(
-                value["resolution"] == "drupal-username" for value in values
-            )
+            matched = sum(value["resolution"] == "drupal-username" for value in values)
             self.stdout.write(
                 f"Attribution -> {label}: {matched} exact username matches, "
                 f"{len(values) - matched} import-user fallbacks"
             )
         self.stdout.write(f"Warnings: {len(result.warnings)}; Errors: {len(result.errors)}")
         if result.plan_file:
-            self.stdout.write(
-                f"Import plan: {result.plan_file} (SHA-256: {result.plan_sha256})"
-            )
+            self.stdout.write(f"Import plan: {result.plan_file} (SHA-256: {result.plan_sha256})")
         self.stdout.write(f"Report: {report_path}")

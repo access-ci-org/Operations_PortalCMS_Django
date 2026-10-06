@@ -1,0 +1,11 @@
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+extend-exclude = '/migrations/'
+
+[tool.isort]
+profile = "black"
+line_length = 120
+py_version = 312
+src_paths = ["operations_portalcms_django"]
+extend_skip = ["migrations"]

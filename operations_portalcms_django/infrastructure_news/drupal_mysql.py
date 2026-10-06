@@ -232,7 +232,7 @@ def _iter_relevant_statements(handle: TextIO) -> Iterator[tuple[int, str]]:
         match = _STATEMENT_START_RE.match(line)
         if not match or match.group(2) not in TABLES:
             continue
-        statement = line[match.start(1):]
+        statement = line[match.start(1) :]
         if statement.rstrip().endswith(";"):
             yield line_number, statement
         else:
@@ -240,10 +240,7 @@ def _iter_relevant_statements(handle: TextIO) -> Iterator[tuple[int, str]]:
             pending_line = line_number
 
     if pending:
-        raise DrupalDumpError(
-            "Unterminated relevant SQL statement beginning at dump line "
-            f"{pending_line}."
-        )
+        raise DrupalDumpError("Unterminated relevant SQL statement beginning at dump line " f"{pending_line}.")
 
 
 def _read_tables(path: Path) -> Dict[str, List[dict]]:
@@ -262,25 +259,17 @@ def _read_tables(path: Path) -> Dict[str, List[dict]]:
                 continue
 
             table, explicit_columns, values = insert.groups()
-            names = (
-                _EXPLICIT_COLUMN_RE.findall(explicit_columns)
-                if explicit_columns
-                else columns.get(table)
-            )
+            names = _EXPLICIT_COLUMN_RE.findall(explicit_columns) if explicit_columns else columns.get(table)
             if not names:
                 raise DrupalDumpError(
-                    f"{table}: INSERT encountered before its column definition "
-                    f"at dump line {line_number}."
+                    f"{table}: INSERT encountered before its column definition " f"at dump line {line_number}."
                 )
 
             projected_names = PROJECTED_COLUMNS.get(table)
             if projected_names:
                 missing_projected = sorted(set(projected_names) - set(names))
                 if missing_projected:
-                    raise DrupalDumpError(
-                        f"{table}: missing required author columns: "
-                        + ", ".join(missing_projected)
-                    )
+                    raise DrupalDumpError(f"{table}: missing required author columns: " + ", ".join(missing_projected))
                 projected_indexes = [names.index(name) for name in projected_names]
             else:
                 projected_indexes = list(range(len(names)))
@@ -301,9 +290,7 @@ def _read_tables(path: Path) -> Dict[str, List[dict]]:
 
     missing = sorted(REQUIRED_TABLES - columns.keys())
     if missing:
-        raise DrupalDumpError(
-            "Dump is missing required Drupal table definitions: " + ", ".join(missing)
-        )
+        raise DrupalDumpError("Dump is missing required Drupal table definitions: " + ", ".join(missing))
     return rows
 
 
@@ -313,9 +300,7 @@ def _positive_int(value, context: str) -> int:
     try:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
-        raise DrupalDumpError(
-            f"{context} must be a positive integer, got {value!r}."
-        ) from exc
+        raise DrupalDumpError(f"{context} must be a positive integer, got {value!r}.") from exc
     if parsed <= 0:
         raise DrupalDumpError(f"{context} must be positive, got {parsed}.")
     return parsed
@@ -323,15 +308,11 @@ def _positive_int(value, context: str) -> int:
 
 def _nonnegative_int(value, context: str) -> int:
     if isinstance(value, bool):
-        raise DrupalDumpError(
-            f"{context} must be a nonnegative integer, got {value!r}."
-        )
+        raise DrupalDumpError(f"{context} must be a nonnegative integer, got {value!r}.")
     try:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
-        raise DrupalDumpError(
-            f"{context} must be a nonnegative integer, got {value!r}."
-        ) from exc
+        raise DrupalDumpError(f"{context} must be a nonnegative integer, got {value!r}.") from exc
     if parsed < 0:
         raise DrupalDumpError(f"{context} must be nonnegative, got {parsed}.")
     return parsed
@@ -344,9 +325,7 @@ def _unix_datetime(value, context: str) -> Optional[str]:
     try:
         return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
     except (OverflowError, OSError, ValueError) as exc:
-        raise DrupalDumpError(
-            f"{context} is outside the supported timestamp range."
-        ) from exc
+        raise DrupalDumpError(f"{context} is outside the supported timestamp range.") from exc
 
 
 def _validate_datetime(value, context: str) -> Optional[str]:
@@ -410,9 +389,7 @@ def _one_value(
 ):
     matching = grouped.get(entity_id, [])
     if len(matching) > 1:
-        raise DrupalDumpError(
-            f"{context} has {len(matching)} values; expected at most one."
-        )
+        raise DrupalDumpError(f"{context} has {len(matching)} values; expected at most one.")
     value = matching[0].get(column) if matching else None
     if required and value in (None, ""):
         raise DrupalDumpError(f"{context} is missing a required value.")
@@ -465,62 +442,36 @@ def parse_drupal_news_dump(
         username = derive_drupal_username(row.get("name"))
         existing_username = usernames_by_uid.get(uid)
         if existing_username is not None and existing_username != username:
-            raise DrupalDumpError(
-                f"users_field_data uid={uid} has conflicting usernames."
-            )
+            raise DrupalDumpError(f"users_field_data uid={uid} has conflicting usernames.")
         usernames_by_uid[uid] = username
     # The raw email-shaped login values are no longer needed after deriving the
     # non-sensitive candidates above.
     table_rows["users_field_data"].clear()
-    infrastructure_types = _choice_map(
-        infrastructure_type_choices, "Infrastructure news choices"
-    )
-    integration_types = _choice_map(
-        integration_type_choices, "Integration news choices"
-    )
-    integration_elements = _choice_map(
-        integration_element_choices, "Integration element choices"
-    )
+    infrastructure_types = _choice_map(infrastructure_type_choices, "Infrastructure news choices")
+    integration_types = _choice_map(integration_type_choices, "Integration news choices")
+    integration_elements = _choice_map(integration_element_choices, "Integration element choices")
     excluded_system_nid_set = {
-        _positive_int(value, "Excluded Infrastructure News nid")
-        for value in excluded_system_nids
+        _positive_int(value, "Excluded Infrastructure News nid") for value in excluded_system_nids
     }
     start_datetime_corrections = dict(system_start_datetime_corrections or {})
     for correction_nid, correction_values in start_datetime_corrections.items():
         _positive_int(correction_nid, "Corrected Infrastructure News nid")
         if len(correction_values) != 2:
             raise DrupalDumpError(
-                "Infrastructure News start-date corrections require exact "
-                "(source, replacement) pairs."
+                "Infrastructure News start-date corrections require exact " "(source, replacement) pairs."
             )
 
     content = _group_by_entity(table_rows["node__field_news_content"], SYSTEM_BUNDLE)
-    content.update(
-        _group_by_entity(table_rows["node__field_news_content"], INTEGRATION_BUNDLE)
-    )
-    infrastructure_type = _group_by_entity(
-        table_rows["node__field_infrastructure_news_type"], SYSTEM_BUNDLE
-    )
-    integration_type = _group_by_entity(
-        table_rows["node__field_intelm_news_type"], INTEGRATION_BUNDLE
-    )
+    content.update(_group_by_entity(table_rows["node__field_news_content"], INTEGRATION_BUNDLE))
+    infrastructure_type = _group_by_entity(table_rows["node__field_infrastructure_news_type"], SYSTEM_BUNDLE)
+    integration_type = _group_by_entity(table_rows["node__field_intelm_news_type"], INTEGRATION_BUNDLE)
     start_dates = _group_by_entity(table_rows["node__field_start_date"], SYSTEM_BUNDLE)
     end_dates = _group_by_entity(table_rows["node__field_end_date"], SYSTEM_BUNDLE)
-    effective_dates = _group_by_entity(
-        table_rows["node__field_effective_date"], INTEGRATION_BUNDLE
-    )
-    expiration_dates = _group_by_entity(
-        table_rows["node__field_expiration_date"], INTEGRATION_BUNDLE
-    )
-    affected_infrastructure = _group_by_entity(
-        table_rows["node__field_affected_infrastructure"], SYSTEM_BUNDLE
-    )
-    affected_integration = _group_by_entity(
-        table_rows["node__field_affected_intelm"], INTEGRATION_BUNDLE
-    )
-    distribution_system = _group_by_entity(
-        table_rows.get("node__field_news_distribution_options", []), SYSTEM_BUNDLE
-    )
+    effective_dates = _group_by_entity(table_rows["node__field_effective_date"], INTEGRATION_BUNDLE)
+    expiration_dates = _group_by_entity(table_rows["node__field_expiration_date"], INTEGRATION_BUNDLE)
+    affected_infrastructure = _group_by_entity(table_rows["node__field_affected_infrastructure"], SYSTEM_BUNDLE)
+    affected_integration = _group_by_entity(table_rows["node__field_affected_intelm"], INTEGRATION_BUNDLE)
+    distribution_system = _group_by_entity(table_rows.get("node__field_news_distribution_options", []), SYSTEM_BUNDLE)
 
     node_by_id: Dict[int, dict] = {}
     for row in table_rows["node_field_data"]:
@@ -541,24 +492,16 @@ def parse_drupal_news_dump(
             entity_id = _positive_int(row.get("entity_id"), f"{table} entity_id")
             node = node_by_id.get(entity_id)
             if node is None:
-                raise DrupalDumpError(
-                    f"{table} references missing node_field_data nid {entity_id}."
-                )
-            revision_id = _positive_int(
-                row.get("revision_id"), f"{table} entity_id={entity_id} revision_id"
-            )
-            node_revision = _positive_int(
-                node.get("vid"), f"node_field_data nid={entity_id} vid"
-            )
+                raise DrupalDumpError(f"{table} references missing node_field_data nid {entity_id}.")
+            revision_id = _positive_int(row.get("revision_id"), f"{table} entity_id={entity_id} revision_id")
+            node_revision = _positive_int(node.get("vid"), f"node_field_data nid={entity_id} vid")
             if revision_id != node_revision:
                 raise DrupalDumpError(
                     f"{table} entity_id={entity_id} belongs to revision {revision_id}, "
                     f"but node_field_data selects revision {node_revision}."
                 )
     infrastructure_resource_ids = {
-        _positive_int(row.get("entity_id"), "infrastructure entity_id"): row.get(
-            "field_infra_resourceid_value"
-        )
+        _positive_int(row.get("entity_id"), "infrastructure entity_id"): row.get("field_infra_resourceid_value")
         for row in _current_rows(table_rows["node__field_infra_resourceid"])
     }
 
@@ -581,19 +524,11 @@ def parse_drupal_news_dump(
         if nid in excluded_system_nid_set:
             excluded_system_nids_found.append(nid)
             continue
-        author_uid = _nonnegative_int(
-            node.get("uid"), f"Infrastructure News nid={nid} author uid"
-        )
-        posted_at = _unix_datetime(
-            node.get("created"), f"Infrastructure News nid={nid} created"
-        )
+        author_uid = _nonnegative_int(node.get("uid"), f"Infrastructure News nid={nid} author uid")
+        posted_at = _unix_datetime(node.get("created"), f"Infrastructure News nid={nid} created")
         if posted_at is None:
-            raise DrupalDumpError(
-                f"Infrastructure News nid={nid} is missing its original post date."
-            )
-        author_username, author_derivation = usernames_by_uid.get(
-            author_uid, ("", "missing-user")
-        )
+            raise DrupalDumpError(f"Infrastructure News nid={nid} is missing its original post date.")
+        author_username, author_derivation = usernames_by_uid.get(author_uid, ("", "missing-user"))
 
         type_label = _one_value(
             infrastructure_type,
@@ -604,9 +539,7 @@ def parse_drupal_news_dump(
         )
         type_code = infrastructure_types.get(type_label)
         if not type_code:
-            raise DrupalDumpError(
-                f"Infrastructure News nid={nid} has unknown type label {type_label!r}."
-            )
+            raise DrupalDumpError(f"Infrastructure News nid={nid} has unknown type label {type_label!r}.")
 
         related_nodes = []
         resource_ids = []
@@ -619,8 +552,7 @@ def parse_drupal_news_dump(
             target_node = node_by_id.get(target_nid)
             if not target_node or target_node.get("type") != "infrastructure":
                 raise DrupalDumpError(
-                    f"Infrastructure News nid={nid} references invalid infrastructure "
-                    f"node {target_nid}."
+                    f"Infrastructure News nid={nid} references invalid infrastructure " f"node {target_nid}."
                 )
             resource_id = infrastructure_resource_ids.get(target_nid)
             if not resource_id:
@@ -629,19 +561,13 @@ def parse_drupal_news_dump(
                     "has no field_infra_resourceid value."
                 )
             if resource_id in seen_resource_ids:
-                raise DrupalDumpError(
-                    f"Infrastructure News nid={nid} repeats resource ID "
-                    f"{resource_id!r}."
-                )
+                raise DrupalDumpError(f"Infrastructure News nid={nid} repeats resource ID " f"{resource_id!r}.")
             seen_resource_ids.add(resource_id)
             resource_ids.append(resource_id)
-            related_nodes.append(
-                {"target_nid": target_nid, "resource_id": resource_id}
-            )
+            related_nodes.append({"target_nid": target_nid, "resource_id": resource_id})
 
         distribution_values = {
-            row.get("field_news_distribution_options_value")
-            for row in distribution_system.get(nid, [])
+            row.get("field_news_distribution_options_value") for row in distribution_system.get(nid, [])
         }
         start_datetime_source = _one_value(
             start_dates,
@@ -666,8 +592,7 @@ def parse_drupal_news_dump(
             start_datetime_source = replacement
             corrected_system_nids.add(nid)
             source_corrections.append(
-                f"SystemStatusNews nid={nid} start_datetime: "
-                f"{expected_source!r} -> {replacement!r}"
+                f"SystemStatusNews nid={nid} start_datetime: " f"{expected_source!r} -> {replacement!r}"
             )
 
         system_records.append(
@@ -697,18 +622,13 @@ def parse_drupal_news_dump(
                     ),
                     f"Infrastructure News nid={nid} end date",
                 ),
-                "send_email": bool(
-                    distribution_values
-                    & {"Email only subscribers", "Email everyone with access"}
-                ),
+                "send_email": bool(distribution_values & {"Email only subscribers", "Email everyone with access"}),
                 "post_to_slack": "Post to Slack" in distribution_values,
                 "is_active": str(node.get("status")) == "1",
                 "status": "published" if str(node.get("status")) == "1" else "draft",
                 "source_metadata": {
                     "drupal_nid": nid,
-                    "drupal_vid": _positive_int(
-                        node.get("vid"), f"Infrastructure News nid={nid} vid"
-                    ),
+                    "drupal_vid": _positive_int(node.get("vid"), f"Infrastructure News nid={nid} vid"),
                     "drupal_created_at": posted_at,
                     "drupal_author": {
                         "uid": author_uid,
@@ -720,17 +640,13 @@ def parse_drupal_news_dump(
             }
         )
 
-    missing_exclusions = sorted(
-        excluded_system_nid_set - set(excluded_system_nids_found)
-    )
+    missing_exclusions = sorted(excluded_system_nid_set - set(excluded_system_nids_found))
     if missing_exclusions:
         raise DrupalDumpError(
             "Requested Infrastructure News exclusions were not present in the dump: "
             + ", ".join(str(value) for value in missing_exclusions)
         )
-    missing_corrections = sorted(
-        set(start_datetime_corrections) - corrected_system_nids
-    )
+    missing_corrections = sorted(set(start_datetime_corrections) - corrected_system_nids)
     if missing_corrections:
         raise DrupalDumpError(
             "Requested Infrastructure News corrections were not applied: "
@@ -740,19 +656,11 @@ def parse_drupal_news_dump(
     integration_records: List[dict] = []
     for node in _news_nodes(table_rows, INTEGRATION_BUNDLE):
         nid = _positive_int(node.get("nid"), "Integration News nid")
-        author_uid = _nonnegative_int(
-            node.get("uid"), f"Integration News nid={nid} author uid"
-        )
-        posted_at = _unix_datetime(
-            node.get("created"), f"Integration News nid={nid} created"
-        )
+        author_uid = _nonnegative_int(node.get("uid"), f"Integration News nid={nid} author uid")
+        posted_at = _unix_datetime(node.get("created"), f"Integration News nid={nid} created")
         if posted_at is None:
-            raise DrupalDumpError(
-                f"Integration News nid={nid} is missing its original post date."
-            )
-        author_username, author_derivation = usernames_by_uid.get(
-            author_uid, ("", "missing-user")
-        )
+            raise DrupalDumpError(f"Integration News nid={nid} is missing its original post date.")
+        author_username, author_derivation = usernames_by_uid.get(author_uid, ("", "missing-user"))
         type_label = _one_value(
             integration_type,
             nid,
@@ -762,9 +670,7 @@ def parse_drupal_news_dump(
         )
         type_code = integration_types.get(type_label)
         if not type_code:
-            raise DrupalDumpError(
-                f"Integration News nid={nid} has unknown type label {type_label!r}."
-            )
+            raise DrupalDumpError(f"Integration News nid={nid} has unknown type label {type_label!r}.")
 
         selected_codes: List[str] = []
         selected_targets: List[dict] = []
@@ -776,24 +682,16 @@ def parse_drupal_news_dump(
             target_node = node_by_id.get(target_nid)
             if not target_node or target_node.get("type") != INTEGRATION_ELEMENT_BUNDLE:
                 raise DrupalDumpError(
-                    f"Integration News nid={nid} references invalid integration "
-                    f"element node {target_nid}."
+                    f"Integration News nid={nid} references invalid integration " f"element node {target_nid}."
                 )
             label = target_node.get("title") or ""
             code = element_code_by_nid.get(target_nid)
             if not code:
-                raise DrupalDumpError(
-                    f"Integration element node {target_nid} has unmapped label "
-                    f"{label!r}."
-                )
+                raise DrupalDumpError(f"Integration element node {target_nid} has unmapped label " f"{label!r}.")
             if code in selected_codes:
-                raise DrupalDumpError(
-                    f"Integration News nid={nid} repeats integration element {code!r}."
-                )
+                raise DrupalDumpError(f"Integration News nid={nid} repeats integration element {code!r}.")
             selected_codes.append(code)
-            selected_targets.append(
-                {"target_nid": target_nid, "code": code, "label": label}
-            )
+            selected_targets.append({"target_nid": target_nid, "code": code, "label": label})
 
         integration_records.append(
             {
@@ -807,9 +705,7 @@ def parse_drupal_news_dump(
                 ),
                 "news_type": type_code,
                 "affected_elements": selected_codes,
-                "affected_element": (
-                    selected_codes[0] if len(selected_codes) == 1 else ""
-                ),
+                "affected_element": (selected_codes[0] if len(selected_codes) == 1 else ""),
                 "effective_date": _validate_date(
                     _one_value(
                         effective_dates,
@@ -834,9 +730,7 @@ def parse_drupal_news_dump(
                 "status": "published" if str(node.get("status")) == "1" else "draft",
                 "source_metadata": {
                     "drupal_nid": nid,
-                    "drupal_vid": _positive_int(
-                        node.get("vid"), f"Integration News nid={nid} vid"
-                    ),
+                    "drupal_vid": _positive_int(node.get("vid"), f"Integration News nid={nid} vid"),
                     "drupal_created_at": posted_at,
                     "drupal_author": {
                         "uid": author_uid,
@@ -849,14 +743,9 @@ def parse_drupal_news_dump(
         )
 
     if any(not record["content"] for record in system_records):
-        empty_ids = [
-            record["source_metadata"]["drupal_nid"]
-            for record in system_records
-            if not record["content"]
-        ]
+        empty_ids = [record["source_metadata"]["drupal_nid"] for record in system_records if not record["content"]]
         warnings.append(
-            "Infrastructure News records with empty content: "
-            + ", ".join(str(value) for value in empty_ids)
+            "Infrastructure News records with empty content: " + ", ".join(str(value) for value in empty_ids)
         )
 
     return ParsedDump(

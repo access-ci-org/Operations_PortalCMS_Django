@@ -22,19 +22,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 ##### ACCESS-CI CUSTOMIZATIONS #####
 # `APP_CONFIG` is the single supported runtime config entry point for this app.
-if 'APP_CONFIG' not in os.environ:
-    raise ImproperlyConfigured('Missing APP_CONFIG environment variable')
+if "APP_CONFIG" not in os.environ:
+    raise ImproperlyConfigured("Missing APP_CONFIG environment variable")
 
-config_file = Path(os.environ['APP_CONFIG'])
+config_file = Path(os.environ["APP_CONFIG"])
 
 try:
-    with open(config_file, 'r', encoding='utf-8') as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         CONF = json.load(f)
 except (ValueError, OSError) as exc:
-    raise ImproperlyConfigured(f'Failed to load APP_CONFIG={config_file}') from exc
+    raise ImproperlyConfigured(f"Failed to load APP_CONFIG={config_file}") from exc
 
 if not isinstance(CONF, dict):
-    raise ImproperlyConfigured('APP_CONFIG must contain a JSON object')
+    raise ImproperlyConfigured("APP_CONFIG must contain a JSON object")
 
 
 def _bool_value(value, default=False):
@@ -42,7 +42,7 @@ def _bool_value(value, default=False):
         return default
     if isinstance(value, bool):
         return value
-    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _config_value(name, default=None):
@@ -50,86 +50,81 @@ def _config_value(name, default=None):
     return CONF.get(name, os.environ.get(name, default))
 
 
-RUNTIME_DEBUG = _bool_value(_config_value('DEBUG'), False)
+RUNTIME_DEBUG = _bool_value(_config_value("DEBUG"), False)
 
 
 def _validate_runtime_config():
     """Validate types and required values without including values in errors."""
-    required_keys = {'DJANGO_SECRET_KEY', 'APP_LOG'}
+    required_keys = {"DJANGO_SECRET_KEY", "APP_LOG"}
 
     # A non-debug configuration is a deployed runtime. Fail during startup
     # instead of silently falling back to localhost or empty credentials.
     if not RUNTIME_DEBUG:
-        required_keys.update({
-            'APP_ENV',
-            'PUBLIC_HOSTNAME',
-            'ALLOWED_HOSTS',
-            'CSRF_TRUSTED_ORIGINS',
-            'DB_DATABASE',
-            'DB_PORT',
-            'DB_HOSTNAME_READ',
-            'DB_HOSTNAME_WRITE',
-            'DJANGO_USER',
-            'DJANGO_PASS',
-            'DB_SEARCH_PATH',
-            'DB_SSLMODE',
-            'STATIC_ROOT',
-            'MEDIA_ROOT',
-            'APP_VERSION',
-            'API_KEY',
-            'CILOGON_CLIENT_ID',
-            'CILOGON_CLIENT_SECRET',
-        })
-
-    missing_keys = sorted(
-        key for key in required_keys
-        if key not in CONF or CONF[key] in ('', None, [])
-    )
-    if missing_keys:
-        raise ImproperlyConfigured(
-            f'Missing required APP_CONFIG keys: {", ".join(missing_keys)}'
+        required_keys.update(
+            {
+                "APP_ENV",
+                "PUBLIC_HOSTNAME",
+                "ALLOWED_HOSTS",
+                "CSRF_TRUSTED_ORIGINS",
+                "DB_DATABASE",
+                "DB_PORT",
+                "DB_HOSTNAME_READ",
+                "DB_HOSTNAME_WRITE",
+                "DJANGO_USER",
+                "DJANGO_PASS",
+                "DB_SEARCH_PATH",
+                "DB_SSLMODE",
+                "STATIC_ROOT",
+                "MEDIA_ROOT",
+                "APP_VERSION",
+                "API_KEY",
+                "CILOGON_CLIENT_ID",
+                "CILOGON_CLIENT_SECRET",
+            }
         )
 
+    missing_keys = sorted(key for key in required_keys if key not in CONF or CONF[key] in ("", None, []))
+    if missing_keys:
+        raise ImproperlyConfigured(f'Missing required APP_CONFIG keys: {", ".join(missing_keys)}')
+
     expected_types = {
-        'DEBUG': bool,
-        'ENVIRONMENT_BANNER_ENABLED': bool,
-        'ALLOWED_HOSTS': list,
-        'CSRF_TRUSTED_ORIGINS': list,
+        "DEBUG": bool,
+        "ENVIRONMENT_BANNER_ENABLED": bool,
+        "ALLOWED_HOSTS": list,
+        "CSRF_TRUSTED_ORIGINS": list,
     }
     invalid_types = sorted(
-        key for key, expected_type in expected_types.items()
-        if key in CONF and not isinstance(CONF[key], expected_type)
+        key for key, expected_type in expected_types.items() if key in CONF and not isinstance(CONF[key], expected_type)
     )
     invalid_types.extend(
         sorted(
-            key for key in required_keys - {'ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS', 'DB_PORT'}
+            key
+            for key in required_keys - {"ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS", "DB_PORT"}
             if key in CONF and not isinstance(CONF[key], str)
         )
     )
-    if 'DB_PORT' in CONF and not isinstance(CONF['DB_PORT'], (str, int)):
-        invalid_types.append('DB_PORT')
+    if "DB_PORT" in CONF and not isinstance(CONF["DB_PORT"], (str, int)):
+        invalid_types.append("DB_PORT")
     invalid_types = sorted(set(invalid_types))
     if invalid_types:
-        raise ImproperlyConfigured(
-            f'Invalid APP_CONFIG value types: {", ".join(invalid_types)}'
-        )
+        raise ImproperlyConfigured(f'Invalid APP_CONFIG value types: {", ".join(invalid_types)}')
 
     if not RUNTIME_DEBUG:
-        app_env = str(CONF['APP_ENV']).strip().lower()
-        if app_env not in {'development', 'beta', 'production'}:
-            raise ImproperlyConfigured('APP_CONFIG APP_ENV is not a deployed environment')
+        app_env = str(CONF["APP_ENV"]).strip().lower()
+        if app_env not in {"development", "beta", "production"}:
+            raise ImproperlyConfigured("APP_CONFIG APP_ENV is not a deployed environment")
 
-        hostname = str(CONF['PUBLIC_HOSTNAME']).strip()
+        hostname = str(CONF["PUBLIC_HOSTNAME"]).strip()
         if not hostname or any(character.isspace() for character in hostname):
-            raise ImproperlyConfigured('APP_CONFIG PUBLIC_HOSTNAME is invalid')
+            raise ImproperlyConfigured("APP_CONFIG PUBLIC_HOSTNAME is invalid")
 
-        db_port = str(CONF['DB_PORT'])
+        db_port = str(CONF["DB_PORT"])
         if not db_port.isdigit() or not 1 <= int(db_port) <= 65535:
-            raise ImproperlyConfigured('APP_CONFIG DB_PORT is invalid')
+            raise ImproperlyConfigured("APP_CONFIG DB_PORT is invalid")
 
-        for key in ('ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS'):
+        for key in ("ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS"):
             if any(not isinstance(item, str) or not item.strip() for item in CONF[key]):
-                raise ImproperlyConfigured(f'APP_CONFIG {key} contains an invalid entry')
+                raise ImproperlyConfigured(f"APP_CONFIG {key} contains an invalid entry")
 
 
 _validate_runtime_config()
@@ -137,15 +132,15 @@ _validate_runtime_config()
 # access_django_user_admin currently consumes API_KEY from the process
 # environment. Keep only that compatibility export instead of copying every
 # config value, including credentials, into the environment.
-if CONF.get('API_KEY'):
-    os.environ['API_KEY'] = str(CONF['API_KEY'])
+if CONF.get("API_KEY"):
+    os.environ["API_KEY"] = str(CONF["API_KEY"])
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = CONF['DJANGO_SECRET_KEY']
+SECRET_KEY = CONF["DJANGO_SECRET_KEY"]
 
 
 def _env_bool(name, default=False):
@@ -157,162 +152,160 @@ def _split_csv(value):
         return []
     if isinstance(value, (list, tuple)):
         return [str(item).strip() for item in value if str(item).strip()]
-    return [item.strip() for item in str(value).split(',') if item.strip()]
+    return [item.strip() for item in str(value).split(",") if item.strip()]
 
 
 DEBUG = RUNTIME_DEBUG
 
 _config_name = config_file.name.lower()
-_default_development_banner = DEBUG or '.dev.' in _config_name or _config_name.endswith('.dev.json')
+_default_development_banner = DEBUG or ".dev." in _config_name or _config_name.endswith(".dev.json")
 
 # Explicit environment identity. These keys are optional for backward
 # compatibility; APP_CONFIG remains the required path to the JSON config file.
-APP_ENV = str(_config_value('APP_ENV', '')).strip().lower()
-PUBLIC_HOSTNAME = str(_config_value('PUBLIC_HOSTNAME', '')).strip()
+APP_ENV = str(_config_value("APP_ENV", "")).strip().lower()
+PUBLIC_HOSTNAME = str(_config_value("PUBLIC_HOSTNAME", "")).strip()
 ENVIRONMENT_LABEL = _config_value(
-    'ENVIRONMENT_LABEL',
-    _config_value('DEVELOPMENT_SERVER_LABEL', 'DEVELOPMENT SERVER'),
+    "ENVIRONMENT_LABEL",
+    _config_value("DEVELOPMENT_SERVER_LABEL", "DEVELOPMENT SERVER"),
 )
 ENVIRONMENT_BANNER_ENABLED = _env_bool(
-    'ENVIRONMENT_BANNER_ENABLED',
-    _env_bool('DEVELOPMENT_SERVER_BANNER', _default_development_banner),
+    "ENVIRONMENT_BANNER_ENABLED",
+    _env_bool("DEVELOPMENT_SERVER_BANNER", _default_development_banner),
 )
 
 # Backward-compatible aliases used by existing templates and configs.
 DEVELOPMENT_SERVER_BANNER = ENVIRONMENT_BANNER_ENABLED
 DEVELOPMENT_SERVER_LABEL = ENVIRONMENT_LABEL
 
-ALLOWED_HOSTS = _split_csv(_config_value('ALLOWED_HOSTS'))
+ALLOWED_HOSTS = _split_csv(_config_value("ALLOWED_HOSTS"))
 
-CSRF_TRUSTED_ORIGINS = _split_csv(_config_value('CSRF_TRUSTED_ORIGINS'))
+CSRF_TRUSTED_ORIGINS = _split_csv(_config_value("CSRF_TRUSTED_ORIGINS"))
 if not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = [
-        f'https://{host}'
-        for host in ALLOWED_HOSTS
-        if host not in {'*', 'localhost', '127.0.0.1', '::1'}
+        f"https://{host}" for host in ALLOWED_HOSTS if host not in {"*", "localhost", "127.0.0.1", "::1"}
     ]
 
-if _env_bool('SECURE_PROXY_SSL_HEADER_ENABLED', True):
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if _env_bool("SECURE_PROXY_SSL_HEADER_ENABLED", True):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'groupadmin_users',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'django.contrib.sites',
-    'django.contrib.redirects',
-    'cms',
-    'djangocms_versioning',
-    'menus',
-    'treebeard',
-    'sekizai',
-    'django_bootstrap5',
-    'portal.apps.OperationsPortalcmsDjangoConfig',
-    'resources.apps.ResourcesConfig',
-    'infrastructure_news.apps.InfrastructureNewsConfig',
-    'integration_news.apps.IntegrationNewsConfig',
+    "groupadmin_users",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.sites",
+    "django.contrib.redirects",
+    "cms",
+    "djangocms_versioning",
+    "menus",
+    "treebeard",
+    "sekizai",
+    "django_bootstrap5",
+    "portal.apps.OperationsPortalcmsDjangoConfig",
+    "resources.apps.ResourcesConfig",
+    "infrastructure_news.apps.InfrastructureNewsConfig",
+    "integration_news.apps.IntegrationNewsConfig",
     # Django CMS plugins
-    'djangocms_text_ckeditor',
-    'djangocms_picture',
-    'djangocms_file',
-    'djangocms_link',
-    'djangocms_video',
-    'djangocms_snippet',
-    'django_admin_logs',
+    "djangocms_text_ckeditor",
+    "djangocms_picture",
+    "djangocms_file",
+    "djangocms_link",
+    "djangocms_video",
+    "djangocms_snippet",
+    "django_admin_logs",
     # Django Filer
-    'filer',
-    'easy_thumbnails',
+    "filer",
+    "easy_thumbnails",
     # socialaccount info
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.cilogon',
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.cilogon",
     # access_django_users app
-    'access_django_user_admin',
+    "access_django_user_admin",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
-    'cms.middleware.user.CurrentUserMiddleware',
-    'cms.middleware.page.CurrentPageMiddleware',
-    'cms.middleware.toolbar.ToolbarMiddleware',
-    'cms.middleware.language.LanguageCookieMiddleware',
-    'allauth.account.middleware.AccountMiddleware',
-    'django.contrib.redirects.middleware.RedirectFallbackMiddleware'
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "cms.middleware.user.CurrentUserMiddleware",
+    "cms.middleware.page.CurrentPageMiddleware",
+    "cms.middleware.toolbar.ToolbarMiddleware",
+    "cms.middleware.language.LanguageCookieMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
+    "django.contrib.redirects.middleware.RedirectFallbackMiddleware",
 ]
 
-ROOT_URLCONF = 'operations_portalcms_django.urls'
+ROOT_URLCONF = "operations_portalcms_django.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-                'django.template.context_processors.i18n',
-                'django.template.context_processors.media',
-                'django.template.context_processors.csrf',
-                'django.template.context_processors.tz',
-                'sekizai.context_processors.sekizai',
-                'cms.context_processors.cms_settings',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.i18n",
+                "django.template.context_processors.media",
+                "django.template.context_processors.csrf",
+                "django.template.context_processors.tz",
+                "sekizai.context_processors.sekizai",
+                "cms.context_processors.cms_settings",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'operations_portalcms_django.wsgi.application'
+WSGI_APPLICATION = "operations_portalcms_django.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DB_SEARCH_PATH = _config_value('DB_SEARCH_PATH', '"$user",public')
-DB_SSLMODE = _config_value('DB_SSLMODE', '')
-DB_SSLROOTCERT = _config_value('DB_SSLROOTCERT', '')
-DB_SSLCERT = _config_value('DB_SSLCERT', '')
-DB_SSLKEY = _config_value('DB_SSLKEY', '')
+DB_SEARCH_PATH = _config_value("DB_SEARCH_PATH", '"$user",public')
+DB_SSLMODE = _config_value("DB_SSLMODE", "")
+DB_SSLROOTCERT = _config_value("DB_SSLROOTCERT", "")
+DB_SSLCERT = _config_value("DB_SSLCERT", "")
+DB_SSLKEY = _config_value("DB_SSLKEY", "")
 
 DB_OPTIONS = {
     # Keep schema resolution explicit during the role/schema cutover.
-    'options': f'-c search_path={DB_SEARCH_PATH}',
+    "options": f"-c search_path={DB_SEARCH_PATH}",
 }
 
 if DB_SSLMODE:
-    DB_OPTIONS['sslmode'] = DB_SSLMODE
+    DB_OPTIONS["sslmode"] = DB_SSLMODE
 if DB_SSLROOTCERT:
-    DB_OPTIONS['sslrootcert'] = DB_SSLROOTCERT
+    DB_OPTIONS["sslrootcert"] = DB_SSLROOTCERT
 if DB_SSLCERT:
-    DB_OPTIONS['sslcert'] = DB_SSLCERT
+    DB_OPTIONS["sslcert"] = DB_SSLCERT
 if DB_SSLKEY:
-    DB_OPTIONS['sslkey'] = DB_SSLKEY
+    DB_OPTIONS["sslkey"] = DB_SSLKEY
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': _config_value('DB_DATABASE', 'portalcms1'),
-        'USER': _config_value('DJANGO_USER', 'portal_django'),
-        'PASSWORD': _config_value('DJANGO_PASS', ''),
-        'HOST': _config_value('DB_HOSTNAME_WRITE', _config_value('DB_HOSTNAME_READ', 'localhost')),
-        'PORT': _config_value('DB_PORT', '5432'),
-        'OPTIONS': DB_OPTIONS,
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": _config_value("DB_DATABASE", "portalcms1"),
+        "USER": _config_value("DJANGO_USER", "portal_django"),
+        "PASSWORD": _config_value("DJANGO_PASS", ""),
+        "HOST": _config_value("DB_HOSTNAME_WRITE", _config_value("DB_HOSTNAME_READ", "localhost")),
+        "PORT": _config_value("DB_PORT", "5432"),
+        "OPTIONS": DB_OPTIONS,
     }
 }
 
@@ -322,16 +315,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -339,13 +332,13 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en'
+LANGUAGE_CODE = "en"
 
 LANGUAGES = [
-    ('en', 'English'),
+    ("en", "English"),
 ]
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -364,248 +357,248 @@ CMS_TOOLBAR_ANONYMOUS_ON = False  # Hide toolbar for anonymous users
 CMS_LANGUAGES = {
     1: [
         {
-            'code': 'en',
-            'name': 'English',
-            'public': True,
-            'hide_untranslated': False,
-            'redirect_on_fallback': True,
+            "code": "en",
+            "name": "English",
+            "public": True,
+            "hide_untranslated": False,
+            "redirect_on_fallback": True,
         },
     ],
-    'default': {
-        'public': True,
-        'hide_untranslated': False,
-        'redirect_on_fallback': True,
-    }
+    "default": {
+        "public": True,
+        "hide_untranslated": False,
+        "redirect_on_fallback": True,
+    },
 }
 
 CMS_TEMPLATES = [
-    ('page.html', 'Page'),
-    ('feature.html', 'Page with Feature'),
-    ('infrastructure.html', 'Infrastructure Integration'),
-    ('focus_area.html', 'Focus Area Page'),
-    ('faq.html', 'FAQ Page'),
+    ("page.html", "Page"),
+    ("feature.html", "Page with Feature"),
+    ("infrastructure.html", "Infrastructure Integration"),
+    ("focus_area.html", "Focus Area Page"),
+    ("faq.html", "FAQ Page"),
 ]
 CMS_PERMISSION = True
-CMS_PUBLIC_FOR = 'all'
+CMS_PUBLIC_FOR = "all"
 
 # Keep the contributor-facing plugin palette small and specific to each slot.
 # Placeholder identifiers must stay aligned with the names used in templates;
 # the ``name`` values below are display labels only.
 _BASIC_CONTENT_PLUGINS = [
-    'TextPlugin',
-    'PicturePlugin',
-    'LinkPlugin',
-    'FilePlugin',
-    'VideoPlayerPlugin',
-    'VideoSourcePlugin',
-    'VideoTrackPlugin',
+    "TextPlugin",
+    "PicturePlugin",
+    "LinkPlugin",
+    "FilePlugin",
+    "VideoPlayerPlugin",
+    "VideoSourcePlugin",
+    "VideoTrackPlugin",
 ]
 _BASIC_PLUGIN_LABELS = {
-    'TextPlugin': 'Add text',
-    'PicturePlugin': 'Add an image',
-    'LinkPlugin': 'Add a link',
-    'FilePlugin': 'Add a downloadable file',
-    'VideoPlayerPlugin': 'Add a video',
-    'VideoSourcePlugin': 'Add a video source',
-    'VideoTrackPlugin': 'Add captions or subtitles',
+    "TextPlugin": "Add text",
+    "PicturePlugin": "Add an image",
+    "LinkPlugin": "Add a link",
+    "FilePlugin": "Add a downloadable file",
+    "VideoPlayerPlugin": "Add a video",
+    "VideoSourcePlugin": "Add a video source",
+    "VideoTrackPlugin": "Add captions or subtitles",
 }
 _BASIC_PLUGIN_MODULES = {
-    'TextPlugin': 'Basic content',
-    'PicturePlugin': 'Media',
-    'LinkPlugin': 'Basic content',
-    'FilePlugin': 'Media',
-    'VideoPlayerPlugin': 'Media',
-    'VideoSourcePlugin': 'Media',
-    'VideoTrackPlugin': 'Media',
+    "TextPlugin": "Basic content",
+    "PicturePlugin": "Media",
+    "LinkPlugin": "Basic content",
+    "FilePlugin": "Media",
+    "VideoPlayerPlugin": "Media",
+    "VideoSourcePlugin": "Media",
+    "VideoTrackPlugin": "Media",
 }
 _NESTED_PLUGIN_RULES = {
-    'child_classes': {
+    "child_classes": {
         # Keep images as standalone blocks. The legacy CKEditor integration
         # does not reliably insert PicturePlugin children at the text cursor.
-        'TextPlugin': ['LinkPlugin', 'FilePlugin', 'VideoPlayerPlugin'],
-        'VideoPlayerPlugin': ['VideoSourcePlugin', 'VideoTrackPlugin'],
+        "TextPlugin": ["LinkPlugin", "FilePlugin", "VideoPlayerPlugin"],
+        "VideoPlayerPlugin": ["VideoSourcePlugin", "VideoTrackPlugin"],
     },
-    'parent_classes': {
-        'VideoSourcePlugin': ['VideoPlayerPlugin'],
-        'VideoTrackPlugin': ['VideoPlayerPlugin'],
+    "parent_classes": {
+        "VideoSourcePlugin": ["VideoPlayerPlugin"],
+        "VideoTrackPlugin": ["VideoPlayerPlugin"],
     },
 }
 
 CMS_PLACEHOLDER_CONF = {
-    'content': {
-        'name': 'Page content',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "content": {
+        "name": "Page content",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'feature_content': {
-        'name': 'Feature text',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "feature_content": {
+        "name": "Feature text",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'feature_image': {
-        'name': 'Feature image (one image)',
-        'plugins': ['PicturePlugin'],
-        'plugin_labels': {'PicturePlugin': 'Add the feature image'},
-        'plugin_modules': {'PicturePlugin': 'Media'},
-        'limits': {'global': 1},
+    "feature_image": {
+        "name": "Feature image (one image)",
+        "plugins": ["PicturePlugin"],
+        "plugin_labels": {"PicturePlugin": "Add the feature image"},
+        "plugin_modules": {"PicturePlugin": "Media"},
+        "limits": {"global": 1},
     },
-    'main_content': {
-        'name': 'Main page content',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "main_content": {
+        "name": "Main page content",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'hero_image': {
-        'name': 'Hero image (one image)',
-        'plugins': ['PicturePlugin'],
-        'plugin_labels': {'PicturePlugin': 'Add the hero image'},
-        'plugin_modules': {'PicturePlugin': 'Media'},
-        'limits': {'global': 1},
+    "hero_image": {
+        "name": "Hero image (one image)",
+        "plugins": ["PicturePlugin"],
+        "plugin_labels": {"PicturePlugin": "Add the hero image"},
+        "plugin_modules": {"PicturePlugin": "Media"},
+        "limits": {"global": 1},
     },
-    'section_1_heading': {
-        'name': 'Section 1 heading',
-        'plugins': ['TextPlugin'],
-        'plugin_labels': {'TextPlugin': 'Add the section heading'},
-        'plugin_modules': {'TextPlugin': 'Basic content'},
-        'limits': {'global': 1},
+    "section_1_heading": {
+        "name": "Section 1 heading",
+        "plugins": ["TextPlugin"],
+        "plugin_labels": {"TextPlugin": "Add the section heading"},
+        "plugin_modules": {"TextPlugin": "Basic content"},
+        "limits": {"global": 1},
     },
-    'section_1_content': {
-        'name': 'Section 1 content',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "section_1_content": {
+        "name": "Section 1 content",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'section_2_heading': {
-        'name': 'Section 2 heading',
-        'plugins': ['TextPlugin'],
-        'plugin_labels': {'TextPlugin': 'Add the section heading'},
-        'plugin_modules': {'TextPlugin': 'Basic content'},
-        'limits': {'global': 1},
+    "section_2_heading": {
+        "name": "Section 2 heading",
+        "plugins": ["TextPlugin"],
+        "plugin_labels": {"TextPlugin": "Add the section heading"},
+        "plugin_modules": {"TextPlugin": "Basic content"},
+        "limits": {"global": 1},
     },
-    'section_2_content': {
-        'name': 'Section 2 content',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "section_2_content": {
+        "name": "Section 2 content",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'section_3_heading': {
-        'name': 'Section 3 heading (optional)',
-        'plugins': ['TextPlugin'],
-        'plugin_labels': {'TextPlugin': 'Add the section heading'},
-        'plugin_modules': {'TextPlugin': 'Basic content'},
-        'limits': {'global': 1},
+    "section_3_heading": {
+        "name": "Section 3 heading (optional)",
+        "plugins": ["TextPlugin"],
+        "plugin_labels": {"TextPlugin": "Add the section heading"},
+        "plugin_modules": {"TextPlugin": "Basic content"},
+        "limits": {"global": 1},
     },
-    'section_3_content': {
-        'name': 'Section 3 content (optional)',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "section_3_content": {
+        "name": "Section 3 content (optional)",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'section_4_heading': {
-        'name': 'Section 4 heading (optional)',
-        'plugins': ['TextPlugin'],
-        'plugin_labels': {'TextPlugin': 'Add the section heading'},
-        'plugin_modules': {'TextPlugin': 'Basic content'},
-        'limits': {'global': 1},
+    "section_4_heading": {
+        "name": "Section 4 heading (optional)",
+        "plugins": ["TextPlugin"],
+        "plugin_labels": {"TextPlugin": "Add the section heading"},
+        "plugin_modules": {"TextPlugin": "Basic content"},
+        "limits": {"global": 1},
     },
-    'section_4_content': {
-        'name': 'Section 4 content (optional)',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "section_4_content": {
+        "name": "Section 4 content (optional)",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'section_5_heading': {
-        'name': 'Section 5 heading (optional)',
-        'plugins': ['TextPlugin'],
-        'plugin_labels': {'TextPlugin': 'Add the section heading'},
-        'plugin_modules': {'TextPlugin': 'Basic content'},
-        'limits': {'global': 1},
+    "section_5_heading": {
+        "name": "Section 5 heading (optional)",
+        "plugins": ["TextPlugin"],
+        "plugin_labels": {"TextPlugin": "Add the section heading"},
+        "plugin_modules": {"TextPlugin": "Basic content"},
+        "limits": {"global": 1},
     },
-    'section_5_content': {
-        'name': 'Section 5 content (optional)',
-        'plugins': _BASIC_CONTENT_PLUGINS,
-        'plugin_labels': _BASIC_PLUGIN_LABELS,
-        'plugin_modules': _BASIC_PLUGIN_MODULES,
+    "section_5_content": {
+        "name": "Section 5 content (optional)",
+        "plugins": _BASIC_CONTENT_PLUGINS,
+        "plugin_labels": _BASIC_PLUGIN_LABELS,
+        "plugin_modules": _BASIC_PLUGIN_MODULES,
         **_NESTED_PLUGIN_RULES,
     },
-    'additional_links': {
-        'name': 'Additional links (optional)',
-        'plugins': ['TextPlugin', 'LinkPlugin'],
-        'plugin_labels': {
-            'TextPlugin': 'Add introductory text',
-            'LinkPlugin': 'Add a link',
+    "additional_links": {
+        "name": "Additional links (optional)",
+        "plugins": ["TextPlugin", "LinkPlugin"],
+        "plugin_labels": {
+            "TextPlugin": "Add introductory text",
+            "LinkPlugin": "Add a link",
         },
-        'plugin_modules': {
-            'TextPlugin': 'Basic content',
-            'LinkPlugin': 'Basic content',
+        "plugin_modules": {
+            "TextPlugin": "Basic content",
+            "LinkPlugin": "Basic content",
         },
     },
-    'featured_image': {
-        'name': 'Featured image (one image)',
-        'plugins': ['PicturePlugin'],
-        'plugin_labels': {'PicturePlugin': 'Add the featured image'},
-        'plugin_modules': {'PicturePlugin': 'Media'},
-        'limits': {'global': 1},
+    "featured_image": {
+        "name": "Featured image (one image)",
+        "plugins": ["PicturePlugin"],
+        "plugin_labels": {"PicturePlugin": "Add the featured image"},
+        "plugin_modules": {"PicturePlugin": "Media"},
+        "limits": {"global": 1},
     },
-    'tags': {
-        'name': 'Tags (optional)',
-        'plugins': ['TextPlugin'],
-        'plugin_labels': {'TextPlugin': 'Add tags'},
-        'plugin_modules': {'TextPlugin': 'Basic content'},
-        'limits': {'global': 1},
+    "tags": {
+        "name": "Tags (optional)",
+        "plugins": ["TextPlugin"],
+        "plugin_labels": {"TextPlugin": "Add tags"},
+        "plugin_modules": {"TextPlugin": "Basic content"},
+        "limits": {"global": 1},
     },
-    'author_info': {
-        'name': 'Author information (optional)',
-        'plugins': ['TextPlugin', 'PicturePlugin'],
-        'plugin_labels': {
-            'TextPlugin': 'Add author details',
-            'PicturePlugin': 'Add an author image',
+    "author_info": {
+        "name": "Author information (optional)",
+        "plugins": ["TextPlugin", "PicturePlugin"],
+        "plugin_labels": {
+            "TextPlugin": "Add author details",
+            "PicturePlugin": "Add an author image",
         },
-        'plugin_modules': {
-            'TextPlugin': 'Basic content',
-            'PicturePlugin': 'Media',
+        "plugin_modules": {
+            "TextPlugin": "Basic content",
+            "PicturePlugin": "Media",
         },
         **_NESTED_PLUGIN_RULES,
     },
-    'related_posts': {
-        'name': 'Related posts (optional)',
-        'plugins': ['TextPlugin', 'LinkPlugin'],
-        'plugin_labels': {
-            'TextPlugin': 'Add introductory text',
-            'LinkPlugin': 'Add a related link',
+    "related_posts": {
+        "name": "Related posts (optional)",
+        "plugins": ["TextPlugin", "LinkPlugin"],
+        "plugin_labels": {
+            "TextPlugin": "Add introductory text",
+            "LinkPlugin": "Add a related link",
         },
-        'plugin_modules': {
-            'TextPlugin': 'Basic content',
-            'LinkPlugin': 'Basic content',
+        "plugin_modules": {
+            "TextPlugin": "Basic content",
+            "LinkPlugin": "Basic content",
         },
     },
 }
 DJANGOCMS_VERSIONING_LOCK_VERSIONS = True
-DJANGOCMS_VERSIONING_ON_PUBLISH_REDIRECT = 'published'
-X_FRAME_OPTIONS = 'SAMEORIGIN'
+DJANGOCMS_VERSIONING_ON_PUBLISH_REDIRECT = "published"
+X_FRAME_OPTIONS = "SAMEORIGIN"
 
 # Thumbnail Settings
 THUMBNAIL_HIGH_RESOLUTION = True
 THUMBNAIL_PROCESSORS = (
-    'easy_thumbnails.processors.colorspace',
-    'easy_thumbnails.processors.autocrop',
-    'filer.thumbnail_processors.scale_and_crop_with_subject_location',
-    'easy_thumbnails.processors.filters',
+    "easy_thumbnails.processors.colorspace",
+    "easy_thumbnails.processors.autocrop",
+    "filer.thumbnail_processors.scale_and_crop_with_subject_location",
+    "easy_thumbnails.processors.filters",
 )
 THUMBNAIL_PRESERVE_EXTENSIONS = True
 THUMBNAIL_ALIASES = {
-    '': {
-        'default': {'size': (300, 300), 'crop': True},
-        'large': {'size': (800, 600), 'crop': False},
+    "": {
+        "default": {"size": (300, 300), "crop": True},
+        "large": {"size": (800, 600), "crop": False},
     },
 }
 
@@ -614,153 +607,152 @@ CKEDITOR_SETTINGS = {
     # The legacy text editor does not complete the django CMS 5 data-bridge
     # callback when adding nested plugins. Hide that add control while keeping
     # the editor integration loaded for existing embedded plugin content.
-    'removeButtons': 'cmsplugins',
+    "removeButtons": "cmsplugins",
 }
-TEXT_SAVE_IMAGE_FUNCTION = 'djangocms_text_ckeditor.picture_save.create_picture_plugin'
-TEXT_ADDITIONAL_TAGS = ('iframe',)
-TEXT_ADDITIONAL_ATTRIBUTES = ('scrolling', 'allowfullscreen', 'frameborder')
+TEXT_SAVE_IMAGE_FUNCTION = "djangocms_text_ckeditor.picture_save.create_picture_plugin"
+TEXT_ADDITIONAL_TAGS = ("iframe",)
+TEXT_ADDITIONAL_ATTRIBUTES = ("scrolling", "allowfullscreen", "frameborder")
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = '/static/'
-STATIC_ROOT = _config_value('STATIC_ROOT', str(BASE_DIR / 'staticfiles'))
+STATIC_URL = "/static/"
+STATIC_ROOT = _config_value("STATIC_ROOT", str(BASE_DIR / "staticfiles"))
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / "static",
 ]
 
-MEDIA_URL = _config_value('MEDIA_URL', '/media/')
-MEDIA_ROOT = _config_value('MEDIA_ROOT', str(BASE_DIR / 'media'))
+MEDIA_URL = _config_value("MEDIA_URL", "/media/")
+MEDIA_ROOT = _config_value("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 # Authentication URLs
-LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
 # Admin Interface Settings
 # Force dark mode in Django admin
-if 'DJANGO_COLORS' not in os.environ:
-    os.environ['DJANGO_COLORS'] = 'dark'
+if "DJANGO_COLORS" not in os.environ:
+    os.environ["DJANGO_COLORS"] = "dark"
 
 # Application Logging
-APP_LOG       = CONF['APP_LOG']  # required in runtime .conf; points to operator-managed log dir
-APP_ERROR_LOG = str(Path(APP_LOG).parent / 'portal.error.log')  # co-located with APP_LOG, derived
-APP_VERSION = _config_value('APP_VERSION', 'dev')
-SYSLOG_SOCK = _config_value('SYSLOG_SOCK', '/var/run/syslog')
+APP_LOG = CONF["APP_LOG"]  # required in runtime .conf; points to operator-managed log dir
+APP_ERROR_LOG = str(Path(APP_LOG).parent / "portal.error.log")  # co-located with APP_LOG, derived
+APP_VERSION = _config_value("APP_VERSION", "dev")
+SYSLOG_SOCK = _config_value("SYSLOG_SOCK", "/var/run/syslog")
 
 # API Configuration
-API_BASE = _config_value('API_BASE', '')
+API_BASE = _config_value("API_BASE", "")
 
 # ==================== ALLAUTH SOCIALACCOUNT CONFIGURATION ====================
 # CILogon OAuth2 Configuration - matches Service Index functionality
 
 SOCIALACCOUNT_PROVIDERS = {
-    'cilogon': {
-        'SCOPE': [
-            'openid',
-            'profile',
-            'email',
-            'org.cilogon.userinfo',
+    "cilogon": {
+        "SCOPE": [
+            "openid",
+            "profile",
+            "email",
+            "org.cilogon.userinfo",
         ],
-        'VERIFIED_EMAIL': True,
-        'VERSION': 'v1',
-        'FIELDS_MAPPING': {
-            'email': 'email',
-            'name': 'name',
-            'first_name': 'given_name',
-            'last_name': 'family_name',
-            'picture': 'picture',
-            'eppn': 'eppn',
+        "VERIFIED_EMAIL": True,
+        "VERSION": "v1",
+        "FIELDS_MAPPING": {
+            "email": "email",
+            "name": "name",
+            "first_name": "given_name",
+            "last_name": "family_name",
+            "picture": "picture",
+            "eppn": "eppn",
         },
-        'APP': {
-            'client_id': _config_value('CILOGON_CLIENT_ID', ''),
-            'secret': _config_value('CILOGON_CLIENT_SECRET', ''),
-            'key': '',
+        "APP": {
+            "client_id": _config_value("CILOGON_CLIENT_ID", ""),
+            "secret": _config_value("CILOGON_CLIENT_SECRET", ""),
+            "key": "",
         },
     },
 }
 
 AUTHENTICATION_BACKENDS = [
     # Allauth authentication backend (required for socialaccount)
-    'allauth.account.auth_backends.AuthenticationBackend',
-    
+    "allauth.account.auth_backends.AuthenticationBackend",
     # Django's default auth backend (for superuser/staff users)
-    'django.contrib.auth.backends.ModelBackend',
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 # Allauth Account Settings
-ACCOUNT_ADAPTER = 'portal.adapters.ClosedLocalSignupAdapter'
-SOCIALACCOUNT_ADAPTER = 'portal.adapters.CILogonSignupAdapter'
+ACCOUNT_ADAPTER = "portal.adapters.ClosedLocalSignupAdapter"
+SOCIALACCOUNT_ADAPTER = "portal.adapters.CILogonSignupAdapter"
 SOCIALACCOUNT_ONLY = True
-ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
-ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
+ACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_EMAIL_REQUIRED = True
-SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_STORE_TOKENS = True
-SOCIALACCOUNT_PROFILE_FIELDS = ['email', 'first_name', 'last_name']
+SOCIALACCOUNT_PROFILE_FIELDS = ["email", "first_name", "last_name"]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # CMS related settings
 CMS_PAGE_WIZARD_CONTENT_PLACEHOLDER = "content"
 CMS_PAGE_WIZARD_CONTENT_PLUGIN = "TextPlugin"
 
 # Logging setup
-_log_handlers = ['console'] if DEBUG else ['file', 'error_file']
+_log_handlers = ["console"] if DEBUG else ["file", "error_file"]
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'standard': {
-            'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s',
-            'datefmt': '%Y-%m-%dT%H:%M:%S%z',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+            "datefmt": "%Y-%m-%dT%H:%M:%S%z",
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'standard',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
         },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': APP_LOG,
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 5,
-            'formatter': 'standard',
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": APP_LOG,
+            "maxBytes": 10 * 1024 * 1024,  # 10 MB
+            "backupCount": 5,
+            "formatter": "standard",
         },
-        'error_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': APP_ERROR_LOG,
-            'level': 'ERROR',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 5,
-            'formatter': 'standard',
+        "error_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": APP_ERROR_LOG,
+            "level": "ERROR",
+            "maxBytes": 10 * 1024 * 1024,  # 10 MB
+            "backupCount": 5,
+            "formatter": "standard",
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': _log_handlers,
-            'level': 'WARNING',
-            'propagate': False,
+    "loggers": {
+        "django": {
+            "handlers": _log_handlers,
+            "level": "WARNING",
+            "propagate": False,
         },
-        'django.request': {
-            'handlers': _log_handlers,
-            'level': 'WARNING',
-            'propagate': False,
+        "django.request": {
+            "handlers": _log_handlers,
+            "level": "WARNING",
+            "propagate": False,
         },
-        'portal': {
-            'handlers': _log_handlers,
-            'level': 'INFO',
-            'propagate': False,
+        "portal": {
+            "handlers": _log_handlers,
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }
 
-APP_NAME = 'Portal CMS'
+APP_NAME = "Portal CMS"
 # APP_VERSION = CONF['APP_VERSION']

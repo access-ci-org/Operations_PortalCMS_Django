@@ -12,7 +12,6 @@ from django.db import DatabaseError
 
 from .models import CiderInfrastructure
 
-
 DEFAULT_OPERATIONS_API_BASE = "https://operations-api.access-ci.org/wh2"
 DEFAULT_RESOURCE_TIMEOUT = 10
 DEFAULT_SOFTWARE_TIMEOUT = 30
@@ -24,6 +23,7 @@ class ResourceDataError(Exception):
 
 
 # API configuration and transport
+
 
 def _settings_int(name, default):
     try:
@@ -82,6 +82,7 @@ def _software_timeout():
 
 
 # Resource normalization and filtering
+
 
 def _resource_to_dict(resource):
     other_attributes = resource.other_attributes if isinstance(resource.other_attributes, dict) else {}
@@ -200,6 +201,7 @@ def _remote_resource_listing(kind):
 
 # Public resource queries
 
+
 def get_resource_listing(kind):
     """Return public resource listing grouped by organisation.
 
@@ -242,6 +244,7 @@ def get_resource_detail(node_id):
 
 
 # Public software catalog queries
+
 
 def get_software_catalog():
     """Return ``(catalog_records, error_message)`` from the software API."""

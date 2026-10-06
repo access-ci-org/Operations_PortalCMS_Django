@@ -18,6 +18,7 @@ class CiderInfrastructure(models.Model):
     Public resource listings and detail pages must use the Warehouse API directly,
     not these local rows.
     """
+
     cider_resource_id = models.IntegerField(primary_key=True)
     cider_type = models.CharField(max_length=16)
     info_resourceid = models.CharField(db_index=True, max_length=40)
@@ -40,15 +41,15 @@ class CiderInfrastructure(models.Model):
     is_active = models.BooleanField(
         default=True,
         db_index=True,
-        help_text='False when the resource is no longer present in the Warehouse API. '
-                  'Inactive rows are retained so historical news relationships remain readable.',
+        help_text="False when the resource is no longer present in the Warehouse API. "
+        "Inactive rows are retained so historical news relationships remain readable.",
     )
 
     class Meta:
-        db_table = 'cider_infrastructure'
-        verbose_name = 'CIDER Infrastructure'
-        verbose_name_plural = 'CIDER Infrastructure'
-        ordering = ['resource_descriptive_name']
+        db_table = "cider_infrastructure"
+        verbose_name = "CIDER Infrastructure"
+        verbose_name_plural = "CIDER Infrastructure"
+        ordering = ["resource_descriptive_name"]
 
     def __str__(self):
         return f"{self.info_resourceid} - {self.resource_descriptive_name}"
@@ -60,6 +61,7 @@ class CiderOrganizations(models.Model):
     Non-authoritative cache — see CiderInfrastructure docstring for details.
     Populated exclusively by sync_cider_from_api.
     """
+
     organization_id = models.IntegerField(primary_key=True)
     organization_name = models.CharField(max_length=120)
     organization_abbrev = models.CharField(max_length=20, blank=True)
@@ -67,10 +69,10 @@ class CiderOrganizations(models.Model):
     other_attributes = models.JSONField(null=True, blank=True)
 
     class Meta:
-        db_table = 'cider_organizations'
-        verbose_name = 'CIDER Organization'
-        verbose_name_plural = 'CIDER Organizations'
-        ordering = ['organization_name']
+        db_table = "cider_organizations"
+        verbose_name = "CIDER Organization"
+        verbose_name_plural = "CIDER Organizations"
+        ordering = ["organization_name"]
 
     def __str__(self):
         return self.organization_name
@@ -82,6 +84,7 @@ class CiderFeatures(models.Model):
     Non-authoritative cache — see CiderInfrastructure docstring for details.
     Populated exclusively by sync_cider_from_api.
     """
+
     feature_category_id = models.IntegerField(primary_key=True)
     feature_category_name = models.CharField(max_length=120)
     feature_category_description = models.CharField(max_length=4000, null=True, blank=True)
@@ -90,10 +93,10 @@ class CiderFeatures(models.Model):
     other_attributes = models.JSONField(null=True, blank=True)
 
     class Meta:
-        db_table = 'cider_features'
-        verbose_name = 'CIDER Feature Category'
-        verbose_name_plural = 'CIDER Feature Categories'
-        ordering = ['feature_category_name']
+        db_table = "cider_features"
+        verbose_name = "CIDER Feature Category"
+        verbose_name_plural = "CIDER Feature Categories"
+        ordering = ["feature_category_name"]
 
     def __str__(self):
         return self.feature_category_name
@@ -107,6 +110,7 @@ class CiderGroups(models.Model):
     membership in Django is not derived from this data: RP groups are owned
     centrally by the Warehouse/Operations API and must not be duplicated here.
     """
+
     group_id = models.IntegerField(primary_key=True)
     info_groupid = models.CharField(db_index=True, max_length=40, unique=True)
     group_descriptive_name = models.CharField(max_length=120)
@@ -117,13 +121,13 @@ class CiderGroups(models.Model):
     other_attributes = models.JSONField(null=True, blank=True)
 
     class Meta:
-        db_table = 'cider_groups'
-        verbose_name = 'CIDER Group'
-        verbose_name_plural = 'CIDER Groups'
-        ordering = ['group_descriptive_name']
+        db_table = "cider_groups"
+        verbose_name = "CIDER Group"
+        verbose_name_plural = "CIDER Groups"
+        ordering = ["group_descriptive_name"]
         permissions = [
-            ('rp_coordinator', 'Can coordinate resource provider activities'),
-            ('rp_implementer', 'Can implement resource provider tasks'),
+            ("rp_coordinator", "Can coordinate resource provider activities"),
+            ("rp_implementer", "Can implement resource provider tasks"),
         ]
 
     def __str__(self):

@@ -5,22 +5,15 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
-
 from djangocms_versioning.constants import DRAFT, PUBLISHED
 
 
 class SubmitPageDraftForReviewTests(TestCase):
     def setUp(self):
         User = get_user_model()
-        self.owner = User.objects.create_user(
-            username="owner", password="password", is_staff=True
-        )
-        self.other_staff = User.objects.create_user(
-            username="other", password="password", is_staff=True
-        )
-        self.non_staff = User.objects.create_user(
-            username="nonstaff", password="password", is_staff=False
-        )
+        self.owner = User.objects.create_user(username="owner", password="password", is_staff=True)
+        self.other_staff = User.objects.create_user(username="other", password="password", is_staff=True)
+        self.non_staff = User.objects.create_user(username="nonstaff", password="password", is_staff=False)
         self.url = reverse("portal:submit_page_draft_for_review", args=[123])
 
     def _version(self, *, state=DRAFT, locked_by_id=None):
@@ -33,9 +26,11 @@ class SubmitPageDraftForReviewTests(TestCase):
 
     def _post_with_version(self, user, version):
         self.client.force_login(user)
-        with mock.patch("portal.views.get_object_or_404", return_value=version), mock.patch(
-            "portal.views.version_list_url", return_value="/versions/"
-        ), mock.patch("portal.views.remove_version_lock") as remove_lock:
+        with (
+            mock.patch("portal.views.get_object_or_404", return_value=version),
+            mock.patch("portal.views.version_list_url", return_value="/versions/"),
+            mock.patch("portal.views.remove_version_lock") as remove_lock,
+        ):
             response = self.client.post(self.url)
         return response, remove_lock
 
@@ -66,9 +61,7 @@ class SubmitPageDraftForReviewTests(TestCase):
         )
         remove_lock.assert_called_once_with(version)
         self.assertEqual(version.state, DRAFT)
-        self.assertFalse(
-            self.owner.has_perm("djangocms_versioning.delete_versionlock")
-        )
+        self.assertFalse(self.owner.has_perm("djangocms_versioning.delete_versionlock"))
 
     def test_user_cannot_submit_another_users_locked_draft(self):
         version = self._version(locked_by_id=self.owner.pk)
