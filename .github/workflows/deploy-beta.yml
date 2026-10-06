@@ -244,7 +244,7 @@ jobs:
 
           ansible -i hosts beta-operations.access-ci.org \
             -m ansible.builtin.uri \
-            -a '{"url":"http://127.0.0.1/healthz/","headers":{"Host":"beta-operations.access-ci.org"},"status_code":200,"timeout":30}'
+            -a '{"url":"http://127.0.0.1/","headers":{"Host":"beta-operations.access-ci.org"},"status_code":200,"timeout":30}'
 
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             https://beta-operations.access-ci.org --max-time 30 || echo "000")
