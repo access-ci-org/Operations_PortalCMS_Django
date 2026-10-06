@@ -1,3 +1,6 @@
+v0.8.5 jlambertson 2026-10-06
+- updated ci and deploy workflow documents
+
 v0.8.4 jlambertson 2026-10-06
 - adding block, isort for code quality checks in ci workflow
 - updating node ci packages to node 24 aligned

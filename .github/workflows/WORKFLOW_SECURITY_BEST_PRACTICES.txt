@@ -1,47 +1,65 @@
 Operations PortalCMS GitHub Actions Security and Best Practices
 Repository: access-ci-org/Operations_PortalCMS_Django
-Status: ci.yml and deploy-production.yml are active. Outstanding GitHub-side
-settings (environments, rulesets, runner labels) are tracked separately in
+Status: ci.yml, deploy-beta.yml, and deploy-production.yml define a serialized
+release promotion. Outstanding GitHub-side settings (environments, rulesets,
+runner labels, and SSH trust) are tracked separately in
 .github/workflows/GITHUB_SETUP_REQUIRED.txt.
 
 Reviewed scope:
 - .github/workflows/ci.yml
+- .github/workflows/deploy-beta.yml
 - .github/workflows/deploy-production.yml
 
 ====================================================================
-1) Current skeleton contract
+1) Current workflow contract
 ====================================================================
 
-A. No automatic triggers
-- CI does not run on pull_request or push yet.
-- Production deployment does not run on tags yet.
-- Beta deployment is intentionally not represented as a GitHub Actions workflow; it is expected to remain manual from the bastion for now.
+A. CI triggers
+- CI runs static analysis on pull requests to main, pushes to main, and manual
+  dispatches.
+- CI does not run migrations or database-backed application tests.
 
-B. No active deployment logic
-- The deploy workflows do not checkout code.
-- The deploy workflows do not read secrets.
-- The deploy workflows do not SSH to hosts.
-- The deploy workflows do not run Ansible, migrations, collectstatic, service restarts, release creation, backups, or smoke tests.
+B. Release promotion
+- A protected vX.Y.Z tag is the only deployment trigger. The tag must resolve
+  to a commit reachable from main.
+- deploy-beta.yml binds the tag to an immutable commit SHA, deploys that exact
+  candidate to beta, and requires beta health checks and smoke tests to pass.
+- deploy-production.yml is workflow_call-only. It accepts the validated tag and
+  SHA from deploy-beta.yml, verifies the caller and tag-to-SHA binding again,
+  and cannot be dispatched directly.
+- Each environment prints Django's migration plan, checks its own recorded
+  migration state, runs migrate only when unapplied migration files exist, and
+  verifies the resulting state before continuing.
+- One concurrency group serializes the complete beta-to-production promotion so
+  a later release cannot replace beta while an earlier release awaits approval.
 
-C. Future topology is documented only
+C. Manual production gate
+- The deploy-production job uses the GitHub production environment. Required
+  reviewers and prevention of self-review must be configured in GitHub settings.
+- Production deployment steps and environment secrets remain unavailable until
+  that approval is granted.
+
+D. Deployment topology
 - Production host: cms1.operations.access-ci.org
 - Production URL: https://operations.access-ci.org
-- Beta host: cms2.operations.access-ci.org
+- Beta inventory host: beta-operations.access-ci.org
 - Beta URL: https://beta-operations.access-ci.org
-- Future infrastructure repository: access-ci-org/Operations_CMS_Infrastructure
+- Infrastructure repository: access-ci-org/Operations_CMS_Infrastructure
 
-D. Let's Encrypt work is deferred
+E. TLS ownership
 - Production certificate target: operations.access-ci.org
 - Beta certificate target: beta-operations.access-ci.org
-- Certificate automation belongs in access-ci-org/Operations_CMS_Infrastructure, not this application repository.
+- Certificate automation belongs in access-ci-org/Operations_CMS_Infrastructure,
+  not this application repository.
 
 ====================================================================
 2) Activation prerequisites
 ====================================================================
 
 A. GitHub environments
-- Create a production environment before enabling real production deploy jobs.
-- Restrict production deployments to release tags only.
+- Create a beta environment with no required reviewers and restrict it to
+  release tags only.
+- Create a production environment and restrict it to release tags only.
 - Require reviewers for production and prevent self-review.
 
 B. Runner controls
@@ -51,19 +69,23 @@ B. Runner controls
 - Limit runner network access to only required CMS infrastructure endpoints.
 
 C. Secrets and tokens
-- Add INFRASTRUCTURE_REPO_TOKEN_PORTAL only when cross-repo checkout is required.
-- Add ANSIBLE_VAULT_PASSWORD only to the production deployment environment when GitHub Actions deployment is enabled.
+- Keep INFRASTRUCTURE_REPO_TOKEN_PORTAL at repository or organization scope for
+  cross-repository checkout in beta and pre-deployment jobs.
+- Store separate ANSIBLE_VAULT_PASSWORD values in the beta and production
+  environments. Do not make the production value available to beta.
 - Do not expose production secrets to CI jobs.
 - Rotate deployment secrets regularly.
 
 D. SSH host verification
 - Do not use StrictHostKeyChecking=no for production.
-- Manage known_hosts on the runner or load trusted host keys before SSH/Ansible.
+- Do not use StrictHostKeyChecking=no for beta.
+- Manage trusted host keys for cms1.operations.access-ci.org and the current
+  inventory-resolved beta endpoint on the deployment runner.
 
 E. CMS infrastructure readiness
 - Confirm Operations_CMS_Infrastructure can deploy with an explicit host limit:
   - cms1.operations.access-ci.org for production
-- Keep beta deployment documented and executed from the bastion with an explicit limit to cms2.operations.access-ci.org.
+  - beta-operations.access-ci.org for beta
 - Confirm application_playbook.yml supports the PortalCMS uv-only deployment path.
 - Confirm Let's Encrypt certificate files and renewal logic are ready for both future public domains.
 
@@ -113,29 +135,35 @@ C. Release tag rules
 ====================================================================
 
 A. Beta
-1. Merge or promote a selected ref for beta validation.
-2. Deploy manually from the bastion using Operations_CMS_Infrastructure.
-3. Limit Ansible to cms2.operations.access-ci.org.
-4. Validate https://beta-operations.access-ci.org.
+1. Merge release-ready changes to main after CI passes.
+2. Create a protected vX.Y.Z tag on the selected main commit.
+3. deploy-beta.yml automatically validates and deploys the exact tag/SHA with
+   Ansible limited to beta-operations.access-ci.org.
+4. Require the beta service, loopback health endpoint, and public smoke test to
+   pass before production becomes eligible.
 
 B. Production
-1. Merge release-ready changes to main.
-2. Create a protected vX.Y.Z tag from main.
-3. Dispatch or trigger deploy-production.yml from the tag.
-4. Deploy only to cms1.operations.access-ci.org.
-5. Validate https://operations.access-ci.org.
+1. deploy-beta.yml calls deploy-production.yml with the same validated tag/SHA.
+2. Revalidate the caller, tag-to-SHA binding, and main ancestry.
+3. Wait for required reviewer approval on the production environment.
+4. Back up the current deployment and deploy only to
+   cms1.operations.access-ci.org.
+5. Validate the production service, loopback health endpoint, and public URL.
 
 ====================================================================
 6) Activation checklist
 ====================================================================
 
-- GitHub production environment configured.
+- GitHub beta environment configured without required reviewers.
+- GitHub production environment configured with required reviewers and
+  prevention of self-review.
 - CODEOWNERS protection enabled for .github changes.
 - Branch and tag protection rulesets configured.
 - Dedicated deployment runner labels configured.
 - INFRASTRUCTURE_REPO_TOKEN_PORTAL configured where needed.
-- ANSIBLE_VAULT_PASSWORD configured only for the production deployment environment when GitHub Actions deployment is enabled.
-- Known SSH host keys managed without bypassing verification.
+- ANSIBLE_VAULT_PASSWORD configured separately for beta and production
+  environments.
+- Known SSH host keys for cms1 and cms2 managed without bypassing verification.
 - Operations_CMS_Infrastructure supports host-limited beta and production deploys.
 - Let's Encrypt automation supports operations.access-ci.org and beta-operations.access-ci.org.
 - CI has a disposable config/database strategy before running DB-backed integration scripts.
