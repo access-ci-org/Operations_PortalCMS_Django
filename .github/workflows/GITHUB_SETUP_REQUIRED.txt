@@ -1,25 +1,25 @@
 Operations PortalCMS GitHub Actions - Outstanding GitHub-Side Setup
 Repository: access-ci-org/Operations_PortalCMS_Django
 
-Status: ci.yml and deploy-production.yml are now active workflow files (see git
-history). The items below are repo/org SETTINGS, not files, so they cannot be
-applied by committing code. Each must be configured directly in GitHub
-(Settings UI, gh CLI, or the REST/GraphQL API) before deploy-production.yml
-can run a real production deployment.
+Status: ci.yml, deploy-beta.yml, and deploy-production.yml define the release
+promotion path. The items below are repo/org SETTINGS, not files, so they cannot
+be applied by committing code. Each must be configured directly in GitHub
+(Settings UI, gh CLI, or the REST/GraphQL API) before a release tag can run a
+real beta-to-production deployment.
 
 ====================================================================
-1) Production environment
+1) Beta and production environments
 ====================================================================
-- Create a "production" environment (Settings > Environments) if it does not
-  already exist.
-- Restrict deployment to tags matching v*.*.* only (deployment branches and
-  tags rule).
-- Add required reviewers if a manual approval gate is wanted before the
-  deploy-production job runs.
-- Add ANSIBLE_VAULT_PASSWORD and INFRASTRUCTURE_REPO_TOKEN_PORTAL as
-  environment secrets here if they should be scoped to this environment
-  only, rather than at the repository level (they are currently repository
-  secrets per the user's confirmation on 2026-09-17).
+- Create a "beta" environment with no required reviewers so a validated release
+  tag deploys automatically. Restrict it to tags matching v*.*.* and add the
+  beta ANSIBLE_VAULT_PASSWORD as an environment secret.
+- Create a "production" environment and restrict it to tags matching v*.*.*.
+- Add required reviewers to production and prevent self-review. This environment
+  is the manual approval gate before the deploy-production job starts.
+- Add the production ANSIBLE_VAULT_PASSWORD as an environment secret.
+- Keep INFRASTRUCTURE_REPO_TOKEN_PORTAL at repository or organization scope.
+  Beta and production pre-deployment checks need it before an environment-gated
+  deployment job starts; do not put the token in CI jobs.
 
 ====================================================================
 2) Tag protection ruleset for v*.*.*
@@ -46,8 +46,8 @@ can run a real production deployment.
 ====================================================================
 4) Self-hosted runner labels
 ====================================================================
-- pre-deployment-checks and deploy-production in deploy-production.yml
-  target: runs-on: [self-hosted, linux, deployment, portalcms]
+- Beta and production pre-deployment/deployment jobs target:
+  runs-on: [self-hosted, linux, deployment, portalcms]
 - Confirm a self-hosted runner is registered with all four labels
   (especially the app-specific "portalcms" label - this is not shared with
   Operations_ServiceIndex_Django's runner, which uses "serviceindex").
@@ -59,11 +59,11 @@ can run a real production deployment.
 ====================================================================
 5) SSH host key trust
 ====================================================================
-- deploy-production.yml deliberately does NOT set
-  ANSIBLE_HOST_KEY_CHECKING=False or StrictHostKeyChecking=no.
-- The self-hosted runner's known_hosts must already trust
-  cms1.operations.access-ci.org before the first real run, or every SSH/
-  Ansible step will fail closed.
+- The deployment workflows deliberately do NOT set ANSIBLE_HOST_KEY_CHECKING=False
+  or StrictHostKeyChecking=no.
+- The self-hosted runner's known_hosts must already trust both
+  cms1.operations.access-ci.org and cms2.operations.access-ci.org before the
+  first real run, or every SSH/Ansible step will fail closed.
 - If there is no existing trust relationship, add a "populate known_hosts"
   step (e.g. from an SSH_KNOWN_HOSTS secret populated via ssh-keyscan -H run
   from the bastion) rather than disabling verification.
@@ -72,6 +72,6 @@ can run a real production deployment.
 Not required to change
 ====================================================================
 - .github/CODEOWNERS is already correct for this purpose.
-- No equivalent ruleset/environment work is needed for beta/dev - that path
-  stays fully manual from the bastion against cms2.operations.access-ci.org
-  and is intentionally not represented in GitHub Actions.
+- No workflow file can configure environment reviewers, deployment tag rules,
+  protected-tag rulesets, runner labels, runner SSH credentials, or known_hosts;
+  an authorized repository administrator must apply and verify those settings.
