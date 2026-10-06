@@ -41,13 +41,13 @@ C. Manual production gate
 
 D. Deployment topology
 - Production host: cms1.operations.access-ci.org
-- Production URL: https://operations.access-ci.org
+- Production URL: https://cms1.operations.access-ci.org (until DNS cutover)
 - Beta inventory host: beta-operations.access-ci.org
 - Beta URL: https://beta-operations.access-ci.org
 - Infrastructure repository: access-ci-org/Operations_CMS_Infrastructure
 
 E. TLS ownership
-- Production certificate target: operations.access-ci.org
+- Production certificate target: cms1.operations.access-ci.org (until DNS cutover)
 - Beta certificate target: beta-operations.access-ci.org
 - Certificate automation belongs in access-ci-org/Operations_CMS_Infrastructure,
   not this application repository.

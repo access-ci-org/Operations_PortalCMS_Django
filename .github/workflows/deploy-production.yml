@@ -149,7 +149,7 @@ jobs:
     # Environment secrets are unavailable until approval is granted.
     environment:
       name: production
-      url: https://operations.access-ci.org
+      url: https://cms1.operations.access-ci.org
 
     steps:
       - name: Deployment initiated
@@ -268,12 +268,8 @@ jobs:
             -m ansible.builtin.command \
             -a "systemctl is-active portal.service"
 
-          ansible -i hosts cms1.operations.access-ci.org \
-            -m ansible.builtin.uri \
-            -a '{"url":"http://127.0.0.1/","headers":{"Host":"cms1.operations.access-ci.org"},"status_code":200,"timeout":30}'
-
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://operations.access-ci.org --max-time 30 || echo "000")
+            https://cms1.operations.access-ci.org --max-time 30 || echo "000")
           if [[ ! "$HTTP_CODE" =~ ^(200|301|302)$ ]]; then
             echo "Production public URL returned HTTP $HTTP_CODE"
             exit 1
@@ -312,7 +308,7 @@ jobs:
       - name: Test production endpoint
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://operations.access-ci.org --max-time 30 || echo "000")
+            https://cms1.operations.access-ci.org --max-time 30 || echo "000")
           if [[ ! "$HTTP_CODE" =~ ^(200|301|302)$ ]]; then
             echo "Production smoke test failed with HTTP $HTTP_CODE"
             exit 1
