@@ -1,3 +1,5 @@
+"""Customize django CMS versioning actions for the page review workflow."""
+
 from cms.toolbar.items import ButtonList
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -9,7 +11,14 @@ from djangocms_versioning.models import Version
 
 
 class ReviewWorkflowVersioningToolbar(VersioningToolbar):
+    """Add review submission and authorized unlock actions to the toolbar.
+
+    Draft owners who cannot publish receive Submit for Review. Users with the
+    version-lock deletion permission may unlock drafts owned by someone else.
+    """
+
     def post_template_populate(self):
+        """Run lock-action logic for page and non-page versioned content."""
         super().post_template_populate()
         # _add_unlock_button is called via add_edit_button for non-page versioned
         # content, but page views use VersioningPageToolbar.populate() which does
@@ -17,6 +26,7 @@ class ReviewWorkflowVersioningToolbar(VersioningToolbar):
         self._add_unlock_button()
 
     def _add_unlock_button(self):
+        """Add Submit for Review or Unlock for the current draft and user."""
         if not LOCK_VERSIONS or not self._is_versioned():
             return
 
@@ -82,4 +92,5 @@ class ReviewWorkflowVersioningToolbar(VersioningToolbar):
         self.toolbar.add_item(item)
 
 
+# Replace the default versioning toolbar with the review-aware toolbar.
 replace_toolbar(VersioningToolbar, ReviewWorkflowVersioningToolbar)

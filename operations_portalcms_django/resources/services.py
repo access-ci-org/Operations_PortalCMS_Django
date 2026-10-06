@@ -1,3 +1,9 @@
+"""Fetch and shape resource and software data for public portal views.
+
+Public listings use the Operations API. Local CIDER rows remain available only
+for form choices and administrative workflows.
+"""
+
 from collections import Counter, defaultdict
 
 import requests
@@ -17,6 +23,8 @@ class ResourceDataError(Exception):
     """Raised when remote resource data cannot be fetched or parsed."""
 
 
+# API configuration and transport
+
 def _settings_int(name, default):
     try:
         return int(getattr(settings, name, default))
@@ -25,6 +33,7 @@ def _settings_int(name, default):
 
 
 def operations_api_base():
+    """Return the first configured API base URL, then the built-in fallback."""
     configured_base = (
         getattr(settings, "OPERATIONS_API_BASE", "")
         or getattr(settings, "API_BASE", "")
@@ -35,10 +44,16 @@ def operations_api_base():
 
 
 def operations_api_url(path):
+    """Build an Operations API URL from a relative path."""
     return f"{operations_api_base()}/{path.lstrip('/')}"
 
 
 def fetch_json(path, *, timeout, error_prefix):
+    """Fetch JSON and convert network, status, empty-body, and decode failures.
+
+    Callers receive ResourceDataError with their supplied operation context
+    instead of requests or JSON implementation details.
+    """
     try:
         response = requests.get(
             operations_api_url(path),
@@ -65,6 +80,8 @@ def _resource_timeout():
 def _software_timeout():
     return _settings_int("OPERATIONS_SOFTWARE_API_TIMEOUT", DEFAULT_SOFTWARE_TIMEOUT)
 
+
+# Resource normalization and filtering
 
 def _resource_to_dict(resource):
     other_attributes = resource.other_attributes if isinstance(resource.other_attributes, dict) else {}
@@ -181,6 +198,8 @@ def _remote_resource_listing(kind):
     return _group_resources_by_org(_publishable_resources(kind, results)), None
 
 
+# Public resource queries
+
 def get_resource_listing(kind):
     """Return public resource listing grouped by organisation.
 
@@ -222,7 +241,10 @@ def get_resource_detail(node_id):
     return detail, None
 
 
+# Public software catalog queries
+
 def get_software_catalog():
+    """Return ``(catalog_records, error_message)`` from the software API."""
     try:
         data = fetch_json(
             "/glue2/v1/software_fast/?format=json",
@@ -247,6 +269,11 @@ def get_software_listing(
     search_topics=True,
     search_keywords=True,
 ):
+    """Return filtered records, unfiltered provider counts, and any API error.
+
+    Provider counts are calculated before provider and text filters so the UI
+    can continue to display every available provider option.
+    """
     results, error_message = get_software_catalog()
     provider_counts = Counter(item.get("ResourceID") or "Unknown Resource" for item in results)
     providers = dict(provider_counts.most_common())
@@ -281,6 +308,7 @@ def get_software_listing(
 
 
 def get_software_detail(software_id):
+    """Return ``(record, error_message)`` for one software ID."""
     results, error_message = get_software_catalog()
     if error_message:
         return None, error_message
