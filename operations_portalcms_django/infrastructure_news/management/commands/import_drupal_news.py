@@ -52,8 +52,12 @@ KNOWN_SOURCE_CORRECTIONS = {
 }
 
 
+# Import outcome tracking
+
 @dataclass
 class ImportResult:
+    """Collect source counts, changes, warnings, and report metadata."""
+
     total_records: int = 0
     system_records: int = 0
     integration_records: int = 0
@@ -87,6 +91,8 @@ class ImportResult:
     def add_error(self, message: str) -> None:
         self.errors.append(message)
 
+
+# Source metadata parsing
 
 def _as_dt(value: Optional[str]) -> Optional[datetime]:
     if not value:
@@ -171,12 +177,19 @@ def _source_posted_at(record: Dict[str, Any]) -> Optional[datetime]:
 
 
 class Command(BaseCommand):
+    """Validate, plan, and execute the Drupal news import workflow.
+
+    Replacement is a two-stage operation: dry-run creates a content-addressed
+    plan, and apply revalidates that exact plan, source, target, and outcome.
+    """
+
     help = (
         "Import Drupal news into SystemStatusNews and IntegrationNews from normalized "
         "JSON or a raw MySQL dump, with guarded replacement and reporting."
     )
 
     def add_arguments(self, parser):
+        """Register source, safety confirmation, and execution options."""
         source_group = parser.add_mutually_exclusive_group()
         source_group.add_argument(
             "--input",
@@ -318,12 +331,18 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Validate inputs and run the planned import in one transaction.
+
+        Dry-run executes the database path but forces rollback. Any exception
+        produces a report before the command re-raises the failure.
+        """
         report_path = Path(options["report_file"])
         plan_path = Path(options["plan_file"]) if options.get("plan_file") else None
         plan_data: Optional[Dict[str, Any]] = None
         plan_file_sha256: Optional[str] = None
         dry_run = bool(options["dry_run"])
         apply = bool(options["apply"])
+        # Load the reviewed plan for apply mode; otherwise resolve source options.
         if apply:
             if plan_path is None or not options.get("confirm_plan_sha256"):
                 raise CommandError(
@@ -433,6 +452,7 @@ class Command(BaseCommand):
             source_correction_names = options.get("source_correction") or []
             system_news_as_of_raw = options.get("system_news_as_of")
 
+        # Enforce source, adjustment, and replacement safety requirements.
         if source_kind not in {"mysql-dump", "normalized-json"}:
             raise CommandError(f"Unsupported import-plan source kind: {source_kind!r}.")
 
@@ -552,6 +572,7 @@ class Command(BaseCommand):
         if mysql_dump and apply and not strict:
             raise CommandError("A raw-dump --apply requires --strict.")
 
+        # Verify source identity before parsing any records.
         if not input_path.exists():
             raise CommandError(f"Input file does not exist: {input_path}")
 
@@ -567,6 +588,7 @@ class Command(BaseCommand):
                 f"Refusing import: source SHA-256 does not match {confirmation_source}."
             )
 
+        # Parse source records and apply only explicitly requested corrections.
         source_warnings: List[str] = []
         excluded_system_nids_found: List[int] = []
         source_corrections_applied: List[str] = []
@@ -692,6 +714,7 @@ class Command(BaseCommand):
         )
         result.warnings.extend(source_warnings)
 
+        # Resolve relationships and stage all database changes atomically.
         try:
             with transaction.atomic():
                 fallback_user = self._resolve_import_user(
@@ -792,6 +815,7 @@ class Command(BaseCommand):
             )
             raise
 
+        # Persist the review artifacts after a successful staged run.
         if replace and dry_run:
             import_plan = self._build_import_plan(
                 input_path=input_path,
@@ -819,7 +843,10 @@ class Command(BaseCommand):
         )
         self._emit_summary(result=result, dry_run=dry_run, report_path=report_path)
 
+    # Source selection and import plans
+
     def _select_newest_mysql_dump(self, directory: Path) -> Path:
+        """Return the single newest valid backup from a source directory."""
         try:
             resolved_directory = directory.resolve(strict=True)
         except OSError as exc:
@@ -890,6 +917,7 @@ class Command(BaseCommand):
         source_correction_names: List[str],
         options: Dict[str, Any],
     ) -> Dict[str, Any]:
+        """Bind source, target, options, record IDs, attribution, and outcomes."""
         configured = settings.DATABASES["default"]
         plan: Dict[str, Any] = {
             "schema": IMPORT_PLAN_SCHEMA,
@@ -952,6 +980,7 @@ class Command(BaseCommand):
         plan_path: Optional[Path],
         plan_data: Dict[str, Any],
     ) -> str:
+        """Create a new plan file and return its SHA-256 digest."""
         if plan_path is None:
             raise CommandError("Internal error: replacement dry-run has no plan path.")
         plan_path.parent.mkdir(parents=True, exist_ok=True)
@@ -974,6 +1003,7 @@ class Command(BaseCommand):
         plan_path: Path,
         confirmed_sha256: str,
     ) -> tuple[Dict[str, Any], str]:
+        """Load a plan only when its file digest and schema are valid."""
         if not plan_path.is_file():
             raise CommandError(f"Import plan does not exist: {plan_path}")
         actual_sha256 = sha256_file(plan_path)
@@ -991,7 +1021,10 @@ class Command(BaseCommand):
         self._validate_import_plan_schema(plan_data)
         return plan_data, actual_sha256
 
+    # Import plan validation
+
     def _validate_import_plan_schema(self, plan_data: Any) -> None:
+        """Validate plan keys, types, digests, identities, and expected outcomes."""
         top_level_keys = {
             "schema",
             "version",
@@ -1431,6 +1464,8 @@ class Command(BaseCommand):
             "unresolved_allowed_na": result.unresolved_allowed_na,
         }
 
+    # Source adjustments and replacement validation
+
     def _adjust_normalized_system_records(
         self,
         records: Any,
@@ -1778,6 +1813,8 @@ class Command(BaseCommand):
                     f"nid={stable_id} affected element relationships."
                 )
 
+    # Author and relationship resolution
+
     def _resolve_import_user(
         self,
         username: str,
@@ -1889,6 +1926,8 @@ class Command(BaseCommand):
             elements[code] = element
             result.integration_elements_created += 1
         return elements
+
+    # Record matching and persistence
 
     def _find_existing_system(self, record: Dict[str, Any]) -> Optional[SystemStatusNews]:
         nid_raw = _nid(record)
@@ -2142,6 +2181,8 @@ class Command(BaseCommand):
         if not dry_run and obj.pk:
             obj.affected_elements.set(m2m_elements)
 
+    # Run reporting
+
     def _write_report(
         self,
         report_path: Path,
@@ -2151,6 +2192,7 @@ class Command(BaseCommand):
         source_kind: str,
         source_sha256: str,
     ) -> None:
+        """Write source identity, attribution, changes, warnings, and errors."""
         report_path.parent.mkdir(parents=True, exist_ok=True)
         lines = [
             "# Drupal News Import Run Report",
@@ -2280,6 +2322,7 @@ class Command(BaseCommand):
         report_path.write_text("\n".join(lines), encoding="utf-8")
 
     def _emit_summary(self, result: ImportResult, dry_run: bool, report_path: Path) -> None:
+        """Print the concise terminal summary for the completed run."""
         mode = "DRY RUN" if dry_run else "IMPORT"
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS(f"{mode} COMPLETE"))

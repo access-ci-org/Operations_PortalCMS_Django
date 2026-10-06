@@ -24,6 +24,12 @@ from resources.services import operations_api_base
 
 
 class Command(BaseCommand):
+    """Synchronize CIDER infrastructure, groups, organizations, and features.
+
+    All selected operations share one transaction. Dry-run mode performs the
+    same lookups and comparisons, then rolls the transaction back.
+    """
+
     help = "Syncs CIDER data from Operations API (infrastructure, groups, organizations, features)"
 
     def _api_base(self, override: str | None) -> str:
@@ -33,6 +39,7 @@ class Command(BaseCommand):
         return operations_api_base()
 
     def add_arguments(self, parser):
+        """Register API, filtering, dry-run, and pruning options."""
         parser.add_argument(
             "--api-url",
             type=str,
@@ -79,6 +86,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run selected sync stages and report their create/update/delete counts."""
         api_base = self._api_base(options["api_url"])
 
         timeout = int(options["timeout"])
@@ -124,18 +132,29 @@ class Command(BaseCommand):
             self.stdout.write(f"  - {key}: {counts[key]}")
         self.stdout.write("")
 
+    # API helpers
+
     def fetch_json(self, url: str, timeout: int):
+        """Fetch and decode one API response."""
         response = requests.get(url, timeout=timeout)
         response.raise_for_status()
         return response.json()
 
     def clip(self, value, length: int) -> str:
+        """Convert a value to text and limit it to a model field length."""
         if value is None:
             return ""
         text = str(value)
         return text[:length]
 
+    # Infrastructure records
+
     def sync_infrastructure(self, api_base: str, timeout: int, dry_run: bool, counts) -> None:
+        """Upsert active infrastructure and deactivate records absent upstream.
+
+        Missing rows are retained as inactive so historical news relationships
+        continue to resolve.
+        """
         self.stdout.write("--- Syncing Infrastructure (/v2/access-active/) ---")
         url = f"{api_base}/cider/v2/access-active/"
         data = self.fetch_json(url, timeout=timeout)
@@ -214,6 +233,8 @@ class Command(BaseCommand):
                     self.style.WARNING(f"  Marked {deactivated} infrastructure resource(s) as inactive.")
                 )
 
+    # Group, organization, and feature records
+
     def sync_groups_bundle(
         self,
         api_base: str,
@@ -223,6 +244,11 @@ class Command(BaseCommand):
         prune_stale_groups: bool,
         counts,
     ) -> None:
+        """Synchronize groups, organizations, categories, and features.
+
+        Stale groups are deleted only when explicitly requested and only after
+        at least one source group ID has been processed.
+        """
         self.stdout.write("--- Syncing Groups Bundle (/v2/access-active-groups/) ---")
         url = f"{api_base}/cider/v2/access-active-groups/"
         data = self.fetch_json(url, timeout=timeout)

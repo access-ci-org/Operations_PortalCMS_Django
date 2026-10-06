@@ -11,48 +11,62 @@ on:
   #   branches:
   #     - main
 
+permissions:
+  contents: read
+
 jobs:
   code-quality:
     name: Code Quality & Security Checks
     runs-on: self-hosted
+    outputs:
+      black: ${{ steps.black.outcome }}
+      isort: ${{ steps.isort.outcome }}
+      flake8: ${{ steps.flake8.outcome }}
+      bandit: ${{ steps.bandit.outcome }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for better analysis
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
 
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
-      - name: Install dependencies
+      - name: Install quality tools in an isolated environment
         run: |
-          uv pip install --system flake8 bandit safety black isort
+          uv venv .venv --python python
+          uv pip install --python .venv/bin/python flake8 bandit black isort
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run Black (code formatting check)
+        id: black
         run: |
           black --check --diff operations_portalcms_django/
         continue-on-error: true
 
       - name: Run isort (import sorting check)
+        id: isort
         run: |
           isort --check-only --diff operations_portalcms_django/
         continue-on-error: true
 
       - name: Run Flake8 (linting)
+        id: flake8
         run: |
           flake8 operations_portalcms_django/ \
             --count --select=E9,F63,F7,F82 --show-source --statistics --max-line-length=120
         continue-on-error: true
 
       - name: Run Bandit (security linting)
+        id: bandit
         run: |
           bandit -r operations_portalcms_django/ -f json -o bandit-report.json -ll -ii
         continue-on-error: true
@@ -80,14 +94,46 @@ jobs:
   summary:
     name: CI Summary
     runs-on: self-hosted
-    needs: [code-quality]
+    needs: [code-quality, dependency-review]
     if: always()
     steps:
-      - name: Check CI Status
+      - name: Publish CI status
+        env:
+          CODE_QUALITY_RESULT: ${{ needs.code-quality.result }}
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+          BLACK_RESULT: ${{ needs.code-quality.outputs.black || 'not-run' }}
+          ISORT_RESULT: ${{ needs.code-quality.outputs.isort || 'not-run' }}
+          FLAKE8_RESULT: ${{ needs.code-quality.outputs.flake8 || 'not-run' }}
+          BANDIT_RESULT: ${{ needs.code-quality.outputs.bandit || 'not-run' }}
         run: |
-          echo "Code Quality: ${{ needs.code-quality.result }}"
-          if [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
-            echo "❌ CI checks failed"; exit 1
-          else
-            echo "✅ All CI checks passed"
+          result_icon() {
+            case "$1" in
+              success) echo "✅" ;;
+              failure) echo "⚠️" ;;
+              skipped) echo "⏭️" ;;
+              cancelled) echo "🚫" ;;
+              *) echo "❔" ;;
+            esac
+          }
+
+          {
+            echo "## CI Summary"
+            echo
+            echo "Static analysis is advisory while the CI baseline is established."
+            echo
+            echo "| Check | Outcome |"
+            echo "| --- | --- |"
+            printf "| Black | %s \`%s\` |\n" "$(result_icon "$BLACK_RESULT")" "$BLACK_RESULT"
+            printf "| isort | %s \`%s\` |\n" "$(result_icon "$ISORT_RESULT")" "$ISORT_RESULT"
+            printf "| Flake8 | %s \`%s\` |\n" "$(result_icon "$FLAKE8_RESULT")" "$FLAKE8_RESULT"
+            printf "| Bandit | %s \`%s\` |\n" "$(result_icon "$BANDIT_RESULT")" "$BANDIT_RESULT"
+            printf "| Dependency Review | %s \`%s\` |\n" \
+              "$(result_icon "$DEPENDENCY_REVIEW_RESULT")" "$DEPENDENCY_REVIEW_RESULT"
+            echo
+            echo "Code-quality job: \`$CODE_QUALITY_RESULT\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$CODE_QUALITY_RESULT" != "success" ]]; then
+            echo "CI infrastructure or setup failed before advisory checks completed."
+            exit 1
           fi
