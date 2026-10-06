@@ -42,20 +42,16 @@ TABLE_COLUMNS = {
         "default_langcode",
         "revision_translation_affected",
     ],
-    "node__field_affected_infrastructure": FIELD_PREFIX
-    + ["field_affected_infrastructure_target_id"],
+    "node__field_affected_infrastructure": FIELD_PREFIX + ["field_affected_infrastructure_target_id"],
     "node__field_affected_intelm": FIELD_PREFIX + ["field_affected_intelm_target_id"],
     "node__field_effective_date": FIELD_PREFIX + ["field_effective_date_value"],
     "node__field_end_date": FIELD_PREFIX + ["field_end_date_value"],
     "node__field_expiration_date": FIELD_PREFIX + ["field_expiration_date_value"],
     "node__field_infra_resourceid": FIELD_PREFIX + ["field_infra_resourceid_value"],
-    "node__field_infrastructure_news_type": FIELD_PREFIX
-    + ["field_infrastructure_news_type_value"],
+    "node__field_infrastructure_news_type": FIELD_PREFIX + ["field_infrastructure_news_type_value"],
     "node__field_intelm_news_type": FIELD_PREFIX + ["field_intelm_news_type_value"],
-    "node__field_news_content": FIELD_PREFIX
-    + ["field_news_content_value", "field_news_content_format"],
-    "node__field_news_distribution_options": FIELD_PREFIX
-    + ["field_news_distribution_options_value"],
+    "node__field_news_content": FIELD_PREFIX + ["field_news_content_value", "field_news_content_format"],
+    "node__field_news_distribution_options": FIELD_PREFIX + ["field_news_distribution_options_value"],
     "node__field_start_date": FIELD_PREFIX + ["field_start_date_value"],
     # The parser must project only uid/name and never retain mail/pass.
     "users_field_data": ["uid", "name", "mail", "pass"],
@@ -66,13 +62,7 @@ def _sql_literal(value):
     if value is None:
         return "NULL"
     text = str(value)
-    text = (
-        text.replace("\\", "\\\\")
-        .replace("'", "\\'")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
-    )
+    text = text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
     return f"'{text}'"
 
 
@@ -95,12 +85,8 @@ def _node_row(nid, vid, bundle, title, timestamp, *, uid=1):
 def _base_rows():
     return {
         "node_field_data": [
-            _node_row(
-                101, 1101, "infrastructure_news_v2", "System title", 1700000000
-            ),
-            _node_row(
-                201, 1201, "integration_news_v1", "Integration title", 1700000100
-            ),
+            _node_row(101, 1101, "infrastructure_news_v2", "System title", 1700000000),
+            _node_row(201, 1201, "integration_news_v1", "Integration title", 1700000100),
             _node_row(301, 1301, "infrastructure", "Resource", 1700000200),
             _node_row(
                 401,
@@ -147,8 +133,7 @@ def _base_rows():
                 "System's first line, with (parentheses) — and Unicode\nsecond line",
             )
             + ["full_html"],
-            _field_row("integration_news_v1", 201, "Integration content")
-            + ["full_html"],
+            _field_row("integration_news_v1", 201, "Integration content") + ["full_html"],
         ],
         "node__field_news_distribution_options": [
             _field_row("infrastructure_news_v2", 101, "Post to Slack"),
@@ -178,10 +163,7 @@ def _dump_text(rows=None, *, omit_table=None, multiline_definitions=False):
         statements.append(f"CREATE TABLE `{table}` ({definitions}) ENGINE=InnoDB;")
         table_rows = rows.get(table, [])
         if table_rows:
-            values = ",".join(
-                "(" + ",".join(_sql_literal(value) for value in row) + ")"
-                for row in table_rows
-            )
+            values = ",".join("(" + ",".join(_sql_literal(value) for value in row) + ")" for row in table_rows)
             statements.append(f"INSERT INTO `{table}` VALUES {values};")
     return "\n".join(statements) + "\n"
 
@@ -265,9 +247,7 @@ class DrupalMysqlParserTests(TestCase):
         self.assertNotIn("pass", system["source_metadata"]["drupal_author"])
 
         integration = parsed.payload["IntegrationNews"][0]
-        self.assertEqual(
-            integration["affected_elements"], ["compute_roadmap", "accessusage"]
-        )
+        self.assertEqual(integration["affected_elements"], ["compute_roadmap", "accessusage"])
         self.assertEqual(
             integration["source_metadata"]["drupal_author"],
             {
@@ -282,12 +262,7 @@ class DrupalMysqlParserTests(TestCase):
         )
         self.assertEqual(integration["affected_element"], "")
         self.assertEqual(
-            [
-                item["target_nid"]
-                for item in integration["source_metadata"][
-                    "affected_integration_elements"
-                ]
-            ],
+            [item["target_nid"] for item in integration["source_metadata"]["affected_integration_elements"]],
             [401, 402],
         )
 
@@ -309,9 +284,7 @@ class DrupalMysqlParserTests(TestCase):
             infrastructure_type_choices=INFRASTRUCTURE_TYPES,
             integration_type_choices=INTEGRATION_TYPES,
             integration_element_choices=INTEGRATION_ELEMENTS,
-            system_start_datetime_corrections={
-                101: ("0026-08-01T12:00:00", "2026-08-01T12:00:00")
-            },
+            system_start_datetime_corrections={101: ("0026-08-01T12:00:00", "2026-08-01T12:00:00")},
         )
 
         self.assertEqual(
@@ -329,9 +302,7 @@ class DrupalMysqlParserTests(TestCase):
                 infrastructure_type_choices=INFRASTRUCTURE_TYPES,
                 integration_type_choices=INTEGRATION_TYPES,
                 integration_element_choices=INTEGRATION_ELEMENTS,
-                system_start_datetime_corrections={
-                    101: ("0026-08-01T12:00:00", "2026-08-01T12:00:00")
-                },
+                system_start_datetime_corrections={101: ("0026-08-01T12:00:00", "2026-08-01T12:00:00")},
             )
 
     def test_excludes_only_requested_existing_system_nid(self):
@@ -374,9 +345,7 @@ class DrupalMysqlParserTests(TestCase):
     def test_rejects_missing_required_table_definition(self):
         path = self._write(_dump_text(omit_table="node__field_affected_intelm"))
 
-        with self.assertRaisesRegex(
-            DrupalDumpError, "node__field_affected_intelm"
-        ):
+        with self.assertRaisesRegex(DrupalDumpError, "node__field_affected_intelm"):
             self._parse(path)
 
     def test_preserves_uid_but_leaves_username_blank_for_deleted_user(self):
@@ -387,9 +356,7 @@ class DrupalMysqlParserTests(TestCase):
         parsed = self._parse(path)
 
         self.assertEqual(
-            parsed.payload["SystemStatusNews"][0]["source_metadata"][
-                "drupal_author"
-            ],
+            parsed.payload["SystemStatusNews"][0]["source_metadata"]["drupal_author"],
             {"uid": 99, "username": "", "username_derivation": "missing-user"},
         )
 
@@ -407,9 +374,7 @@ class DrupalMysqlParserTests(TestCase):
 
     def test_rejects_duplicate_multi_value_reference(self):
         rows = _base_rows()
-        rows["node__field_affected_intelm"].append(
-            _field_row("integration_news_v1", 201, 401, delta=2)
-        )
+        rows["node__field_affected_intelm"].append(_field_row("integration_news_v1", 201, 401, delta=2))
         path = self._write(_dump_text(rows))
 
         with self.assertRaisesRegex(DrupalDumpError, "repeats integration element"):

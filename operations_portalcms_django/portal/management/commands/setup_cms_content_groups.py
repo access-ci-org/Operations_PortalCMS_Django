@@ -1,21 +1,15 @@
 """Configure the site-wide CMS content editor and publisher groups."""
 
+from cms.models import GlobalPagePermission
+from cms.plugin_pool import plugin_pool
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.contrib.sites.models import Site
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from cms.models import GlobalPagePermission
-from cms.plugin_pool import plugin_pool
-
-
-CONTENT_EDITOR_GROUP = (
-    "urn:group:access-ci.org:operations.access-ci.org:content-editor"
-)
-CONTENT_PUBLISHER_GROUP = (
-    "urn:group:access-ci.org:operations.access-ci.org:content-publisher"
-)
+CONTENT_EDITOR_GROUP = "urn:group:access-ci.org:operations.access-ci.org:content-editor"
+CONTENT_PUBLISHER_GROUP = "urn:group:access-ci.org:operations.access-ci.org:content-publisher"
 
 # (application label, model name, permission codename)
 BASE_EDITOR_PERMISSION_KEYS = (
@@ -95,9 +89,7 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         site = self._get_site(options["site_id"])
         editor_permissions = self._resolve_permissions(get_editor_permission_keys())
-        publisher_permissions = editor_permissions | self._resolve_permissions(
-            PUBLISHER_EXTRA_PERMISSION_KEYS
-        )
+        publisher_permissions = editor_permissions | self._resolve_permissions(PUBLISHER_EXTRA_PERMISSION_KEYS)
 
         specifications = (
             (
@@ -112,9 +104,7 @@ class Command(BaseCommand):
             ),
         )
 
-        self.stdout.write(
-            f"CMS content group configuration for Site {site.pk} ({site.domain})"
-        )
+        self.stdout.write(f"CMS content group configuration for Site {site.pk} ({site.domain})")
         if dry_run:
             self.stdout.write(self.style.WARNING("DRY RUN: no database changes"))
 
@@ -132,9 +122,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             for group_name, permissions, global_defaults in specifications:
                 group, created = Group.objects.get_or_create(name=group_name)
-                self.stdout.write(
-                    f"{'Create' if created else 'Update'} group: {group_name}"
-                )
+                self.stdout.write(f"{'Create' if created else 'Update'} group: {group_name}")
                 group.permissions.set(permissions)
                 global_permission = self._get_group_global_permission(group)
                 if global_permission is None:
@@ -172,15 +160,11 @@ class Command(BaseCommand):
             else:
                 resolved.add(permission)
         if missing:
-            raise CommandError(
-                "Missing required permission(s): " + ", ".join(sorted(missing))
-            )
+            raise CommandError("Missing required permission(s): " + ", ".join(sorted(missing)))
         return resolved
 
     def _get_group_global_permission(self, group):
-        rows = list(
-            GlobalPagePermission.objects.filter(group=group).order_by("pk")
-        )
+        rows = list(GlobalPagePermission.objects.filter(group=group).order_by("pk"))
         mixed_rows = [row.pk for row in rows if row.user_id is not None]
         group_rows = [row for row in rows if row.user_id is None]
         if mixed_rows:
@@ -190,8 +174,7 @@ class Command(BaseCommand):
             )
         if len(group_rows) > 1:
             raise CommandError(
-                f"Duplicate GlobalPagePermission rows for {group.name}: "
-                + ", ".join(str(row.pk) for row in group_rows)
+                f"Duplicate GlobalPagePermission rows for {group.name}: " + ", ".join(str(row.pk) for row in group_rows)
             )
         return group_rows[0] if group_rows else None
 
@@ -208,9 +191,7 @@ class Command(BaseCommand):
             self.stdout.write(f"  Would assign {len(permissions)} permission(s)")
             for permission in sorted(permissions, key=self._permission_sort_key):
                 self.stdout.write(f"    + {self._permission_label(permission)}")
-            self.stdout.write(
-                f"  Would create site-wide permission for Site {site.pk}"
-            )
+            self.stdout.write(f"  Would create site-wide permission for Site {site.pk}")
             return
 
         current_permissions = set(group.permissions.all())
@@ -238,9 +219,7 @@ class Command(BaseCommand):
 
         global_permission = self._get_group_global_permission(group)
         if global_permission is None:
-            self.stdout.write(
-                f"  Would create site-wide permission for Site {site.pk}"
-            )
+            self.stdout.write(f"  Would create site-wide permission for Site {site.pk}")
             return
 
         changed_fields = [
@@ -252,9 +231,7 @@ class Command(BaseCommand):
         if current_site_ids != {site.pk}:
             changed_fields.append("sites")
         if changed_fields:
-            self.stdout.write(
-                "  Global permission changes: " + ", ".join(changed_fields)
-            )
+            self.stdout.write("  Global permission changes: " + ", ".join(changed_fields))
         else:
             self.stdout.write("  Global permission already configured")
 
@@ -268,7 +245,4 @@ class Command(BaseCommand):
 
     @staticmethod
     def _permission_label(permission):
-        return (
-            f"{permission.content_type.app_label}."
-            f"{permission.content_type.model}.{permission.codename}"
-        )
+        return f"{permission.content_type.app_label}." f"{permission.content_type.model}.{permission.codename}"

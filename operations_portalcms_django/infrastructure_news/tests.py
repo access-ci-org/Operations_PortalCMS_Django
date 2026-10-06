@@ -1,5 +1,6 @@
 import json
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime
+from datetime import timezone as datetime_timezone
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -35,7 +36,7 @@ class SystemStatusWorkflowMethodTests(SimpleTestCase):
 
         for view in views:
             with self.subTest(view=view.__name__):
-                request = self.factory.get('/infrastructure-news/1/state/')
+                request = self.factory.get("/infrastructure-news/1/state/")
                 request.user = AuthenticatedReviewer()
 
                 response = view(request, pk=1)
@@ -47,39 +48,39 @@ class ApiTimestampFormattingTests(SimpleTestCase):
     def test_formats_winter_timestamp_in_central_standard_time(self):
         value = datetime(2024, 1, 15, 12, 0, tzinfo=datetime_timezone.utc)
 
-        self.assertEqual(_format_timestamp(value), '2024-01-15T06:00:00-0600')
+        self.assertEqual(_format_timestamp(value), "2024-01-15T06:00:00-0600")
 
     def test_formats_summer_timestamp_in_central_daylight_time(self):
         value = datetime(2024, 7, 15, 12, 0, tzinfo=datetime_timezone.utc)
 
-        self.assertEqual(_format_timestamp(value), '2024-07-15T07:00:00-0500')
+        self.assertEqual(_format_timestamp(value), "2024-07-15T07:00:00-0500")
 
     def test_formats_naive_timestamp_as_utc(self):
         value = datetime(2024, 7, 15, 12, 0)
 
-        self.assertEqual(_format_timestamp(value), '2024-07-15T07:00:00-0500')
+        self.assertEqual(_format_timestamp(value), "2024-07-15T07:00:00-0500")
 
     def test_formats_missing_timestamp_as_empty_string(self):
-        self.assertEqual(_format_timestamp(None), '')
+        self.assertEqual(_format_timestamp(None), "")
 
 
 class InfrastructureNewsUrlTests(SimpleTestCase):
     def test_page_url_name_resolves_to_infrastructure_news_view_path(self):
         self.assertEqual(
-            reverse('infrastructure_news:system_status_news'),
-            '/infrastructure_news_view',
+            reverse("infrastructure_news:system_status_news"),
+            "/infrastructure_news_view",
         )
 
     def test_add_url_name_resolves_to_infrastructure_news_path(self):
         self.assertEqual(
-            reverse('infrastructure_news:add_system_status_news'),
-            '/infrastructure_news/add/',
+            reverse("infrastructure_news:add_system_status_news"),
+            "/infrastructure_news/add/",
         )
 
     def test_update_url_name_resolves_to_infrastructure_news_path(self):
         self.assertEqual(
-            reverse('infrastructure_news:update_system_status_news', args=[286]),
-            '/infrastructure_news/update/286/',
+            reverse("infrastructure_news:update_system_status_news", args=[286]),
+            "/infrastructure_news/update/286/",
         )
 
 
@@ -90,51 +91,47 @@ class ApiInfrastructureNewsTests(TestCase):
         # otherwise leak into this one.
         cache.clear()
         self.author = User.objects.create_user(
-            username='api_test_author',
-            first_name='API Test',
-            last_name='Author',
-            email='private-infrastructure-author@example.test',
+            username="api_test_author",
+            first_name="API Test",
+            last_name="Author",
+            email="private-infrastructure-author@example.test",
         )
         self.published = SystemStatusNews.objects.create(
-            subject='Published item',
-            content='Published content',
-            infrastructure_news_type='outage_partial',
+            subject="Published item",
+            content="Published content",
+            infrastructure_news_type="outage_partial",
             outage_id=900,
-            start_datetime=datetime(
-                2024, 1, 15, 12, 0, tzinfo=datetime_timezone.utc
-            ),
-            end_datetime=datetime(
-                2024, 7, 15, 12, 0, tzinfo=datetime_timezone.utc
-            ),
+            start_datetime=datetime(2024, 1, 15, 12, 0, tzinfo=datetime_timezone.utc),
+            end_datetime=datetime(2024, 7, 15, 12, 0, tzinfo=datetime_timezone.utc),
             author=self.author,
-            status='published',
+            status="published",
             is_active=True,
         )
         self.draft = SystemStatusNews.objects.create(
-            subject='Draft item',
-            content='Draft content',
-            infrastructure_news_type='outage_partial',
+            subject="Draft item",
+            content="Draft content",
+            infrastructure_news_type="outage_partial",
             outage_id=901,
             author=self.author,
-            status='draft',
+            status="draft",
             is_active=True,
         )
         self.inactive = SystemStatusNews.objects.create(
-            subject='Inactive item',
-            content='Inactive content',
-            infrastructure_news_type='outage_partial',
+            subject="Inactive item",
+            content="Inactive content",
+            infrastructure_news_type="outage_partial",
             outage_id=902,
             author=self.author,
-            status='published',
+            status="published",
             is_active=False,
         )
 
     def test_only_published_active_items_included(self):
-        response = self.client.get('/api/infrastructure_news_v1')
+        response = self.client.get("/api/infrastructure_news_v1")
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.content)
-        outage_ids = {item['outage_id'] for item in data}
+        outage_ids = {item["outage_id"] for item in data}
 
         self.assertIn(str(self.published.outage_id), outage_ids)
         self.assertNotIn(str(self.draft.outage_id), outage_ids)
@@ -142,81 +139,86 @@ class ApiInfrastructureNewsTests(TestCase):
 
     def test_api_url_name_resolves_to_versioned_path(self):
         self.assertEqual(
-            reverse('infrastructure_news:api_infrastructure_news'),
-            '/api/infrastructure_news_v1',
+            reverse("infrastructure_news:api_infrastructure_news"),
+            "/api/infrastructure_news_v1",
         )
 
     def test_published_item_field_shape(self):
-        response = self.client.get('/api/infrastructure_news_v1')
+        response = self.client.get("/api/infrastructure_news_v1")
         data = json.loads(response.content)
-        item = next(i for i in data if i['outage_id'] == str(self.published.outage_id))
+        item = next(i for i in data if i["outage_id"] == str(self.published.outage_id))
 
         self.assertNotEqual(self.published.pk, self.published.outage_id)
-        self.assertEqual(item['outage_id'], '900')
-        self.assertEqual(item['subject'], 'Published item')
-        self.assertEqual(item['type'], 'Outage Partial')
-        self.assertEqual(item['start_timestamp'], '2024-01-15T06:00:00-0600')
-        self.assertEqual(item['end_timestamp'], '2024-07-15T07:00:00-0500')
+        self.assertEqual(item["outage_id"], "900")
+        self.assertEqual(item["subject"], "Published item")
+        self.assertEqual(item["type"], "Outage Partial")
+        self.assertEqual(item["start_timestamp"], "2024-01-15T06:00:00-0600")
+        self.assertEqual(item["end_timestamp"], "2024-07-15T07:00:00-0500")
         self.assertEqual(
             sorted(item.keys()),
-            sorted([
-                'subject', 'type', 'content', 'start_timestamp', 'end_timestamp',
-                'web_url', 'outage_id', 'distribution_options', 'affected_infrastructure',
-            ]),
+            sorted(
+                [
+                    "subject",
+                    "type",
+                    "content",
+                    "start_timestamp",
+                    "end_timestamp",
+                    "web_url",
+                    "outage_id",
+                    "distribution_options",
+                    "affected_infrastructure",
+                ]
+            ),
         )
 
     def test_items_are_ordered_by_stable_outage_id_with_nulls_last(self):
         SystemStatusNews.objects.create(
-            subject='Earlier stable identifier',
-            content='Earlier identifier content',
-            infrastructure_news_type='degraded',
+            subject="Earlier stable identifier",
+            content="Earlier identifier content",
+            infrastructure_news_type="degraded",
             outage_id=100,
             author=self.author,
-            status='published',
+            status="published",
             is_active=True,
         )
         SystemStatusNews.objects.create(
-            subject='Missing stable identifier',
-            content='Missing identifier content',
-            infrastructure_news_type='degraded',
+            subject="Missing stable identifier",
+            content="Missing identifier content",
+            infrastructure_news_type="degraded",
             outage_id=None,
             author=self.author,
-            status='published',
+            status="published",
             is_active=True,
         )
 
-        response = self.client.get('/api/infrastructure_news_v1')
+        response = self.client.get("/api/infrastructure_news_v1")
         data = json.loads(response.content)
 
-        self.assertEqual([item['outage_id'] for item in data], ['100', '900', None])
-        missing_timestamp_item = next(
-            item for item in data if item['outage_id'] is None
-        )
-        self.assertEqual(missing_timestamp_item['start_timestamp'], '')
-        self.assertEqual(missing_timestamp_item['end_timestamp'], '')
+        self.assertEqual([item["outage_id"] for item in data], ["100", "900", None])
+        missing_timestamp_item = next(item for item in data if item["outage_id"] is None)
+        self.assertEqual(missing_timestamp_item["start_timestamp"], "")
+        self.assertEqual(missing_timestamp_item["end_timestamp"], "")
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
-        page_response = self.client.get('/infrastructure_news_view')
-        api_response = self.client.get('/api/infrastructure_news_v1')
+        page_response = self.client.get("/infrastructure_news_view")
+        api_response = self.client.get("/api/infrastructure_news_v1")
 
         page_outage_ids = {
             str(item.outage_id) if item.outage_id is not None else None
-            for item in page_response.context['system_status_news']
+            for item in page_response.context["system_status_news"]
         }
-        api_outage_ids = {
-            item['outage_id'] for item in json.loads(api_response.content)
-        }
+        api_outage_ids = {item["outage_id"] for item in json.loads(api_response.content)}
 
         self.assertEqual(page_outage_ids, api_outage_ids)
 
     def test_unversioned_api_url_is_not_exposed(self):
-        response = self.client.get('/api/infrastructure_news')
+        response = self.client.get("/api/infrastructure_news")
 
         self.assertEqual(response.status_code, 404)
 
     def test_anonymous_page_shows_published_author_name_without_email(self):
-        response = self.client.get('/infrastructure_news_view')
+        response = self.client.get("/infrastructure_news_view")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Author: API Test Author')
+        self.assertContains(response, "Author: API Test Author")
         self.assertNotContains(response, self.author.email)

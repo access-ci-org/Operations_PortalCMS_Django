@@ -1,6 +1,5 @@
 from django import template
 from django.urls import reverse
-
 from djangocms_versioning.constants import DRAFT
 
 register = template.Library()

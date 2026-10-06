@@ -1,12 +1,5 @@
 from io import StringIO
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
-from django.contrib.sites.models import Site
-from django.core.management import call_command
-from django.core.management.base import CommandError
-from django.test import TestCase
-
 from cms.api import create_page
 from cms.models import GlobalPagePermission
 from cms.utils.page_permissions import (
@@ -18,6 +11,12 @@ from cms.utils.page_permissions import (
     user_can_move_page,
     user_can_publish_page,
 )
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
+from django.contrib.sites.models import Site
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase
 from djangocms_versioning.models import Version
 
 from portal.management.commands.setup_cms_content_groups import (
@@ -62,9 +61,7 @@ class SetupCMSContentGroupsTests(TestCase):
     def test_apply_sets_exact_permissions_and_preserves_memberships(self):
         User = get_user_model()
         editor_user = User.objects.create_user(username="editor", password="unused")
-        publisher_user = User.objects.create_user(
-            username="publisher", password="unused"
-        )
+        publisher_user = User.objects.create_user(username="publisher", password="unused")
         editor_group = Group.objects.create(name=CONTENT_EDITOR_GROUP)
         publisher_group = Group.objects.create(name=CONTENT_PUBLISHER_GROUP)
         editor_user.groups.add(editor_group)
@@ -81,13 +78,10 @@ class SetupCMSContentGroupsTests(TestCase):
 
         editor_group.refresh_from_db()
         publisher_group.refresh_from_db()
-        self.assertEqual(
-            self._permission_names(editor_group), set(get_editor_permission_keys())
-        )
+        self.assertEqual(self._permission_names(editor_group), set(get_editor_permission_keys()))
         self.assertEqual(
             self._permission_names(publisher_group),
-            set(get_editor_permission_keys())
-            | set(PUBLISHER_EXTRA_PERMISSION_KEYS),
+            set(get_editor_permission_keys()) | set(PUBLISHER_EXTRA_PERMISSION_KEYS),
         )
         self.assertEqual(
             set(editor_user.groups.values_list("name", flat=True)),
@@ -101,28 +95,18 @@ class SetupCMSContentGroupsTests(TestCase):
         editor_global = self._global_permission(editor_group)
         publisher_global = self._global_permission(publisher_group)
         for field_name in GLOBAL_PERMISSION_FIELDS:
-            self.assertEqual(
-                getattr(editor_global, field_name), field_name == "can_change"
-            )
+            self.assertEqual(getattr(editor_global, field_name), field_name == "can_change")
             self.assertEqual(
                 getattr(publisher_global, field_name),
                 field_name in {"can_change", "can_publish"},
             )
-        self.assertEqual(
-            set(editor_global.sites.values_list("pk", flat=True)), {self.site.pk}
-        )
-        self.assertEqual(
-            set(publisher_global.sites.values_list("pk", flat=True)), {self.site.pk}
-        )
+        self.assertEqual(set(editor_global.sites.values_list("pk", flat=True)), {self.site.pk})
+        self.assertEqual(set(publisher_global.sites.values_list("pk", flat=True)), {self.site.pk})
 
     def test_effective_page_permissions_separate_editor_and_publisher(self):
         User = get_user_model()
-        editor = User.objects.create_user(
-            username="editor", password="unused", is_staff=True
-        )
-        publisher = User.objects.create_user(
-            username="publisher", password="unused", is_staff=True
-        )
+        editor = User.objects.create_user(username="editor", password="unused", is_staff=True)
+        publisher = User.objects.create_user(username="publisher", password="unused", is_staff=True)
         page = create_page(
             title="Permission Test",
             template="page.html",
@@ -161,39 +145,21 @@ class SetupCMSContentGroupsTests(TestCase):
         version = Version.objects.get()
         self.assertFalse(version.check_publish.as_bool(editor))
         self.assertTrue(version.check_publish.as_bool(publisher))
-        self.assertTrue(
-            editor.has_perm(
-                "djangocms_versioning.view_pagecontentversion"
-            )
-        )
-        self.assertFalse(
-            editor.has_perm(
-                "djangocms_versioning.change_pagecontentversion"
-            )
-        )
-        self.assertTrue(
-            publisher.has_perm(
-                "djangocms_versioning.change_pagecontentversion"
-            )
-        )
+        self.assertTrue(editor.has_perm("djangocms_versioning.view_pagecontentversion"))
+        self.assertFalse(editor.has_perm("djangocms_versioning.change_pagecontentversion"))
+        self.assertTrue(publisher.has_perm("djangocms_versioning.change_pagecontentversion"))
 
         for user in (editor, publisher):
             self.assertFalse(user_can_add_page(user, site=self.site))
             self.assertFalse(user_can_delete_page(user, page, site=self.site))
             self.assertFalse(user_can_move_page(user, page, site=self.site))
-            self.assertFalse(
-                user_can_change_page_advanced_settings(user, page, site=self.site)
-            )
-            self.assertFalse(
-                user_can_change_page_permissions(user, page, site=self.site)
-            )
+            self.assertFalse(user_can_change_page_advanced_settings(user, page, site=self.site))
+            self.assertFalse(user_can_change_page_permissions(user, page, site=self.site))
 
     def test_registered_plugin_models_are_included(self):
         permission_keys = set(get_editor_permission_keys())
 
-        self.assertIn(
-            ("djangocms_file", "folder", "change_folder"), permission_keys
-        )
+        self.assertIn(("djangocms_file", "folder", "change_folder"), permission_keys)
         self.assertIn(
             (
                 "infrastructure_news",
@@ -214,16 +180,12 @@ class SetupCMSContentGroupsTests(TestCase):
     def test_apply_is_idempotent(self):
         call_command("setup_cms_content_groups")
         first_group_ids = list(
-            Group.objects.filter(
-                name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP]
-            )
+            Group.objects.filter(name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP])
             .order_by("name")
             .values_list("pk", flat=True)
         )
         first_global_ids = list(
-            GlobalPagePermission.objects.filter(
-                group__name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP]
-            )
+            GlobalPagePermission.objects.filter(group__name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP])
             .order_by("group__name")
             .values_list("pk", flat=True)
         )
@@ -232,9 +194,7 @@ class SetupCMSContentGroupsTests(TestCase):
 
         self.assertEqual(
             list(
-                Group.objects.filter(
-                    name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP]
-                )
+                Group.objects.filter(name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP])
                 .order_by("name")
                 .values_list("pk", flat=True)
             ),
@@ -242,9 +202,7 @@ class SetupCMSContentGroupsTests(TestCase):
         )
         self.assertEqual(
             list(
-                GlobalPagePermission.objects.filter(
-                    group__name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP]
-                )
+                GlobalPagePermission.objects.filter(group__name__in=[CONTENT_EDITOR_GROUP, CONTENT_PUBLISHER_GROUP])
                 .order_by("group__name")
                 .values_list("pk", flat=True)
             ),
@@ -288,8 +246,7 @@ class SetupCMSContentGroupsTests(TestCase):
         self.assertEqual(GlobalPagePermission.objects.count(), 0)
         self.assertIn("- cms.page.delete_page", output.getvalue())
         self.assertIn(
-            "+ integration_news.integrationnewsitemplugin."
-            "change_integrationnewsitemplugin",
+            "+ integration_news.integrationnewsitemplugin." "change_integrationnewsitemplugin",
             output.getvalue(),
         )
 
@@ -313,9 +270,7 @@ class SetupCMSContentGroupsTests(TestCase):
             call_command("setup_cms_content_groups")
 
         self.assertEqual(set(editor_group.permissions.all()), {extra_permission})
-        self.assertEqual(
-            GlobalPagePermission.objects.filter(group=publisher_group).count(), 2
-        )
+        self.assertEqual(GlobalPagePermission.objects.filter(group=publisher_group).count(), 2)
 
     def test_mixed_user_group_global_permission_fails_closed(self):
         User = get_user_model()

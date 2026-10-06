@@ -12,6 +12,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase
 from django.utils.dateparse import parse_datetime
+
 from integration_news.models import IntegrationNews
 from resources.models import CiderInfrastructure
 
@@ -23,9 +24,7 @@ from .test_drupal_mysql import _dump_text
 
 class ImportCommandResolutionTests(SimpleTestCase):
     def test_portal_command_is_the_canonical_importer(self):
-        from portal.management.commands.import_drupal_news import (
-            Command as PortalCommand,
-        )
+        from portal.management.commands.import_drupal_news import Command as PortalCommand
 
         self.assertIs(PortalCommand, CanonicalCommand)
 
@@ -49,14 +48,10 @@ class NormalizedSourceAdjustmentTests(SimpleTestCase):
         ]
 
     def test_excludes_and_exactly_corrects_requested_records(self):
-        adjusted, exclusions, corrections = (
-            self.command._adjust_normalized_system_records(
-                records=self.records,
-                excluded_system_nids={404},
-                start_datetime_corrections={
-                    928: ("0026-01-07T12:50:36", "2026-01-07T12:50:36")
-                },
-            )
+        adjusted, exclusions, corrections = self.command._adjust_normalized_system_records(
+            records=self.records,
+            excluded_system_nids={404},
+            start_datetime_corrections={928: ("0026-01-07T12:50:36", "2026-01-07T12:50:36")},
         )
 
         self.assertEqual(
@@ -74,18 +69,14 @@ class NormalizedSourceAdjustmentTests(SimpleTestCase):
             self.command._adjust_normalized_system_records(
                 records=self.records,
                 excluded_system_nids={404},
-                start_datetime_corrections={
-                    928: ("0026-01-07T12:50:36", "2026-01-07T12:50:36")
-                },
+                start_datetime_corrections={928: ("0026-01-07T12:50:36", "2026-01-07T12:50:36")},
             )
 
 
 class SystemNewsCutoffTests(SimpleTestCase):
     def setUp(self):
         self.command = CanonicalCommand()
-        self.cutoff = self.command._parse_system_news_as_of(
-            "2026-09-01T12:00:00Z"
-        )
+        self.cutoff = self.command._parse_system_news_as_of("2026-09-01T12:00:00Z")
         self.records = [
             {
                 "subject": "Past",
@@ -376,8 +367,7 @@ class AtomicReplaceCommandTests(TestCase):
                         "drupal_created_at": "2026-08-01T11:00:00Z",
                         "drupal_author": {
                             "uid": 10,
-                            "username": self.matched_author.username
-                            + "@arbitrary.example",
+                            "username": self.matched_author.username + "@arbitrary.example",
                         },
                     },
                 }
@@ -520,9 +510,9 @@ class AtomicReplaceCommandTests(TestCase):
 
     def test_case_different_drupal_username_uses_explicit_fallback(self):
         payload = self._payload()
-        payload["SystemStatusNews"][0]["source_metadata"]["drupal_author"][
-            "username"
-        ] = self.matched_author.username.upper() + "@arbitrary.example"
+        payload["SystemStatusNews"][0]["source_metadata"]["drupal_author"]["username"] = (
+            self.matched_author.username.upper() + "@arbitrary.example"
+        )
         self._write_payload(payload)
 
         self._run_replace("--dry-run")
@@ -530,9 +520,7 @@ class AtomicReplaceCommandTests(TestCase):
         plan = json.loads(self.plan_path.read_text(encoding="utf-8"))
         attribution = plan["expected"]["system_attribution"][0]
         self.assertEqual(attribution["resolution"], "fallback")
-        self.assertEqual(
-            attribution["fallback_reason"], "no-django-username-match"
-        )
+        self.assertEqual(attribution["fallback_reason"], "no-django-username-match")
         self.assertEqual(attribution["django_username"], self.author.username)
 
     def test_replace_apply_requires_matching_source_checksum(self):
@@ -595,11 +583,7 @@ class AtomicReplaceCommandTests(TestCase):
         system = SystemStatusNews.objects.get(outage_id=101)
         integration = IntegrationNews.objects.get(integration_news_id=201)
         self.assertEqual(
-            set(
-                system.affected_infrastructure_items.values_list(
-                    "info_resourceid", flat=True
-                )
-            ),
+            set(system.affected_infrastructure_items.values_list("info_resourceid", flat=True)),
             {"resource.example"},
         )
         self.assertEqual(
@@ -634,9 +618,7 @@ class AtomicReplaceCommandTests(TestCase):
             self._run_replace("--apply")
 
         self.assertTrue(SystemStatusNews.objects.filter(pk=self.old_system.pk).exists())
-        self.assertTrue(
-            IntegrationNews.objects.filter(pk=self.old_integration.pk).exists()
-        )
+        self.assertTrue(IntegrationNews.objects.filter(pk=self.old_integration.pk).exists())
         self.assertFalse(SystemStatusNews.objects.filter(outage_id=101).exists())
         self.assertFalse(IntegrationNews.objects.filter(integration_news_id=201).exists())
 

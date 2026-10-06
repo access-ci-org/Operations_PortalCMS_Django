@@ -3,7 +3,6 @@
 from cms.toolbar.items import ButtonList
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-
 from djangocms_versioning.cms_toolbars import LOCK_VERSIONS, VersioningToolbar, replace_toolbar
 from djangocms_versioning.constants import DRAFT
 from djangocms_versioning.helpers import get_object_preview_url

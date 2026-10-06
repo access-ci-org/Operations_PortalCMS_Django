@@ -5,16 +5,26 @@ from portal.templatetags import get_settings
 
 
 class EnvironmentBannerTests(TestCase):
-    def banner(self, *, app_env="", public_hostname="", request_host="", db_name="portal1",
-               banner_enabled=False, banner_label=""):
+    def banner(
+        self,
+        *,
+        app_env="",
+        public_hostname="",
+        request_host="",
+        db_name="portal1",
+        banner_enabled=False,
+        banner_label="",
+    ):
         request = SimpleNamespace(get_host=lambda: request_host)
         database_settings = {"default": {"NAME": db_name}}
 
-        with mock.patch.object(get_settings.settings, "APP_ENV", app_env, create=True), \
-             mock.patch.object(get_settings.settings, "PUBLIC_HOSTNAME", public_hostname, create=True), \
-             mock.patch.object(get_settings.settings, "DATABASES", database_settings, create=True), \
-             mock.patch.object(get_settings.settings, "DEVELOPMENT_SERVER_BANNER", banner_enabled, create=True), \
-             mock.patch.object(get_settings.settings, "DEVELOPMENT_SERVER_LABEL", banner_label, create=True):
+        with (
+            mock.patch.object(get_settings.settings, "APP_ENV", app_env, create=True),
+            mock.patch.object(get_settings.settings, "PUBLIC_HOSTNAME", public_hostname, create=True),
+            mock.patch.object(get_settings.settings, "DATABASES", database_settings, create=True),
+            mock.patch.object(get_settings.settings, "DEVELOPMENT_SERVER_BANNER", banner_enabled, create=True),
+            mock.patch.object(get_settings.settings, "DEVELOPMENT_SERVER_LABEL", banner_label, create=True),
+        ):
             return get_settings._environment_banner_context(request)
 
     def test_explicit_beta_banner(self):

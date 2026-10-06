@@ -14,25 +14,26 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
+
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('filer/', include('filer.urls')),
-    path('accounts/', include('allauth.urls')),  # Allauth (login/logout/social auth/CILogon)
-    path('access_django_user_admin/', include('access_django_user_admin.urls', namespace="access_django_user_admin")),
-    path('', include('resources.urls', namespace='resources')),  # Resources (CIDER) views
-    path('', include('infrastructure_news.urls', namespace='infrastructure_news')),  # Infrastructure/system status news
-    path('', include('integration_news.urls', namespace='integration_news')),  # Integration news
-    path('', include('portal.urls')),  # Application views (portal core, etc.)
+    path("admin/", admin.site.urls),
+    path("filer/", include("filer.urls")),
+    path("accounts/", include("allauth.urls")),  # Allauth (login/logout/social auth/CILogon)
+    path("access_django_user_admin/", include("access_django_user_admin.urls", namespace="access_django_user_admin")),
+    path("", include("resources.urls", namespace="resources")),  # Resources (CIDER) views
+    path("", include("infrastructure_news.urls", namespace="infrastructure_news")),  # Infrastructure/system status news
+    path("", include("integration_news.urls", namespace="integration_news")),  # Integration news
+    path("", include("portal.urls")),  # Application views (portal core, etc.)
     # Redirects for retired /pub/ FAQ pages -> new /faqs/ CMS pages
-    path('pub/identity-faqs/', RedirectView.as_view(url='/faqs/account-setup-and-management/', permanent=True)),
-    path('pub/ticketing-faqs/', RedirectView.as_view(url='/faqs/ticketing-system/', permanent=True)),
-    path('', include('cms.urls')),  # CMS pages - keep this last as catch-all
+    path("pub/identity-faqs/", RedirectView.as_view(url="/faqs/account-setup-and-management/", permanent=True)),
+    path("pub/ticketing-faqs/", RedirectView.as_view(url="/faqs/ticketing-system/", permanent=True)),
+    path("", include("cms.urls")),  # CMS pages - keep this last as catch-all
 ]
 
 if settings.DEBUG:

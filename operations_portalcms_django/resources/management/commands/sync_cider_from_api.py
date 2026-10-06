@@ -5,6 +5,7 @@ Default strategy:
 - v2/access-active/ for full infrastructure records
 - v2/access-active-groups/ for groups, organizations, and feature catalogs
 """
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -222,16 +223,18 @@ class Command(BaseCommand):
         # Mark resources absent from this API payload as inactive.
         # Rows are never deleted so historical news relationships remain readable.
         if not dry_run and seen_ids:
-            deactivated = CiderInfrastructure.objects.filter(
-                is_active=True,
-            ).exclude(
-                cider_resource_id__in=seen_ids,
-            ).update(is_active=False)
+            deactivated = (
+                CiderInfrastructure.objects.filter(
+                    is_active=True,
+                )
+                .exclude(
+                    cider_resource_id__in=seen_ids,
+                )
+                .update(is_active=False)
+            )
             if deactivated:
                 counts["infrastructure_deactivated"] += deactivated
-                self.stdout.write(
-                    self.style.WARNING(f"  Marked {deactivated} infrastructure resource(s) as inactive.")
-                )
+                self.stdout.write(self.style.WARNING(f"  Marked {deactivated} infrastructure resource(s) as inactive."))
 
     # Group, organization, and feature records
 
@@ -307,9 +310,7 @@ class Command(BaseCommand):
 
         if prune_stale_groups:
             if not source_group_ids:
-                raise CommandError(
-                    "Refusing to prune stale CIDER groups because no source group IDs were processed."
-                )
+                raise CommandError("Refusing to prune stale CIDER groups because no source group IDs were processed.")
 
             stale_groups = CiderGroups.objects.exclude(group_id__in=source_group_ids)
             if group_prefix:
@@ -379,9 +380,7 @@ class Command(BaseCommand):
 
             defaults = {
                 "feature_category_name": self.clip(category.get("feature_category_name"), 120),
-                "feature_category_description": self.clip(
-                    category.get("feature_category_description"), 4000
-                ),
+                "feature_category_description": self.clip(category.get("feature_category_description"), 4000),
                 "feature_category_types": category.get("feature_category_types", []),
                 "features": feature_map.get(category_id, []),
                 "other_attributes": {},

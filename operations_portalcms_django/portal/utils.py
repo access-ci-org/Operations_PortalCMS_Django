@@ -2,6 +2,7 @@
 Utility functions for Operations Portal CMS
 """
 
+
 def is_operations_user(user):
     """
     Check if user belongs to operations groups (concierge, badge/roadmap maintainers).
@@ -20,8 +21,6 @@ def is_operations_user(user):
         return True
 
     # Check if user is in any operations group
-    ops_groups = user.groups.filter(
-        name__startswith='urn:group:access-ci.org:operations.access-ci.org:'
-    )
+    ops_groups = user.groups.filter(name__startswith="urn:group:access-ci.org:operations.access-ci.org:")
 
     return ops_groups.exists()

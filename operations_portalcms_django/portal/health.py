@@ -11,16 +11,16 @@ from django.views.decorators.http import require_GET
 def readiness(request):
     """Report the deployed version and verify the default database is usable."""
     payload = {
-        'status': 'ok',
-        'version': str(getattr(settings, 'APP_VERSION', 'unknown')),
+        "status": "ok",
+        "version": str(getattr(settings, "APP_VERSION", "unknown")),
     }
 
     try:
         with connection.cursor() as cursor:
-            cursor.execute('SELECT 1')
+            cursor.execute("SELECT 1")
             cursor.fetchone()
     except Error:
-        payload['status'] = 'unavailable'
+        payload["status"] = "unavailable"
         return JsonResponse(payload, status=503)
 
     return JsonResponse(payload)

@@ -27,9 +27,7 @@ class SignupPolicyTests(SimpleTestCase):
         self.assertEqual(match.url_name, "login")
 
     def test_local_signup_policy_is_closed(self):
-        self.assertFalse(
-            get_account_adapter(self.request).is_open_for_signup(self.request)
-        )
+        self.assertFalse(get_account_adapter(self.request).is_open_for_signup(self.request))
 
     def test_cilogon_social_signup_policy_remains_open(self):
         sociallogin = SimpleNamespace(
