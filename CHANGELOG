@@ -1,3 +1,6 @@
+v0.8.7 jlambertson 2026-10-06
+- tweaking ci checking of deployments
+
 v0.8.6 jlambertson 2026-10-06
 - updated ci and deploy workflow documents to better use ansible
 
