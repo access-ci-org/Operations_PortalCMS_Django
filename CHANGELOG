@@ -1,3 +1,7 @@
+v0.8.4 jlambertson 2026-10-06
+- adding block, isort for code quality checks in ci workflow
+- updating node ci packages to node 24 aligned
+
 v0.8.3 jlambertson 2026-09-25
 - removing hardcoded urls in urls.py to be replaced with redirects module in admin
 
