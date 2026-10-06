@@ -62,8 +62,9 @@ real beta-to-production deployment.
 - The deployment workflows deliberately do NOT set ANSIBLE_HOST_KEY_CHECKING=False
   or StrictHostKeyChecking=no.
 - The self-hosted runner's known_hosts must already trust both
-  cms1.operations.access-ci.org and cms2.operations.access-ci.org before the
-  first real run, or every SSH/Ansible step will fail closed.
+  cms1.operations.access-ci.org and the inventory-resolved endpoint for
+  beta-operations.access-ci.org before the first real run, or every SSH/Ansible
+  step will fail closed.
 - If there is no existing trust relationship, add a "populate known_hosts"
   step (e.g. from an SSH_KNOWN_HOSTS secret populated via ssh-keyscan -H run
   from the bastion) rather than disabling verification.

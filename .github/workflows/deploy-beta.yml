@@ -95,27 +95,25 @@ jobs:
           persist-credentials: false
 
       - name: Check beta server health
+        working-directory: infrastructure/ansible
         run: |
-          ssh cms2.operations.access-ci.org "echo 'Beta server is accessible'"
+          ansible -i hosts beta-operations.access-ci.org -m ansible.builtin.ping
 
       - name: Check current deployment
+        working-directory: infrastructure/ansible
         env:
           APP_REF: ${{ needs.validate-ref.outputs.app_ref }}
           COMMIT_SHA: ${{ needs.validate-ref.outputs.commit_sha }}
         run: |
-          CURRENT_VERSION=$(ssh cms2.operations.access-ci.org \
-            "readlink -f /soft/django-cms-01/PROD | xargs basename" || echo "unknown")
+          ansible -i hosts beta-operations.access-ci.org \
+            -m ansible.builtin.shell \
+            -a "readlink -f /soft/django-cms-01/PROD | xargs basename"
 
           {
-            echo "**Current beta version:** $CURRENT_VERSION"
+            echo "**Current beta version:** reported in the job log above"
             echo "**Requested ref:** $APP_REF"
             echo "**Requested commit:** $COMMIT_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Verify Ansible connectivity
-        working-directory: infrastructure/ansible
-        run: |
-          ansible -i hosts cms2.operations.access-ci.org -m ping
 
   deploy-beta:
     name: Deploy to Beta
@@ -155,18 +153,18 @@ jobs:
           persist-credentials: false
 
       - name: Create backup
+        working-directory: infrastructure/ansible
         env:
           COMMIT_SHA: ${{ needs.validate-ref.outputs.commit_sha }}
         run: |
           SHORT_SHA=${COMMIT_SHA:0:12}
           BACKUP_DIR="/soft/backups/$(date +%Y%m%d-%H%M%S)-pre-$SHORT_SHA"
 
-          # BACKUP_DIR contains only a timestamp and validated commit SHA, so
-          # expanding it on the client before running the remote command is intended.
-          # shellcheck disable=SC2029
-          ssh cms2.operations.access-ci.org \
-            "sudo mkdir -p /soft/backups && \
-             sudo cp -r /soft/django-cms-01/PROD '$BACKUP_DIR'"
+          ansible -i hosts beta-operations.access-ci.org \
+            --become \
+            -m ansible.builtin.shell \
+            -a "mkdir -p /soft/backups && \
+                cp -r /soft/django-cms-01/PROD '$BACKUP_DIR'"
 
       - name: Run Ansible deployment
         working-directory: infrastructure/ansible
@@ -180,64 +178,73 @@ jobs:
           ansible-playbook \
             -i hosts application_playbook.yml \
             --vault-password-file=<(printf '%s' "$ANSIBLE_VAULT_PASSWORD") \
-            --limit=cms2.operations.access-ci.org \
+            --limit=beta-operations.access-ci.org \
             --extra-vars "app_tag=$APP_REF git_version=$COMMIT_SHA" \
             -vv
 
       - name: Check and apply database migrations when needed
+        working-directory: infrastructure/ansible
         run: |
           set -euo pipefail
 
-          ssh cms2.operations.access-ci.org \
-            "cd /soft/django-cms-01 && \
-             sudo -u software ./sbin/manage.prod.sh migrate --plan"
+          ansible -i hosts beta-operations.access-ci.org \
+            --become --become-user software \
+            -m ansible.builtin.command \
+            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --plan"
 
-          if ssh cms2.operations.access-ci.org \
-            "cd /soft/django-cms-01 && \
-             sudo -u software ./sbin/manage.prod.sh migrate --check"; then
+          if ansible -i hosts beta-operations.access-ci.org \
+            --become --become-user software \
+            -m ansible.builtin.command \
+            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --check"; then
             echo "Beta database already matches the release migration files; skipping migrate."
           else
             echo "Pending beta migrations detected; applying them now."
-            ssh cms2.operations.access-ci.org \
-              "cd /soft/django-cms-01 && \
-               sudo -u software ./sbin/manage.prod.sh migrate --noinput"
+            ansible -i hosts beta-operations.access-ci.org \
+              --become --become-user software \
+              -m ansible.builtin.command \
+              -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --noinput"
           fi
 
-          ssh cms2.operations.access-ci.org \
-            "cd /soft/django-cms-01 && \
-             sudo -u software ./sbin/manage.prod.sh migrate --check"
+          ansible -i hosts beta-operations.access-ci.org \
+            --become --become-user software \
+            -m ansible.builtin.command \
+            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --check"
 
       - name: Collect static files
+        working-directory: infrastructure/ansible
         run: |
-          ssh cms2.operations.access-ci.org \
-            "cd /soft/django-cms-01 && sudo -u software ./sbin/manage.prod.sh collectstatic --noinput"
+          ansible -i hosts beta-operations.access-ci.org \
+            --become --become-user software \
+            -m ansible.builtin.command \
+            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh collectstatic --noinput"
 
       - name: Restart application service
+        working-directory: infrastructure/ansible
         run: |
-          ssh cms2.operations.access-ci.org \
-            "sudo systemctl restart portal.service && \
-             sleep 5 && \
-             sudo systemctl status portal.service"
+          ansible -i hosts beta-operations.access-ci.org \
+            --become \
+            -m ansible.builtin.systemd_service \
+            -a "name=portal.service state=restarted"
+          sleep 5
+          ansible -i hosts beta-operations.access-ci.org \
+            --become \
+            -m ansible.builtin.command \
+            -a "systemctl status portal.service"
 
       - name: Verify deployment
         id: verify
+        working-directory: infrastructure/ansible
         run: |
           sleep 15
 
-          SERVICE_STATUS=$(ssh cms2.operations.access-ci.org \
-            "systemctl is-active portal.service" || echo "failed")
-          if [[ "$SERVICE_STATUS" != "active" ]]; then
-            echo "Beta portal.service is not active (status: $SERVICE_STATUS)"
-            exit 1
-          fi
+          ansible -i hosts beta-operations.access-ci.org \
+            --become \
+            -m ansible.builtin.command \
+            -a "systemctl is-active portal.service"
 
-          HEALTHZ_CODE=$(ssh cms2.operations.access-ci.org \
-            "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/healthz/ --max-time 30" \
-            || echo "000")
-          if [[ "$HEALTHZ_CODE" != "200" ]]; then
-            echo "Beta loopback /healthz/ check returned HTTP $HEALTHZ_CODE"
-            exit 1
-          fi
+          ansible -i hosts beta-operations.access-ci.org \
+            -m ansible.builtin.uri \
+            -a "url=http://127.0.0.1/healthz/ status_code=200 timeout=30"
 
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             https://beta-operations.access-ci.org --max-time 30 || echo "000")
@@ -261,7 +268,7 @@ jobs:
             echo "| Parameter | Value |"
             echo "| --- | --- |"
             echo "| Environment | beta |"
-            echo "| Target host | cms2.operations.access-ci.org |"
+            echo "| Target host | beta-operations.access-ci.org |"
             echo "| Ref | $APP_REF |"
             echo "| Commit | $COMMIT_SHA |"
             echo "| Deployed by | $GITHUB_ACTOR |"

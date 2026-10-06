@@ -42,7 +42,7 @@ C. Manual production gate
 D. Deployment topology
 - Production host: cms1.operations.access-ci.org
 - Production URL: https://operations.access-ci.org
-- Beta host: cms2.operations.access-ci.org
+- Beta inventory host: beta-operations.access-ci.org
 - Beta URL: https://beta-operations.access-ci.org
 - Infrastructure repository: access-ci-org/Operations_CMS_Infrastructure
 
@@ -79,13 +79,13 @@ C. Secrets and tokens
 D. SSH host verification
 - Do not use StrictHostKeyChecking=no for production.
 - Do not use StrictHostKeyChecking=no for beta.
-- Manage trusted host keys for cms1.operations.access-ci.org and
-  cms2.operations.access-ci.org on the deployment runner.
+- Manage trusted host keys for cms1.operations.access-ci.org and the current
+  inventory-resolved beta endpoint on the deployment runner.
 
 E. CMS infrastructure readiness
 - Confirm Operations_CMS_Infrastructure can deploy with an explicit host limit:
   - cms1.operations.access-ci.org for production
-  - cms2.operations.access-ci.org for beta
+  - beta-operations.access-ci.org for beta
 - Confirm application_playbook.yml supports the PortalCMS uv-only deployment path.
 - Confirm Let's Encrypt certificate files and renewal logic are ready for both future public domains.
 
@@ -138,7 +138,7 @@ A. Beta
 1. Merge release-ready changes to main after CI passes.
 2. Create a protected vX.Y.Z tag on the selected main commit.
 3. deploy-beta.yml automatically validates and deploys the exact tag/SHA with
-   Ansible limited to cms2.operations.access-ci.org.
+   Ansible limited to beta-operations.access-ci.org.
 4. Require the beta service, loopback health endpoint, and public smoke test to
    pass before production becomes eligible.
 
