@@ -1,13 +1,25 @@
 name: Promote Release through Beta to Production
 
 on:
-  # A release tag is the only entry point to the beta-to-production promotion.
-  # The tag must resolve to a commit reachable from main.
+  # A release tag starts the normal path with migrations disabled. A manual
+  # dispatch of that same tag is the only way to authorize a migration retry.
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: Existing immutable vX.Y.Z release tag
+        required: true
+        type: string
+      run_migrations:
+        description: Authorize database migrations for this beta retry
+        required: true
+        type: boolean
+        default: false
 
 permissions:
+  actions: read
   contents: read
 
 # Keep the full release train serialized while production awaits approval. This
@@ -24,33 +36,66 @@ jobs:
     outputs:
       app_ref: ${{ steps.validate.outputs.app_ref }}
       commit_sha: ${{ steps.validate.outputs.commit_sha }}
+      run_migrations: ${{ steps.validate.outputs.run_migrations }}
 
     steps:
       - name: Checkout selected application ref
         uses: actions/checkout@v4
         with:
           repository: access-ci-org/Operations_PortalCMS_Django
-          ref: ${{ github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Validate selected ref
         id: validate
         env:
-          APP_REF: ${{ github.ref_name }}
+          APP_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          SELECTED_REF: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
+          REQUESTED_RUN_MIGRATIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || false }}
         run: |
           set -euo pipefail
 
           COMMIT_SHA=$(git rev-parse 'HEAD^{commit}')
 
-          if [[ "$REF_TYPE" != "tag" ]]; then
-            echo "Release promotion must be started by a tag."
+          if [[ ! "$APP_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag '$APP_REF' must use the vX.Y.Z release format."
             exit 1
           fi
 
-          if [[ ! "$APP_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Tag '$APP_REF' must use the vX.Y.Z release format."
+          if [[ "$REF_TYPE" != "tag" ]]; then
+            echo "Release promotion and migration retries must run from the release tag."
+            exit 1
+          fi
+
+          if [[ "$SELECTED_REF" != "$APP_REF" ]]; then
+            echo "Selected ref '$SELECTED_REF' does not match requested tag '$APP_REF'."
+            exit 1
+          fi
+
+          if ! git rev-parse "refs/tags/$APP_REF" >/dev/null 2>&1; then
+            echo "Tag '$APP_REF' does not exist."
+            exit 1
+          fi
+
+          TAG_COMMIT_SHA=$(git rev-list -n 1 "refs/tags/$APP_REF")
+          if [[ "$TAG_COMMIT_SHA" != "$COMMIT_SHA" ]]; then
+            echo "Tag '$APP_REF' resolves to $TAG_COMMIT_SHA, not checked-out commit $COMMIT_SHA."
+            exit 1
+          fi
+
+          RUN_MIGRATIONS=false
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            RUN_MIGRATIONS="$REQUESTED_RUN_MIGRATIONS"
+          fi
+          if [[ "$RUN_MIGRATIONS" != "true" && "$RUN_MIGRATIONS" != "false" ]]; then
+            echo "run_migrations must resolve to lowercase true or false."
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" != "workflow_dispatch" && "$RUN_MIGRATIONS" != "false" ]]; then
+            echo "Only a manual beta dispatch may authorize migrations."
             exit 1
           fi
 
@@ -65,18 +110,76 @@ jobs:
           {
             echo "app_ref=$APP_REF"
             echo "commit_sha=$COMMIT_SHA"
+            echo "run_migrations=$RUN_MIGRATIONS"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Verify a default-false beta attempt preceded migration authorization
+        if: github.event_name == 'workflow_dispatch' && inputs.run_migrations
+        uses: actions/github-script@v7
+        env:
+          TAG: ${{ steps.validate.outputs.app_ref }}
+          COMMIT_SHA: ${{ steps.validate.outputs.commit_sha }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRuns,
+              {
+                owner,
+                repo,
+                workflow_id: 'deploy-beta.yml',
+                event: 'push',
+                head_sha: process.env.COMMIT_SHA,
+                per_page: 100,
+              },
+            );
+
+            for (const run of runs) {
+              if (run.head_branch !== process.env.TAG) {
+                continue;
+              }
+
+              const jobs = await github.paginate(
+                github.rest.actions.listJobsForWorkflowRun,
+                { owner, repo, run_id: run.id, per_page: 100 },
+              );
+              const defaultFalseAttemptStopped = jobs.some(
+                (job) =>
+                  job.name === 'Deploy to Beta' && job.conclusion === 'failure',
+              );
+
+              if (defaultFalseAttemptStopped) {
+                core.info(
+                  `Found prior default-false beta attempt ${run.id} for ${process.env.TAG} at ${process.env.COMMIT_SHA}.`,
+                );
+                await core.summary
+                  .addHeading('Beta migration retry eligibility', 2)
+                  .addLink(`Prior default-false run ${run.id}`, run.html_url)
+                  .addRaw(
+                    '<p>Review that run to confirm pending migrations—not another failure—caused the stop.</p>',
+                  )
+                  .write();
+                return;
+              }
+            }
+
+            core.setFailed(
+              `No failed default-false beta deployment was found for ${process.env.TAG} at ${process.env.COMMIT_SHA}.`,
+            );
 
       - name: Record deployment candidate
         env:
           APP_REF: ${{ steps.validate.outputs.app_ref }}
           COMMIT_SHA: ${{ steps.validate.outputs.commit_sha }}
+          RUN_MIGRATIONS: ${{ steps.validate.outputs.run_migrations }}
         run: |
           {
             echo "## Beta deployment candidate"
             echo
             echo "- **Tag:** $APP_REF"
             echo "- **Commit:** $COMMIT_SHA"
+            echo "- **Actor:** $GITHUB_ACTOR"
+            echo "- **Run migrations:** $RUN_MIGRATIONS"
           } >> "$GITHUB_STEP_SUMMARY"
 
   pre-deployment-checks:
@@ -129,10 +232,12 @@ jobs:
         env:
           APP_REF: ${{ needs.validate-ref.outputs.app_ref }}
           COMMIT_SHA: ${{ needs.validate-ref.outputs.commit_sha }}
+          RUN_MIGRATIONS: ${{ needs.validate-ref.outputs.run_migrations }}
         run: |
           echo "Starting beta deployment"
           echo "Ref: $APP_REF"
           echo "Commit: $COMMIT_SHA"
+          echo "Run migrations: $RUN_MIGRATIONS"
           echo "Initiated by: $GITHUB_ACTOR"
           echo "Run ID: $GITHUB_RUN_ID"
 
@@ -172,64 +277,16 @@ jobs:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
           APP_REF: ${{ needs.validate-ref.outputs.app_ref }}
           COMMIT_SHA: ${{ needs.validate-ref.outputs.commit_sha }}
+          RUN_MIGRATIONS: ${{ needs.validate-ref.outputs.run_migrations }}
         run: |
-          echo "Deploying $APP_REF at $COMMIT_SHA to beta"
+          echo "Deploying $APP_REF at $COMMIT_SHA to beta (run_migrations=$RUN_MIGRATIONS)"
 
           ansible-playbook \
             -i hosts application_playbook.yml \
             --vault-password-file=<(printf '%s' "$ANSIBLE_VAULT_PASSWORD") \
             --limit=beta-operations.access-ci.org \
-            --extra-vars "app_tag=$APP_REF git_version=$COMMIT_SHA" \
+            --extra-vars "app_tag=$APP_REF git_version=$COMMIT_SHA run_migrations=$RUN_MIGRATIONS" \
             -vv
-
-      - name: Check and apply database migrations when needed
-        working-directory: infrastructure/ansible
-        run: |
-          set -euo pipefail
-
-          ansible -i hosts beta-operations.access-ci.org \
-            --become --become-user software \
-            -m ansible.builtin.command \
-            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --plan"
-
-          if ansible -i hosts beta-operations.access-ci.org \
-            --become --become-user software \
-            -m ansible.builtin.command \
-            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --check"; then
-            echo "Beta database already matches the release migration files; skipping migrate."
-          else
-            echo "Pending beta migrations detected; applying them now."
-            ansible -i hosts beta-operations.access-ci.org \
-              --become --become-user software \
-              -m ansible.builtin.command \
-              -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --noinput"
-          fi
-
-          ansible -i hosts beta-operations.access-ci.org \
-            --become --become-user software \
-            -m ansible.builtin.command \
-            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh migrate --check"
-
-      - name: Collect static files
-        working-directory: infrastructure/ansible
-        run: |
-          ansible -i hosts beta-operations.access-ci.org \
-            --become --become-user software \
-            -m ansible.builtin.command \
-            -a "chdir=/soft/django-cms-01 ./sbin/manage.prod.sh collectstatic --noinput"
-
-      - name: Restart application service
-        working-directory: infrastructure/ansible
-        run: |
-          ansible -i hosts beta-operations.access-ci.org \
-            --become \
-            -m ansible.builtin.systemd_service \
-            -a "name=portal.service state=restarted"
-          sleep 5
-          ansible -i hosts beta-operations.access-ci.org \
-            --become \
-            -m ansible.builtin.command \
-            -a "systemctl status portal.service"
 
       - name: Verify deployment
         id: verify
@@ -260,6 +317,7 @@ jobs:
         env:
           APP_REF: ${{ needs.validate-ref.outputs.app_ref }}
           COMMIT_SHA: ${{ needs.validate-ref.outputs.commit_sha }}
+          RUN_MIGRATIONS: ${{ needs.validate-ref.outputs.run_migrations }}
           VERIFICATION: ${{ steps.verify.outputs.status }}
         run: |
           {
@@ -271,6 +329,7 @@ jobs:
             echo "| Target host | beta-operations.access-ci.org |"
             echo "| Ref | $APP_REF |"
             echo "| Commit | $COMMIT_SHA |"
+            echo "| Run migrations | $RUN_MIGRATIONS |"
             echo "| Deployed by | $GITHUB_ACTOR |"
             echo "| Deployment status | ${{ job.status }} |"
             echo "| Verification | $VERIFICATION |"
@@ -308,11 +367,13 @@ jobs:
     name: Approve and Deploy to Production
     needs: [validate-ref, post-deployment-tests]
     permissions:
+      actions: read
       contents: write
     uses: ./.github/workflows/deploy-production.yml
     with:
       version_tag: ${{ needs.validate-ref.outputs.app_ref }}
       commit_sha: ${{ needs.validate-ref.outputs.commit_sha }}
+      run_migrations: false
     secrets: inherit
 
   rollback-on-failure:
@@ -326,11 +387,27 @@ jobs:
         env:
           APP_REF: ${{ needs.validate-ref.outputs.app_ref }}
           COMMIT_SHA: ${{ needs.validate-ref.outputs.commit_sha }}
+          RUN_MIGRATIONS: ${{ needs.validate-ref.outputs.run_migrations }}
         run: |
           {
             echo "## Beta deployment failed"
             echo
             echo "Ref $APP_REF at $COMMIT_SHA did not complete successfully."
             echo "Production is not eligible to run. Review the failed step and beta backup."
-            echo "After correcting main, create a new patch release tag; do not move or reuse this tag."
+            if [[ "$RUN_MIGRATIONS" == "false" ]]; then
+              echo
+              echo "If, and only if, the Ansible log shows that the default-false migration check stopped because migrations are pending, review the reported plan and start a new run for this exact tag:"
+              echo
+              echo '```bash'
+              echo "gh workflow run deploy-beta.yml --repo access-ci-org/Operations_PortalCMS_Django --ref $APP_REF --field version_tag=$APP_REF --field run_migrations=true"
+              echo '```'
+              echo
+              echo "Do not use this command for configuration, connectivity, backup, or other playbook failures. Do not use Re-run failed jobs because it preserves run_migrations=false."
+              echo "See .github/workflows/README.md for the full guarded procedure."
+              echo "For non-migration failures, correct main and create a new patch release tag; do not move or reuse this tag."
+            else
+              echo
+              echo "This was not a default-false deployment failure. Do not launch another migration-enabled retry from this summary."
+              echo "Review whether schema changes began and follow the authorized recovery or rollback procedure."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

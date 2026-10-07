@@ -1,3 +1,6 @@
+v0.8.10 jlambertson 2026-10-07
+- updating migrations gating for deployments manual v ci
+
 v0.8.9 jlambertson 2026-10-06
 - tweaking ci checking of deployments with better host checks v2
 

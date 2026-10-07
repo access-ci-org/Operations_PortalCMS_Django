@@ -11,11 +11,16 @@ real beta-to-production deployment.
 1) Beta and production environments
 ====================================================================
 - Create a "beta" environment with no required reviewers so a validated release
-  tag deploys automatically. Restrict it to tags matching v*.*.* and add the
-  beta ANSIBLE_VAULT_PASSWORD as an environment secret.
-- Create a "production" environment and restrict it to tags matching v*.*.*.
+  tag deploys automatically. Allow tags matching v*.*.* in its deployment
+  branch/tag policy, then add the beta ANSIBLE_VAULT_PASSWORD as an environment
+  secret. Manual migration retries are also dispatched from the exact release tag.
+- Create a "production" environment and allow tags matching v*.*.* in its
+  deployment branch/tag policy.
 - Add required reviewers to production and prevent self-review. This environment
   is the manual approval gate before the deploy-production job starts.
+- A production migration retry is dispatched with GitHub CLI from the exact
+  immutable release tag, verifies successful beta smoke tests for that tag and
+  commit, and then reaches this separate Environment approval.
 - Add the production ANSIBLE_VAULT_PASSWORD as an environment secret.
 - Keep INFRASTRUCTURE_REPO_TOKEN_PORTAL at repository or organization scope.
   Beta and production pre-deployment checks need it before an environment-gated
