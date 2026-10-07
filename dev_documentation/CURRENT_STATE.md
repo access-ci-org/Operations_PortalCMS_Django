@@ -63,6 +63,29 @@ Current Verification Snapshot.
 - Media root from Django settings: repo `media/`; nginx serves
   `/soft/django-cms-01/tags/Operations_PortalCMS_Django/operations_portalcms_django/media/`
 
+### Migration Deployment Flow
+
+- The infrastructure `application_playbook.yml` is the only deployment-time owner
+  of migration planning, checks, authorized execution, static collection, release
+  activation, and service restart.
+- Release-tag pushes always pass `run_migrations=false`. A pending migration stops
+  before activation and never changes that value automatically.
+- After reviewing the reported plan and migration code, an authorized human may
+  manually dispatch `deploy-beta.yml` with GitHub CLI, using the exact same
+  immutable release tag as both `--ref` and `version_tag` and setting
+  `run_migrations=true`. The workflow also requires a prior failed default-false
+  tag deployment for that tag and commit.
+- Production is first attempted with `run_migrations=false`. A production migration
+  requires a separate GitHub CLI dispatch of `deploy-production.yml`, using the
+  same immutable tag as both `--ref` and `version_tag`, successful beta smoke tests
+  for that tag and commit, an explicit `run_migrations=true`, and approval through
+  the protected production environment. The exact guarded commands are documented
+  in `.github/workflows/README.md`.
+- The corresponding `Operations_CMS_Infrastructure` playbook change is merged to
+  `main`. It still must be validated against beta before production use.
+  Application-code copies are not database backups; production migration
+  authorization also requires the separately approved recovery process.
+
 ### Runtime Config Contract
 
 `APP_CONFIG` is the required entry point. Django exits during startup if

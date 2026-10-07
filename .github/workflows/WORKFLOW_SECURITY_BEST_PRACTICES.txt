@@ -20,24 +20,32 @@ A. CI triggers
 - CI does not run migrations or database-backed application tests.
 
 B. Release promotion
-- A protected vX.Y.Z tag is the only deployment trigger. The tag must resolve
-  to a commit reachable from main.
+- A protected vX.Y.Z tag starts the normal deployment path. The tag must resolve
+  to a commit reachable from main, and run_migrations is forced to false.
 - deploy-beta.yml binds the tag to an immutable commit SHA, deploys that exact
-  candidate to beta, and requires beta health checks and smoke tests to pass.
-- deploy-production.yml is workflow_call-only. It accepts the validated tag and
-  SHA from deploy-beta.yml, verifies the caller and tag-to-SHA binding again,
-  and cannot be dispatched directly.
-- Each environment prints Django's migration plan, checks its own recorded
-  migration state, runs migrate only when unapplied migration files exist, and
-  verifies the resulting state before continuing.
+  candidate to beta, and requires beta health checks and smoke tests to pass. A
+  manual retry must be dispatched with GitHub CLI from that same tag, with the
+  same tag supplied as version_tag; only that path may set run_migrations to true.
+- deploy-production.yml normally accepts the validated tag and SHA from
+  deploy-beta.yml with run_migrations=false. A manual production migration retry
+  runs from the exact same tag and requires successful beta smoke tests for that
+  tag and commit before it can reach the protected production environment.
+- application_playbook.yml owns migration planning and checks, authorized migrate,
+  static collection, activation, service restart, and readiness checks. GitHub
+  passes the explicit run_migrations boolean and never derives true from a command
+  result.
 - One concurrency group serializes the complete beta-to-production promotion so
-  a later release cannot replace beta while an earlier release awaits approval.
+  a later release cannot replace beta while an earlier release or a manually
+  dispatched production retry awaits approval.
 
 C. Manual production gate
 - The deploy-production job uses the GitHub production environment. Required
   reviewers and prevention of self-review must be configured in GitHub settings.
 - Production deployment steps and environment secrets remain unavailable until
   that approval is granted.
+- Migration intent and production approval are separate decisions: the manual
+  dispatch records run_migrations=true, while the environment reviewer authorizes
+  access to production.
 
 D. Deployment topology
 - Production host: cms1.operations.access-ci.org
@@ -57,9 +65,9 @@ E. TLS ownership
 ====================================================================
 
 A. GitHub environments
-- Create a beta environment with no required reviewers and restrict it to
-  release tags only.
-- Create a production environment and restrict it to release tags only.
+- Create a beta environment with no required reviewers and allow release tags
+  matching v*.*.*. Manual retries run from the exact same release tag.
+- Create a production environment and allow release tags matching v*.*.*.
 - Require reviewers for production and prevent self-review.
 
 B. Runner controls
@@ -87,6 +95,9 @@ E. CMS infrastructure readiness
   - cms1.operations.access-ci.org for production
   - beta-operations.access-ci.org for beta
 - Confirm application_playbook.yml supports the PortalCMS uv-only deployment path.
+- The run_migrations default-false gating is merged in
+  Operations_CMS_Infrastructure main. Validate it against beta before using the
+  migration-retry workflows for production.
 - Confirm Let's Encrypt certificate files and renewal logic are ready for both future public domains.
 
 ====================================================================
@@ -137,18 +148,28 @@ C. Release tag rules
 A. Beta
 1. Merge release-ready changes to main after CI passes.
 2. Create a protected vX.Y.Z tag on the selected main commit.
-3. deploy-beta.yml automatically validates and deploys the exact tag/SHA with
-   Ansible limited to beta-operations.access-ci.org.
-4. Require the beta service, loopback health endpoint, and public smoke test to
+3. deploy-beta.yml validates the exact tag/SHA and invokes Ansible with
+   run_migrations=false, limited to beta-operations.access-ci.org.
+4. If migrations are pending, review the plan and migration code, then manually
+   dispatch deploy-beta.yml with GitHub CLI, using the same tag as both --ref and
+   version_tag and setting run_migrations=true. The workflow requires a prior
+   failed default-false deployment, but the human must still confirm that pending
+   migrations—not another failure—caused the stop.
+5. Require the beta service, loopback health endpoint, and public smoke test to
    pass before production becomes eligible.
 
 B. Production
-1. deploy-beta.yml calls deploy-production.yml with the same validated tag/SHA.
+1. deploy-beta.yml calls deploy-production.yml with the same validated tag/SHA
+   and run_migrations=false.
 2. Revalidate the caller, tag-to-SHA binding, and main ancestry.
 3. Wait for required reviewer approval on the production environment.
-4. Back up the current deployment and deploy only to
-   cms1.operations.access-ci.org.
-5. Validate the production service, loopback health endpoint, and public URL.
+4. If migrations are pending, review the production plan and confirm the approved
+   database recovery process. Dispatch deploy-production.yml with GitHub CLI,
+   using the exact same tag as both --ref and version_tag and setting
+   run_migrations=true.
+5. Revalidate the release, successful beta job, and production environment
+   approval, then deploy only to cms1.operations.access-ci.org.
+6. Validate the production service, loopback health endpoint, and public URL.
 
 ====================================================================
 6) Activation checklist
@@ -165,5 +186,7 @@ B. Production
   environments.
 - Known SSH host keys for cms1 and cms2 managed without bypassing verification.
 - Operations_CMS_Infrastructure supports host-limited beta and production deploys.
+- Operations_CMS_Infrastructure main contains and has validated the default-false
+  run_migrations gate used by application_playbook.yml.
 - Let's Encrypt automation supports operations.access-ci.org and beta-operations.access-ci.org.
 - CI has a disposable config/database strategy before running DB-backed integration scripts.

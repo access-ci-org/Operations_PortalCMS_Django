@@ -80,6 +80,7 @@ DEPLOYMENT.md
 QUICKREF.md
 portalcms_django_config
 integration_news_permission_followup.txt
+MIGRATION_DEPLOYMENT_CHANGES.txt
 
 # Flask stuff:
 instance/

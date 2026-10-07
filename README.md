@@ -72,6 +72,17 @@ static/media, API, OAuth, version, and secret-bearing configuration keys and
 their JSON types. Deployment configuration remains owned by
 `Operations_CMS_Infrastructure`.
 
+Database migrations are fail-closed during release promotion. Normal tag-triggered
+deployments always call the infrastructure playbook with `run_migrations=false`.
+If the playbook reports pending migrations, an authorized human must review the
+plan and manually dispatch the appropriate workflow with GitHub CLI, using the
+exact same immutable release tag as both `--ref` and `version_tag`, with
+`run_migrations=true`. Production still requires its separate protected-environment
+approval. See [the deployment workflow runbook](.github/workflows/README.md) for
+the exact beta and production commands. The infrastructure playbook implementation
+is on `main` but must be validated against beta before these paths are used for
+production.
+
 
 ---
 
