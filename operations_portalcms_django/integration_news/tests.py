@@ -6,6 +6,7 @@ from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 
 from . import workflow
+from .forms import IntegrationNewsForm
 from .models import IntegrationElement, IntegrationNews
 
 
@@ -39,6 +40,15 @@ class IntegrationWorkflowMethodTests(SimpleTestCase):
                 response = view(request, pk=1)
 
                 self.assertEqual(response.status_code, 405)
+
+
+class IntegrationNewsFormTests(SimpleTestCase):
+    def test_distribution_options_use_requested_labels(self):
+        form = IntegrationNewsForm()
+
+        self.assertEqual(form.fields["email_notification"].label, "Email everyone with access")
+        self.assertEqual(form.fields["subscriber_notification"].label, "Email only subscribers")
+        self.assertEqual(form.fields["slack_notification"].label, "Post to Slack")
 
 
 class IntegrationNewsUrlTests(SimpleTestCase):
