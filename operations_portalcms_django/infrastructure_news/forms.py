@@ -12,21 +12,18 @@ class SystemStatusNewsForm(forms.ModelForm):
         initial=False,
         label="Email everyone with access",
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-        help_text="Not yet implemented",
     )
     subscriber_notification = forms.BooleanField(
         required=False,
         initial=False,
         label="Email only subscribers",
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-        help_text="Not yet implemented",
     )
     slack_notification = forms.BooleanField(
         required=False,
         initial=False,
         label="Post to Slack",
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-        help_text="Not yet implemented",
     )
     start_datetime = forms.DateTimeField(
         required=True,
