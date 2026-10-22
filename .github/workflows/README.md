@@ -8,6 +8,9 @@ Migration execution requires a new, explicit workflow dispatch for the exact sam
 immutable release tag. Do not use GitHub's **Re-run failed jobs** action: a rerun
 keeps the original `run_migrations=false` input.
 
+1. The app repo deploy via `app_tag` (release) in the form `vX.Y.Z` (v2.8.3) uses the necessary Ansible Vault Password to decrypt secrets stored in `Operations_CMS_Infrastructure/ansible/passwords.yml` This value is stored in the Infrastructure repo: [Operations_CMS_Infrastructure](https://github.com/access-ci-org/Operations_CMS_Infrastructure) AND app repo: [Operations_PortalCMS_Django](https://github.com/access-ci-org/Operations_PortalCMS_Django) repo under: Settings>Secrets and variables>Actions (Actions secrets and variables) as `ANSIBLE_VAULT_PASSWORD`. This has no expiration set in our current usage (as of 2026-10-22)
+2. [Operations_PortalCMS_Django](https://github.com/access-ci-org/Operations_PortalCMS_Django), on the other hand as a secret stored as `INFRASTRUCTURE_REPO_TOKEN_PORTAL` because it is needed to check out the infra code that deploys the app cod itself. This secret expires on June 29, 2027, is scoped for `repo`. ACCESS-CI's org account in GitHub does not allow org level secrets that can be run at the org level so this secret needs to be rotated using the same LABEL: `INFRASTRUCTURE_REPO_TOKEN_PORTAL` (from within one of the repo admin's personal accounts) and added to the Django code actions secrets because the defined variable is in the GitHub Workflow that way.
+
 ## Before a migration-enabled retry
 
 1. Confirm the failed **Run Ansible deployment** step stopped at the pending-

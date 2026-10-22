@@ -59,6 +59,8 @@ part of this source tree.
 - **Package Manager:** uv
 - **Runtime Config:** required `APP_CONFIG` JSON file
 
+### GitHub Workflows information on actions, permissions, etc, is found at [.github/workflows/README.md](.github/workflows/README.md)
+
 ## Deployment readiness contract
 
 `GET /healthz/` returns the configured `APP_VERSION` and performs a lightweight
