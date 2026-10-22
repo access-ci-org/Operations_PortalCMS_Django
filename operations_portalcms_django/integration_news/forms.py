@@ -44,7 +44,14 @@ class IntegrationNewsForm(forms.ModelForm):
     email_notification = forms.BooleanField(
         required=False,
         initial=False,
-        label="Email everyone",
+        label="Email everyone with access",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Not yet implemented",
+    )
+    subscriber_notification = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Email only subscribers",
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
         help_text="Not yet implemented",
     )

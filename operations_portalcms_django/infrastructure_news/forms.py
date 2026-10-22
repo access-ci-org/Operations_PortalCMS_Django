@@ -7,6 +7,27 @@ from .models import SystemStatusNews
 
 
 class SystemStatusNewsForm(forms.ModelForm):
+    email_notification = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Email everyone with access",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Not yet implemented",
+    )
+    subscriber_notification = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Email only subscribers",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Not yet implemented",
+    )
+    slack_notification = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Post to Slack",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Not yet implemented",
+    )
     start_datetime = forms.DateTimeField(
         required=True,
         label="Start Date and Time",
@@ -36,10 +57,6 @@ class SystemStatusNewsForm(forms.ModelForm):
             "affected_infrastructure_items",
             "start_datetime",
             "end_datetime",
-            "send_email",
-            "email_list",
-            "post_to_slack",
-            "slack_channel",
             "is_active",
         ]
         labels = {
@@ -48,29 +65,17 @@ class SystemStatusNewsForm(forms.ModelForm):
             "infrastructure_news_type": "Infrastructure News Type",
             "affected_infrastructure_items": "Affected Infrastructure",
             "is_active": "Active",
-            "send_email": "Send Email Notification",
-            "email_list": "Email Recipients",
-            "post_to_slack": "Post to Slack",
-            "slack_channel": "Slack Channel",
         }
         widgets = {
             "subject": forms.TextInput(attrs={"class": "form-control", "placeholder": "Enter news subject"}),
             "infrastructure_news_type": forms.Select(attrs={"class": "form-select"}),
-            "email_list": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "email1@example.com, email2@example.com"}
-            ),
-            "slack_channel": forms.TextInput(attrs={"class": "form-control", "placeholder": "#channel-name"}),
-        }
-        help_texts = {
-            "email_list": "Comma-separated email addresses for notifications",
-            "slack_channel": "Slack channel name (e.g., #operations-alerts)",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["affected_infrastructure_items"].queryset = get_active_infrastructure_queryset()
         self.fields["affected_infrastructure_items"].label_from_instance = (
-            lambda item: f"{item.info_resourceid} - {item.resource_descriptive_name}"
+            lambda item: f"{item.resource_descriptive_name} - {item.info_resourceid}"
         )
         if self.instance.pk:
             self.fields["affected_infrastructure_items"].initial = self.instance.affected_infrastructure_items.all()

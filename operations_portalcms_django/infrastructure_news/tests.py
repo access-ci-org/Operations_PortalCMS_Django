@@ -7,7 +7,10 @@ from django.core.cache import cache
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 
+from resources.models import CiderInfrastructure
+
 from . import workflow
+from .forms import SystemStatusNewsForm
 from .models import SystemStatusNews
 from .services import _format_timestamp
 
@@ -42,6 +45,32 @@ class SystemStatusWorkflowMethodTests(SimpleTestCase):
                 response = view(request, pk=1)
 
                 self.assertEqual(response.status_code, 405)
+
+
+class SystemStatusNewsFormTests(SimpleTestCase):
+    def test_affected_infrastructure_is_ordered_and_labeled_by_description(self):
+        form = SystemStatusNewsForm()
+        field = form.fields["affected_infrastructure_items"]
+        infrastructure = CiderInfrastructure(
+            cider_resource_id=1,
+            cider_type="resource",
+            info_resourceid="allocations.access-ci.org",
+            info_siteid="access",
+            resource_descriptive_name="ACCESS Allocations Portal",
+        )
+
+        self.assertEqual(field.queryset.query.order_by, ("resource_descriptive_name",))
+        self.assertEqual(
+            field.label_from_instance(infrastructure),
+            "ACCESS Allocations Portal - allocations.access-ci.org",
+        )
+
+    def test_distribution_options_use_requested_labels(self):
+        form = SystemStatusNewsForm()
+
+        self.assertEqual(form.fields["email_notification"].label, "Email everyone with access")
+        self.assertEqual(form.fields["subscriber_notification"].label, "Email only subscribers")
+        self.assertEqual(form.fields["slack_notification"].label, "Post to Slack")
 
 
 class ApiTimestampFormattingTests(SimpleTestCase):
