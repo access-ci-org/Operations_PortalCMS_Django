@@ -52,17 +52,21 @@ Raw-dump imports enforce all of the following:
 5. `--dry-run` and `--apply` are mutually exclusive; replacement without either is refused.
 6. A strict dry-run writes a versioned JSON plan binding the source path and SHA-256,
    release interpreter, target, options, adjustments, IDs, counts, relationships,
-   per-record author/post-date attribution and planned database outcome.
+   distribution-option counts, per-record author/post-date attribution and planned
+   database outcome.
 7. A raw-dump write requires `--strict`, an existing import user, and
-   `--suppress-notifications`.
+   `--suppress-notifications`. This keeps the legacy delivery-action fields off; it does
+   not erase the separately stored distribution choices.
 8. Drupal node IDs and revisions, field-table revisions, types, dates, references and
-   choice mappings are validated before PostgreSQL replacement begins.
+   choice mappings are validated before PostgreSQL replacement begins. Unknown or
+   duplicate distribution choices fail rather than being dropped.
 9. Only Infrastructure News that is current or future at the operator-approved cutover
    timestamp is retained. Every affected infrastructure and integration-element reference
    on a retained record is preserved; unknown, missing or duplicate relationships fail
    validation or become strict-mode failures.
-10. Delete, import, stable-ID assignment, relationship creation, full field/relationship
-    verification and final stable-ID-set verification share one PostgreSQL transaction.
+10. Delete, import, stable-ID assignment, relationship creation, distribution-choice
+    persistence, full field/relationship verification and final stable-ID-set verification
+    share one PostgreSQL transaction.
 11. Any failure rolls back the complete replacement.
 12. Replacement dry-runs require a timezone-aware `--system-news-as-of` value. Apply
     loads the exact value from the reviewed plan, and every cutoff-excluded Drupal nid is
@@ -82,8 +86,8 @@ Raw-dump imports enforce all of the following:
     post timestamp are bound per nid in the plan. Raw email-shaped logins, their domains,
     Drupal mail columns and password data are never retained or emitted.
 16. Every run writes a Markdown report, including the plan identity, cutoff, cutoff
-    exclusions, explicit exclusions, corrections and every author/post-date decision.
-    Parser failures are also recorded.
+    exclusions, explicit exclusions, corrections, distribution-option counts and every
+    author/post-date decision. Parser failures are also recorded.
 
 The parser reads only the current Drupal node/field tables plus `uid` and `name` from the
 Drupal users table, and ignores unrelated dump tables and user columns. It uses no live
@@ -364,6 +368,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db.migrations.recorder import MigrationRecorder
 from infrastructure_news.management.commands.import_drupal_news import (
     IMPORT_CONTRACT_VERSION,
     IMPORT_PLAN_VERSION,
@@ -371,6 +376,11 @@ from infrastructure_news.management.commands.import_drupal_news import (
 
 database = settings.DATABASES["default"]
 expected_python = Path(os.environ["RELEASE"]) / ".venv/bin/python"
+required_migrations = {
+    ("infrastructure_news", "0009_systemstatusnews_distribution_options"),
+    ("integration_news", "0009_integrationnews_distribution_options"),
+}
+applied_migrations = set(MigrationRecorder.Migration.objects.values_list("app", "name"))
 
 print("python:", sys.executable)
 print("plan version:", IMPORT_PLAN_VERSION)
@@ -382,14 +392,16 @@ print("fallback user:", os.environ["IMPORT_USER"])
 
 if Path(sys.executable) != expected_python:
     raise SystemExit("Python executable does not match RELEASE")
-if (IMPORT_PLAN_VERSION, IMPORT_CONTRACT_VERSION) != (3, 3):
-    raise SystemExit("Release does not contain plan/contract version 3")
+if (IMPORT_PLAN_VERSION, IMPORT_CONTRACT_VERSION) != (4, 4):
+    raise SystemExit("Release does not contain plan/contract version 4")
 if str(database.get("NAME") or "") != os.environ["EXPECTED_DATABASE"]:
     raise SystemExit("Database does not match EXPECTED_DATABASE")
 if str(database.get("HOST") or "") != os.environ["EXPECTED_WRITE_HOST"]:
     raise SystemExit("Host does not match EXPECTED_WRITE_HOST")
 if not User.objects.filter(username=os.environ["IMPORT_USER"]).exists():
     raise SystemExit("Fallback Django user does not exist")
+if missing_migrations := sorted(required_migrations - applied_migrations):
+    raise SystemExit(f"Required distribution migrations are not applied: {missing_migrations}")
 
 print("Release and target checks: OK")
 PY
@@ -403,9 +415,9 @@ news_preflight
 ```
 
 This reads settings but never prints credentials. Continue only after the output confirms
-plan and contract version 3, the release interpreter, the expected database for the
+plan and contract version 4, the release interpreter, the expected database for the
 environment passed to `news_setup` (`portal_beta` or `portal1`), the independently
-approved write host, and fallback user `jlambertson`.
+approved write host, fallback user `jlambertson`, and both distribution migrations.
 
 ### 4. Run the strict dry-run
 
@@ -472,7 +484,7 @@ less "$DRY_RUN_REPORT"
 less "$PRETTY_PLAN"
 ```
 
-Print and validate the compact version 3 contract:
+Print and validate the compact version 4 contract:
 
 ```bash
 news_review_contract() {
@@ -487,8 +499,8 @@ expected = plan["expected"]
 
 if plan["schema"] != "access-ci.drupal-news-import-plan":
     raise SystemExit("Unexpected plan schema")
-if (plan["version"], contract["contract_version"]) != (3, 3):
-    raise SystemExit("Expected plan/contract version 3")
+if (plan["version"], contract["contract_version"]) != (4, 4):
+    raise SystemExit("Expected plan/contract version 4")
 
 fallback_user = contract["options"]["import_user"]
 for feed, key in (
@@ -522,6 +534,7 @@ print("integration IDs:", expected["integration_ids"])
 print("cutoff-excluded system IDs:", expected["cutoff_excluded_system_nids"])
 print("system relationships:", expected["system_relationships"])
 print("integration relationships:", expected["integration_relationships"])
+print("distribution options:", expected["distribution_option_counts"])
 print("planned outcome:", expected["outcome"])
 
 for feed, key in (
@@ -747,6 +760,13 @@ from integration_news.models import IntegrationNews as I
 print("system rows:", S.objects.count())
 print("system null outage_id:", S.objects.filter(outage_id__isnull=True).count())
 print("system relationships:", S.affected_infrastructure_items.through.objects.count())
+print("system distribution options:")
+for field in (
+    "distribution_email_everyone",
+    "distribution_email_subscribers",
+    "distribution_post_to_slack",
+):
+    print(" ", field, S.objects.filter(**{field: True}).count())
 print("system attribution:")
 for row in S.objects.order_by("outage_id").values_list(
     "outage_id", "author__username", "created_at", "published_at"
@@ -759,6 +779,13 @@ print(
     I.objects.filter(integration_news_id__isnull=True).count(),
 )
 print("integration relationships:", I.affected_elements.through.objects.count())
+print("integration distribution options:")
+for field in (
+    "distribution_email_everyone",
+    "distribution_email_subscribers",
+    "distribution_post_to_slack",
+):
+    print(" ", field, I.objects.filter(**{field: True}).count())
 print("integration attribution:")
 for row in I.objects.order_by("integration_news_id").values_list(
     "integration_news_id", "author__username", "created_at", "published_at"
@@ -774,11 +801,11 @@ PY
 news_verify
 ```
 
-Confirm counts, relationships, authors and timestamps against the reviewed plan and apply
-report. Manually check representative exact-match, fallback, multi-resource,
-multi-element and HTML-heavy records in both the environment's pages and JSON APIs.
-Confirm displayed post dates are the Drupal dates and that no migration email or Slack
-notification was sent.
+Confirm counts, relationships, distribution options, authors and timestamps against the
+reviewed plan and apply report. Manually check representative exact-match, fallback,
+multi-resource, multi-element, multi-distribution and HTML-heavy records in both the
+environment's pages and JSON APIs. Confirm displayed post dates and API distribution
+strings match Drupal and that no migration email or Slack notification was sent.
 
 ### 9. Failure and retry behavior
 

@@ -222,6 +222,18 @@ class ImportPlanTests(SimpleTestCase):
             integration_records=1,
             system_relationships=2,
             integration_relationships=1,
+            distribution_option_counts={
+                "SystemStatusNews": {
+                    "Email everyone with access": 1,
+                    "Email only subscribers": 1,
+                    "Post to Slack": 1,
+                },
+                "IntegrationNews": {
+                    "Email everyone with access": 0,
+                    "Email only subscribers": 1,
+                    "Post to Slack": 1,
+                },
+            },
             excluded_system_nids=[404],
             cutoff_excluded_system_nids=[1, 2],
             system_news_as_of="2026-09-01T12:00:00Z",
@@ -309,7 +321,7 @@ class ImportPlanTests(SimpleTestCase):
 
     def test_rejects_plan_from_previous_schema_version(self):
         plan = self._plan()
-        plan["version"] = 2
+        plan["version"] = 3
         self.plan_path.write_text(
             json.dumps(plan, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -317,6 +329,19 @@ class ImportPlanTests(SimpleTestCase):
         plan_sha256 = hashlib.sha256(self.plan_path.read_bytes()).hexdigest()
 
         with self.assertRaisesMessage(CommandError, "plan version is not supported"):
+            self.command._load_import_plan(self.plan_path, plan_sha256)
+
+    def test_rejects_impossible_distribution_option_count(self):
+        plan = self._plan()
+        plan["expected"]["distribution_option_counts"]["IntegrationNews"]["Post to Slack"] = 2
+        plan["contract_sha256"] = self.command._import_plan_contract_sha256(plan)
+        self.plan_path.write_text(
+            json.dumps(plan, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        plan_sha256 = hashlib.sha256(self.plan_path.read_bytes()).hexdigest()
+
+        with self.assertRaisesMessage(CommandError, "distribution-option counts are malformed"):
             self.command._load_import_plan(self.plan_path, plan_sha256)
 
 
@@ -359,6 +384,9 @@ class AtomicReplaceCommandTests(TestCase):
                     "end_datetime": "2026-08-01T13:00:00Z",
                     "send_email": True,
                     "post_to_slack": True,
+                    "distribution_email_everyone": True,
+                    "distribution_email_subscribers": True,
+                    "distribution_post_to_slack": True,
                     "is_active": True,
                     "status": "published",
                     "source_metadata": {
@@ -380,6 +408,9 @@ class AtomicReplaceCommandTests(TestCase):
                     "affected_element": "nagios",
                     "effective_date": "2026-08-01",
                     "expiration_date": "2026-09-01",
+                    "distribution_email_everyone": False,
+                    "distribution_email_subscribers": True,
+                    "distribution_post_to_slack": True,
                     "is_active": True,
                     "status": "published",
                     "source_metadata": {
@@ -459,7 +490,15 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertIn("Exact derived-username matches: `1`", report)
         self.assertIn("Explicit import-user fallbacks: `1`", report)
         plan = json.loads(self.plan_path.read_text(encoding="utf-8"))
-        self.assertEqual(plan["version"], 3)
+        self.assertEqual(plan["version"], 4)
+        self.assertEqual(
+            plan["expected"]["distribution_option_counts"]["SystemStatusNews"],
+            {
+                "Email everyone with access": 1,
+                "Email only subscribers": 1,
+                "Post to Slack": 1,
+            },
+        )
         self.assertEqual(
             plan["expected"]["system_attribution"][0]["django_username"],
             self.matched_author.username,
@@ -489,6 +528,12 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertEqual(integration.published_at, posted_at)
         self.assertFalse(system.send_email)
         self.assertFalse(system.post_to_slack)
+        self.assertTrue(system.distribution_email_everyone)
+        self.assertTrue(system.distribution_email_subscribers)
+        self.assertTrue(system.distribution_post_to_slack)
+        self.assertFalse(integration.distribution_email_everyone)
+        self.assertTrue(integration.distribution_email_subscribers)
+        self.assertTrue(integration.distribution_post_to_slack)
         self.assertEqual(
             list(integration.affected_elements.values_list("code", flat=True)),
             ["nagios"],
@@ -592,6 +637,12 @@ class AtomicReplaceCommandTests(TestCase):
         )
         self.assertFalse(system.send_email)
         self.assertFalse(system.post_to_slack)
+        self.assertTrue(system.distribution_email_everyone)
+        self.assertTrue(system.distribution_email_subscribers)
+        self.assertTrue(system.distribution_post_to_slack)
+        self.assertFalse(integration.distribution_email_everyone)
+        self.assertTrue(integration.distribution_email_subscribers)
+        self.assertTrue(integration.distribution_post_to_slack)
 
     def test_replace_rolls_back_deletion_and_import_on_final_validation_failure(self):
         self._write_payload()

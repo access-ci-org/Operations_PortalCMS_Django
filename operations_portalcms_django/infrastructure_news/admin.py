@@ -26,7 +26,14 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
         ),
         (
             "Distribution Options",
-            {"fields": ("send_email", "email_list", "post_to_slack", "slack_channel"), "classes": ("collapse",)},
+            {
+                "fields": (
+                    "distribution_email_everyone",
+                    "distribution_email_subscribers",
+                    "distribution_post_to_slack",
+                ),
+                "classes": ("collapse",),
+            },
         ),
         ("Metadata", {"fields": ("author", "created_at", "updated_at"), "classes": ("collapse",)}),
     )

@@ -187,6 +187,14 @@ The feature-app split is represented in code by `infrastructure_news` and
 `integration_news`; table names remain stable through explicit model
 `db_table` settings and migration state.
 
+Both news models persist the three independent Drupal-compatible distribution
+choices: email everyone with access, email only subscribers, and post to Slack.
+The add/edit forms and Django admin can change those choices, and each public
+news API returns them in the legacy comma-separated `distribution_options`
+field. These values are publishing intent only; email and Slack delivery are
+not implemented. The older System Status News delivery-control fields remain
+separate and are not enabled by the Drupal importer.
+
 ### CIDER Cache Tables
 
 | Model | Current table | Role |
@@ -284,7 +292,7 @@ Run Django management commands from the Django project directory
 | `manage.py setup_focus_area_page_permissions` | Creates/updates CMS `PagePermission` rows for focus pages after the groups exist; supports `--dry-run` |
 | `manage.py sync_cider_from_api` | Refreshes CIDER infrastructure, organization, group, category, and feature metadata; supports `--dry-run` |
 | `manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups` | Checks or prunes stale local CIDER group rows |
-| `manage.py import_drupal_news` | One-time Drupal cutover importer for both news feeds; it derives a non-email username candidate from each Drupal login, then a strict replacement dry-run can select the newest timestamped raw dump from an explicit directory and writes a versioned JSON plan binding the source, release, target, cutoff, adjustments, IDs, counts, relationships, per-record exact-username/fallback author resolution, original post dates, and expected outcome; apply consumes and revalidates that exact reviewed plan before guarded atomic replacement |
+| `manage.py import_drupal_news` | One-time Drupal cutover importer for both news feeds; it derives a non-email username candidate from each Drupal login, maps and counts all three distribution choices for both bundles, then a strict replacement dry-run can select the newest timestamped raw dump from an explicit directory and writes a versioned JSON plan binding the source, release, target, cutoff, adjustments, IDs, counts, relationships, distribution counts, per-record exact-username/fallback author resolution, original post dates, and expected outcome; apply consumes and revalidates that exact reviewed plan before guarded atomic replacement |
 | `database/verify_db.sh` | Read-only RDS schema, ownership, count, and migration-state verification |
 
 After pulling changes that include migrations, run `migrate` before starting the

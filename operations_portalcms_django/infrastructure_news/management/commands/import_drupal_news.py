@@ -33,13 +33,14 @@ from infrastructure_news.drupal_mysql import (
 )
 from infrastructure_news.models import SystemStatusNews
 from integration_news.models import IntegrationElement, IntegrationNews
+from portal.news_distribution import DISTRIBUTION_OPTION_FIELDS
 from resources.models import CiderInfrastructure
 
 DEFAULT_INPUT = Path("database/drupal_backups/generated/drupal_news_normalized_for_django.json")
 DEFAULT_REPORT = Path("database/drupal_backups/generated/drupal_news_import_dry_run.md")
 IMPORT_PLAN_SCHEMA = "access-ci.drupal-news-import-plan"
-IMPORT_PLAN_VERSION = 3
-IMPORT_CONTRACT_VERSION = 3
+IMPORT_PLAN_VERSION = 4
+IMPORT_CONTRACT_VERSION = 4
 MYSQL_BACKUP_NAME_RE = re.compile(
     r"^backup_database-(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}" r"(?:Z|[+-]\d{2}:\d{2}))\.mysql\.gz$"
 )
@@ -64,6 +65,7 @@ class ImportResult:
     integration_records: int = 0
     system_relationships: int = 0
     integration_relationships: int = 0
+    distribution_option_counts: Dict[str, Dict[str, int]] = field(default_factory=dict)
     integration_elements_created: int = 0
     integration_elements_updated: int = 0
     excluded_system_nids: List[int] = field(default_factory=list)
@@ -131,6 +133,22 @@ def _provenance_tag(record: Dict[str, Any]) -> str:
     nid = _nid(record)
     vid = (record.get("source_metadata", {}) or {}).get("drupal_vid")
     return f"[drupal_nid:{nid};drupal_vid:{vid}]"
+
+
+def _distribution_flag(record: Dict[str, Any], field_name: str, legacy_field_name: Optional[str]) -> bool:
+    if field_name in record:
+        value = record[field_name]
+        if not isinstance(value, bool):
+            raise CommandError(f"News nid={_nid(record)} field {field_name} must be a JSON boolean.")
+        return value
+    return bool(record.get(legacy_field_name, False)) if legacy_field_name else False
+
+
+def _distribution_option_counts(records: List[Dict[str, Any]]) -> Dict[str, int]:
+    return {
+        label: sum(_distribution_flag(record, field_name, legacy_field_name) for record in records)
+        for field_name, label, legacy_field_name in DISTRIBUTION_OPTION_FIELDS
+    }
 
 
 def _source_author(record: Dict[str, Any]) -> str:
@@ -293,7 +311,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--suppress-notifications",
             action="store_true",
-            help="Force imported infrastructure-news email and Slack flags off.",
+            help=(
+                "Keep legacy infrastructure-news delivery flags off while preserving "
+                "the imported distribution choices as inert data."
+            ),
         )
         parser.add_argument(
             "--exclude-system-nid",
@@ -638,6 +659,10 @@ class Command(BaseCommand):
             )
             for record in integration_records
         )
+        result.distribution_option_counts = {
+            "SystemStatusNews": _distribution_option_counts(system_records),
+            "IntegrationNews": _distribution_option_counts(integration_records),
+        }
         result.warnings.extend(source_warnings)
 
         # Resolve relationships and stage all database changes atomically.
@@ -860,6 +885,7 @@ class Command(BaseCommand):
                 "integration_records": result.integration_records,
                 "system_relationships": result.system_relationships,
                 "integration_relationships": result.integration_relationships,
+                "distribution_option_counts": result.distribution_option_counts,
                 "system_ids": sorted(expected_system_ids),
                 "integration_ids": sorted(expected_integration_ids),
                 "excluded_system_nids": result.excluded_system_nids,
@@ -935,6 +961,7 @@ class Command(BaseCommand):
             "integration_records",
             "system_relationships",
             "integration_relationships",
+            "distribution_option_counts",
             "system_ids",
             "integration_ids",
             "excluded_system_nids",
@@ -1060,6 +1087,13 @@ class Command(BaseCommand):
             for name in count_fields
         ):
             raise CommandError("Import plan contains an invalid expected count.")
+        self._validate_distribution_option_counts(
+            expected["distribution_option_counts"],
+            {
+                "SystemStatusNews": expected["system_records"],
+                "IntegrationNews": expected["integration_records"],
+            },
+        )
         self._validate_plan_id_list(expected["system_ids"], "SystemStatusNews IDs", allow_empty=True)
         self._validate_plan_id_list(expected["integration_ids"], "IntegrationNews IDs", allow_empty=False)
         self._validate_plan_id_list(
@@ -1189,6 +1223,26 @@ class Command(BaseCommand):
         if attribution_ids != expected_ids:
             raise CommandError(f"Import plan {feed_name} attribution IDs differ from record IDs.")
 
+    def _validate_distribution_option_counts(
+        self,
+        counts: Any,
+        record_counts: Dict[str, int],
+    ) -> None:
+        labels = {label for _, label, _ in DISTRIBUTION_OPTION_FIELDS}
+        if not isinstance(counts, dict) or set(counts) != set(record_counts):
+            raise CommandError("Import plan distribution-option counts are malformed.")
+        for feed_name, values in counts.items():
+            if not isinstance(values, dict) or set(values) != labels:
+                raise CommandError("Import plan distribution-option counts are malformed.")
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+                or value > record_counts[feed_name]
+                for value in values.values()
+            ):
+                raise CommandError("Import plan distribution-option counts are malformed.")
+
     def _validate_plan_id_list(
         self,
         values: Any,
@@ -1235,6 +1289,7 @@ class Command(BaseCommand):
             "integration_records": result.integration_records,
             "system_relationships": result.system_relationships,
             "integration_relationships": result.integration_relationships,
+            "distribution_option_counts": result.distribution_option_counts,
             "system_ids": sorted(expected_system_ids),
             "integration_ids": sorted(expected_integration_ids),
             "excluded_system_nids": result.excluded_system_nids,
@@ -1491,6 +1546,15 @@ class Command(BaseCommand):
                 "end_datetime": _as_dt(record.get("end_datetime")),
                 "send_email": False if suppress_notifications else bool(record.get("send_email", False)),
                 "post_to_slack": False if suppress_notifications else bool(record.get("post_to_slack", False)),
+                "distribution_email_everyone": _distribution_flag(
+                    record, "distribution_email_everyone", "send_email"
+                ),
+                "distribution_email_subscribers": _distribution_flag(
+                    record, "distribution_email_subscribers", None
+                ),
+                "distribution_post_to_slack": _distribution_flag(
+                    record, "distribution_post_to_slack", "post_to_slack"
+                ),
                 "is_active": bool(record.get("is_active", True)),
                 "status": record.get("status") or "published",
                 "author_id": system_authors[stable_id].pk,
@@ -1540,6 +1604,15 @@ class Command(BaseCommand):
                 "affected_element": (str(expected_codes[0]) if len(expected_codes) == 1 else ""),
                 "effective_date": _as_date(record.get("effective_date")),
                 "expiration_date": _as_date(record.get("expiration_date")),
+                "distribution_email_everyone": _distribution_flag(
+                    record, "distribution_email_everyone", "send_email"
+                ),
+                "distribution_email_subscribers": _distribution_flag(
+                    record, "distribution_email_subscribers", None
+                ),
+                "distribution_post_to_slack": _distribution_flag(
+                    record, "distribution_post_to_slack", "post_to_slack"
+                ),
                 "is_active": bool(record.get("is_active", True)),
                 "status": record.get("status") or "published",
                 "author_id": integration_authors[stable_id].pk,
@@ -1731,6 +1804,9 @@ class Command(BaseCommand):
         obj.end_datetime = _as_dt(record.get("end_datetime"))
         obj.send_email = False if suppress_notifications else bool(record.get("send_email", False))
         obj.post_to_slack = False if suppress_notifications else bool(record.get("post_to_slack", False))
+        obj.distribution_email_everyone = _distribution_flag(record, "distribution_email_everyone", "send_email")
+        obj.distribution_email_subscribers = _distribution_flag(record, "distribution_email_subscribers", None)
+        obj.distribution_post_to_slack = _distribution_flag(record, "distribution_post_to_slack", "post_to_slack")
         obj.is_active = bool(record.get("is_active", True))
         obj.status = record.get("status") or "published"
         obj.review_comments = _provenance_tag(record)
@@ -1811,6 +1887,9 @@ class Command(BaseCommand):
         obj.news_type = record.get("news_type") or ""
         obj.effective_date = _as_date(record.get("effective_date"))
         obj.expiration_date = _as_date(record.get("expiration_date"))
+        obj.distribution_email_everyone = _distribution_flag(record, "distribution_email_everyone", "send_email")
+        obj.distribution_email_subscribers = _distribution_flag(record, "distribution_email_subscribers", None)
+        obj.distribution_post_to_slack = _distribution_flag(record, "distribution_post_to_slack", "post_to_slack")
         obj.is_active = bool(record.get("is_active", True))
         obj.status = record.get("status") or "published"
         obj.review_comments = _provenance_tag(record)
@@ -1922,6 +2001,12 @@ class Command(BaseCommand):
             f"- `IntegrationNews` staged: `{result.integration_records}`",
             f"- Expected infrastructure relationships: `{result.system_relationships}`",
             f"- Expected integration-element relationships: `{result.integration_relationships}`",
+            "- Distribution-option counts:",
+            *[
+                f"  - `{feed_name}` {label}: `{count}`"
+                for feed_name, counts in result.distribution_option_counts.items()
+                for label, count in counts.items()
+            ],
             f"- `IntegrationElement` rows created: `{result.integration_elements_created}`",
             f"- `IntegrationElement` labels updated: `{result.integration_elements_updated}`",
             "",

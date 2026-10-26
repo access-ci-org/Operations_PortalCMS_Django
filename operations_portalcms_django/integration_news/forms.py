@@ -73,9 +73,22 @@ class IntegrationNewsForm(forms.ModelForm):
         self.fields["affected_elements"].queryset = IntegrationElement.objects.order_by("label")
         if self.instance.pk:
             self.fields["affected_elements"].initial = self.instance.affected_elements.all()
+            self.fields["email_notification"].initial = self.instance.distribution_email_everyone
+            self.fields["subscriber_notification"].initial = self.instance.distribution_email_subscribers
+            self.fields["slack_notification"].initial = self.instance.distribution_post_to_slack
 
     def save_related_fields(self, news):
         affected_elements = list(self.cleaned_data.get("affected_elements", []))
         news.affected_elements.set(affected_elements)
         news.affected_element = affected_elements[0].code if len(affected_elements) == 1 else ""
-        news.save(update_fields=["affected_element"])
+        news.distribution_email_everyone = self.cleaned_data["email_notification"]
+        news.distribution_email_subscribers = self.cleaned_data["subscriber_notification"]
+        news.distribution_post_to_slack = self.cleaned_data["slack_notification"]
+        news.save(
+            update_fields=[
+                "affected_element",
+                "distribution_email_everyone",
+                "distribution_email_subscribers",
+                "distribution_post_to_slack",
+            ]
+        )

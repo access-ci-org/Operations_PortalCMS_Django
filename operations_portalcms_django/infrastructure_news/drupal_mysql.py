@@ -20,6 +20,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, TextIO
 
+from portal.news_distribution import DISTRIBUTION_OPTIONS_BY_LABEL
+
 SYSTEM_BUNDLE = "infrastructure_news_v2"
 INTEGRATION_BUNDLE = "integration_news_v1"
 INTEGRATION_ELEMENT_BUNDLE = "integration_element"
@@ -420,6 +422,16 @@ def _news_nodes(table_rows: Mapping[str, List[dict]], bundle: str) -> List[dict]
     return sorted(normalized, key=lambda row: int(row["nid"]))
 
 
+def _distribution_flags(rows: Sequence[dict], *, context: str) -> Dict[str, bool]:
+    values = [row.get("field_news_distribution_options_value") for row in rows]
+    unknown = [value for value in values if value not in DISTRIBUTION_OPTIONS_BY_LABEL]
+    if unknown:
+        raise DrupalDumpError(f"{context} contains unknown distribution option(s): {unknown!r}.")
+    if len(values) != len(set(values)):
+        raise DrupalDumpError(f"{context} contains duplicate distribution options.")
+    return {field_name: label in values for label, field_name in DISTRIBUTION_OPTIONS_BY_LABEL.items()}
+
+
 def parse_drupal_news_dump(
     path: Path,
     *,
@@ -472,6 +484,9 @@ def parse_drupal_news_dump(
     affected_infrastructure = _group_by_entity(table_rows["node__field_affected_infrastructure"], SYSTEM_BUNDLE)
     affected_integration = _group_by_entity(table_rows["node__field_affected_intelm"], INTEGRATION_BUNDLE)
     distribution_system = _group_by_entity(table_rows.get("node__field_news_distribution_options", []), SYSTEM_BUNDLE)
+    distribution_integration = _group_by_entity(
+        table_rows.get("node__field_news_distribution_options", []), INTEGRATION_BUNDLE
+    )
 
     node_by_id: Dict[int, dict] = {}
     for row in table_rows["node_field_data"]:
@@ -566,9 +581,10 @@ def parse_drupal_news_dump(
             resource_ids.append(resource_id)
             related_nodes.append({"target_nid": target_nid, "resource_id": resource_id})
 
-        distribution_values = {
-            row.get("field_news_distribution_options_value") for row in distribution_system.get(nid, [])
-        }
+        distribution_flags = _distribution_flags(
+            distribution_system.get(nid, []),
+            context=f"Infrastructure News nid={nid}",
+        )
         start_datetime_source = _one_value(
             start_dates,
             nid,
@@ -622,8 +638,7 @@ def parse_drupal_news_dump(
                     ),
                     f"Infrastructure News nid={nid} end date",
                 ),
-                "send_email": bool(distribution_values & {"Email only subscribers", "Email everyone with access"}),
-                "post_to_slack": "Post to Slack" in distribution_values,
+                **distribution_flags,
                 "is_active": str(node.get("status")) == "1",
                 "status": "published" if str(node.get("status")) == "1" else "draft",
                 "source_metadata": {
@@ -725,6 +740,10 @@ def parse_drupal_news_dump(
                         required=False,
                     ),
                     f"Integration News nid={nid} expiration date",
+                ),
+                **_distribution_flags(
+                    distribution_integration.get(nid, []),
+                    context=f"Integration News nid={nid}",
                 ),
                 "is_active": str(node.get("status")) == "1",
                 "status": "published" if str(node.get("status")) == "1" else "draft",

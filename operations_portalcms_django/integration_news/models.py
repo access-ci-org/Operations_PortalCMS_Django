@@ -2,6 +2,7 @@ from cms.models.pluginmodel import CMSPlugin
 from django.contrib.auth.models import User
 from django.db import models
 from djangocms_text_ckeditor.fields import HTMLField
+from portal.news_distribution import DISTRIBUTION_OPTION_FIELDS
 
 
 class IntegrationElement(models.Model):
@@ -45,6 +46,8 @@ class IntegrationNews(models.Model):
         ("access_oauth_mapfile", "access-oauth-mapfile - ACCESS OAuth identity to local account mapping"),
     ]
 
+    DISTRIBUTION_OPTIONS = tuple((field_name, label) for field_name, label, _ in DISTRIBUTION_OPTION_FIELDS)
+
     title = models.CharField(max_length=200)
     content = HTMLField()
     news_type = models.CharField(max_length=50, blank=True)
@@ -65,6 +68,9 @@ class IntegrationNews(models.Model):
     )
     effective_date = models.DateField(null=True, blank=True)
     expiration_date = models.DateField(null=True, blank=True)
+    distribution_email_everyone = models.BooleanField(default=False, verbose_name="Email everyone with access")
+    distribution_email_subscribers = models.BooleanField(default=False, verbose_name="Email only subscribers")
+    distribution_post_to_slack = models.BooleanField(default=False, verbose_name="Post to Slack")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="authored_integration_news")
@@ -108,6 +114,9 @@ class IntegrationNews(models.Model):
 
     def __str__(self):
         return self.title
+
+    def get_distribution_options(self):
+        return [label for field_name, label in self.DISTRIBUTION_OPTIONS if getattr(self, field_name)]
 
     def get_news_type_label(self):
         return dict(self.INTEGRATION_NEWS_TYPES).get(self.news_type, self.news_type or "N/A")
