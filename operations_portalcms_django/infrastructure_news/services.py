@@ -29,14 +29,7 @@ def get_public_news_queryset():
 
 
 def _distribution_options(news):
-    options = []
-    if news.email_list:
-        options.append("Email only subscribers")
-    elif news.send_email:
-        options.append("Email everyone with access")
-    if news.post_to_slack:
-        options.append("Post to Slack")
-    return ", ".join(options)
+    return ", ".join(news.get_distribution_options())
 
 
 def _affected_infrastructure(news):

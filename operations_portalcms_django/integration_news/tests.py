@@ -51,6 +51,59 @@ class IntegrationNewsFormTests(SimpleTestCase):
         self.assertEqual(form.fields["slack_notification"].label, "Post to Slack")
 
 
+class IntegrationNewsDistributionPersistenceTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(username="integration_distribution_author")
+
+    def _form_data(self, **overrides):
+        data = {
+            "title": "Distribution test",
+            "content": "Saved distribution content",
+            "news_type": "software_release",
+            "effective_date": "2026-10-26",
+            "email_notification": "on",
+            "subscriber_notification": "on",
+            "slack_notification": "on",
+        }
+        data.update(overrides)
+        return data
+
+    def _save_form(self, form):
+        self.assertTrue(form.is_valid(), form.errors)
+        news = form.save(commit=False)
+        news.author = self.author
+        news.news_type = form.cleaned_data["news_type"]
+        news.effective_date = form.cleaned_data["effective_date"]
+        news.expiration_date = form.cleaned_data["expiration_date"]
+        news.save()
+        form.save_related_fields(news)
+        return news
+
+    def test_create_and_edit_preserve_independent_distribution_options(self):
+        news = self._save_form(IntegrationNewsForm(data=self._form_data()))
+
+        news.refresh_from_db()
+        self.assertTrue(news.distribution_email_everyone)
+        self.assertTrue(news.distribution_email_subscribers)
+        self.assertTrue(news.distribution_post_to_slack)
+
+        edit_form = IntegrationNewsForm(instance=news)
+        self.assertTrue(edit_form.fields["email_notification"].initial)
+        self.assertTrue(edit_form.fields["subscriber_notification"].initial)
+        self.assertTrue(edit_form.fields["slack_notification"].initial)
+
+        update = IntegrationNewsForm(
+            data=self._form_data(email_notification="", subscriber_notification=""),
+            instance=news,
+        )
+        news = self._save_form(update)
+        news.refresh_from_db()
+
+        self.assertFalse(news.distribution_email_everyone)
+        self.assertFalse(news.distribution_email_subscribers)
+        self.assertTrue(news.distribution_post_to_slack)
+
+
 class IntegrationNewsUrlTests(SimpleTestCase):
     def test_page_url_name_resolves_to_integration_news_path(self):
         self.assertEqual(
@@ -120,6 +173,9 @@ class ApiIntegrationNewsTests(TestCase):
             author=self.author,
             status="published",
             is_active=True,
+            distribution_email_everyone=True,
+            distribution_email_subscribers=True,
+            distribution_post_to_slack=True,
         )
         self.published.affected_elements.set([self.element])
         self.draft = IntegrationNews.objects.create(
@@ -168,6 +224,10 @@ class ApiIntegrationNewsTests(TestCase):
         self.assertEqual(item["subject"], "Published item")
         self.assertEqual(item["type"], "Software Release")
         self.assertEqual(item["effective_date"], "2024-01-15")
+        self.assertEqual(
+            item["distribution_options"],
+            "Email everyone with access, Email only subscribers, Post to Slack",
+        )
         self.assertEqual(
             item["affected_integration_element"],
             [{"title": "ACCESS Allocated Production Compute - Integration Roadmap"}],

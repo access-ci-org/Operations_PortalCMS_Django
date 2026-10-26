@@ -21,7 +21,7 @@ def _news_item_to_dict(news, request):
         "effective_date": news.effective_date.isoformat() if news.effective_date else "",
         "web_url": request.build_absolute_uri(reverse("integration_news:integration_news")),
         "integration_news_id": str(news.integration_news_id) if news.integration_news_id is not None else None,
-        "distribution_options": "",
+        "distribution_options": ", ".join(news.get_distribution_options()),
         "affected_integration_element": _affected_integration_element(news),
     }
 

@@ -73,6 +73,56 @@ class SystemStatusNewsFormTests(SimpleTestCase):
         self.assertEqual(form.fields["slack_notification"].label, "Post to Slack")
 
 
+class SystemStatusNewsDistributionPersistenceTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(username="distribution_author")
+
+    def _form_data(self, **overrides):
+        data = {
+            "subject": "Distribution test",
+            "content": "Saved distribution content",
+            "infrastructure_news_type": "degraded",
+            "start_datetime": "2026-10-26T09:00",
+            "email_notification": "on",
+            "subscriber_notification": "on",
+            "slack_notification": "on",
+            "is_active": "on",
+        }
+        data.update(overrides)
+        return data
+
+    def test_create_and_edit_preserve_independent_distribution_options(self):
+        form = SystemStatusNewsForm(data=self._form_data())
+        self.assertTrue(form.is_valid(), form.errors)
+        news = form.save(commit=False)
+        news.author = self.author
+        news.save()
+        form.save_related_fields(news)
+
+        news.refresh_from_db()
+        self.assertTrue(news.distribution_email_everyone)
+        self.assertTrue(news.distribution_email_subscribers)
+        self.assertTrue(news.distribution_post_to_slack)
+
+        edit_form = SystemStatusNewsForm(instance=news)
+        self.assertTrue(edit_form.fields["email_notification"].initial)
+        self.assertTrue(edit_form.fields["subscriber_notification"].initial)
+        self.assertTrue(edit_form.fields["slack_notification"].initial)
+
+        update = SystemStatusNewsForm(
+            data=self._form_data(email_notification="", slack_notification=""),
+            instance=news,
+        )
+        self.assertTrue(update.is_valid(), update.errors)
+        news = update.save()
+        update.save_related_fields(news)
+        news.refresh_from_db()
+
+        self.assertFalse(news.distribution_email_everyone)
+        self.assertTrue(news.distribution_email_subscribers)
+        self.assertFalse(news.distribution_post_to_slack)
+
+
 class ApiTimestampFormattingTests(SimpleTestCase):
     def test_formats_winter_timestamp_in_central_standard_time(self):
         value = datetime(2024, 1, 15, 12, 0, tzinfo=datetime_timezone.utc)
@@ -135,6 +185,9 @@ class ApiInfrastructureNewsTests(TestCase):
             author=self.author,
             status="published",
             is_active=True,
+            distribution_email_everyone=True,
+            distribution_email_subscribers=True,
+            distribution_post_to_slack=True,
         )
         self.draft = SystemStatusNews.objects.create(
             subject="Draft item",
@@ -184,6 +237,10 @@ class ApiInfrastructureNewsTests(TestCase):
         self.assertEqual(item["start_timestamp"], "2024-01-15T06:00:00-0600")
         self.assertEqual(item["end_timestamp"], "2024-07-15T07:00:00-0500")
         self.assertEqual(
+            item["distribution_options"],
+            "Email everyone with access, Email only subscribers, Post to Slack",
+        )
+        self.assertEqual(
             sorted(item.keys()),
             sorted(
                 [
@@ -199,6 +256,16 @@ class ApiInfrastructureNewsTests(TestCase):
                 ]
             ),
         )
+
+    def test_distribution_options_match_legacy_two_value_format(self):
+        self.published.distribution_email_everyone = False
+        self.published.save(update_fields=["distribution_email_everyone"])
+
+        response = self.client.get("/api/infrastructure_news_v1")
+        data = json.loads(response.content)
+        item = next(i for i in data if i["outage_id"] == str(self.published.outage_id))
+
+        self.assertEqual(item["distribution_options"], "Email only subscribers, Post to Slack")
 
     def test_items_are_ordered_by_stable_outage_id_with_nulls_last(self):
         SystemStatusNews.objects.create(

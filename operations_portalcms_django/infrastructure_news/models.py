@@ -2,6 +2,7 @@ from cms.models.pluginmodel import CMSPlugin
 from django.contrib.auth.models import User
 from django.db import models
 from djangocms_text_ckeditor.fields import HTMLField
+from portal.news_distribution import DISTRIBUTION_OPTION_FIELDS
 
 
 class SystemStatusNews(models.Model):
@@ -15,6 +16,8 @@ class SystemStatusNews(models.Model):
         ("reconfiguration", "Reconfiguration"),
         ("retirement", "Retirement"),
     ]
+
+    DISTRIBUTION_OPTIONS = tuple((field_name, label) for field_name, label, _ in DISTRIBUTION_OPTION_FIELDS)
 
     subject = models.CharField(max_length=200, default="Untitled", verbose_name="Subject")
     content = HTMLField(verbose_name="News Content")
@@ -58,6 +61,9 @@ class SystemStatusNews(models.Model):
         verbose_name="Outage ID",
         help_text="Stable external identifier used by API consumers. Carried from Drupal for imported records; auto-assigned for new records.",
     )
+    distribution_email_everyone = models.BooleanField(default=False, verbose_name="Email everyone with access")
+    distribution_email_subscribers = models.BooleanField(default=False, verbose_name="Email only subscribers")
+    distribution_post_to_slack = models.BooleanField(default=False, verbose_name="Post to Slack")
     send_email = models.BooleanField(default=False, verbose_name="Send Email Notification")
     email_list = models.CharField(max_length=500, blank=True, verbose_name="Email Recipients")
     post_to_slack = models.BooleanField(default=False, verbose_name="Post to Slack")
@@ -105,6 +111,9 @@ class SystemStatusNews(models.Model):
 
     def __str__(self):
         return self.subject
+
+    def get_distribution_options(self):
+        return [label for field_name, label in self.DISTRIBUTION_OPTIONS if getattr(self, field_name)]
 
     def get_affected_infrastructure_values(self):
         related_items = sorted(

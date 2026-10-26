@@ -76,9 +76,22 @@ class SystemStatusNewsForm(forms.ModelForm):
         )
         if self.instance.pk:
             self.fields["affected_infrastructure_items"].initial = self.instance.affected_infrastructure_items.all()
+            self.fields["email_notification"].initial = self.instance.distribution_email_everyone
+            self.fields["subscriber_notification"].initial = self.instance.distribution_email_subscribers
+            self.fields["slack_notification"].initial = self.instance.distribution_post_to_slack
 
     def save_related_fields(self, news):
         affected_items = list(self.cleaned_data.get("affected_infrastructure_items", []))
         news.affected_infrastructure_items.set(affected_items)
         news.affected_infrastructure = ", ".join(item.info_resourceid for item in affected_items)
-        news.save(update_fields=["affected_infrastructure"])
+        news.distribution_email_everyone = self.cleaned_data["email_notification"]
+        news.distribution_email_subscribers = self.cleaned_data["subscriber_notification"]
+        news.distribution_post_to_slack = self.cleaned_data["slack_notification"]
+        news.save(
+            update_fields=[
+                "affected_infrastructure",
+                "distribution_email_everyone",
+                "distribution_email_subscribers",
+                "distribution_post_to_slack",
+            ]
+        )

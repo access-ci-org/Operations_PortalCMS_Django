@@ -136,7 +136,11 @@ def _base_rows():
             _field_row("integration_news_v1", 201, "Integration content") + ["full_html"],
         ],
         "node__field_news_distribution_options": [
-            _field_row("infrastructure_news_v2", 101, "Post to Slack"),
+            _field_row("infrastructure_news_v2", 101, "Email everyone with access", delta=0),
+            _field_row("infrastructure_news_v2", 101, "Email only subscribers", delta=1),
+            _field_row("infrastructure_news_v2", 101, "Post to Slack", delta=2),
+            _field_row("integration_news_v1", 201, "Email only subscribers", delta=0),
+            _field_row("integration_news_v1", 201, "Post to Slack", delta=1),
         ],
         "node__field_start_date": [
             _field_row("infrastructure_news_v2", 101, "2026-08-01T12:00:00"),
@@ -229,7 +233,9 @@ class DrupalMysqlParserTests(TestCase):
             "System's first line, with (parentheses) — and Unicode\nsecond line",
         )
         self.assertEqual(system["affected_infrastructure"], "resource.example")
-        self.assertTrue(system["post_to_slack"])
+        self.assertTrue(system["distribution_email_everyone"])
+        self.assertTrue(system["distribution_email_subscribers"])
+        self.assertTrue(system["distribution_post_to_slack"])
         self.assertEqual(
             system["source_metadata"]["drupal_author"],
             {
@@ -247,6 +253,9 @@ class DrupalMysqlParserTests(TestCase):
         self.assertNotIn("pass", system["source_metadata"]["drupal_author"])
 
         integration = parsed.payload["IntegrationNews"][0]
+        self.assertFalse(integration["distribution_email_everyone"])
+        self.assertTrue(integration["distribution_email_subscribers"])
+        self.assertTrue(integration["distribution_post_to_slack"])
         self.assertEqual(integration["affected_elements"], ["compute_roadmap", "accessusage"])
         self.assertEqual(
             integration["source_metadata"]["drupal_author"],
@@ -378,4 +387,24 @@ class DrupalMysqlParserTests(TestCase):
         path = self._write(_dump_text(rows))
 
         with self.assertRaisesRegex(DrupalDumpError, "repeats integration element"):
+            self._parse(path)
+
+    def test_rejects_unknown_distribution_option(self):
+        rows = _base_rows()
+        rows["node__field_news_distribution_options"].append(
+            _field_row("integration_news_v1", 201, "Unknown delivery", delta=2)
+        )
+        path = self._write(_dump_text(rows))
+
+        with self.assertRaisesRegex(DrupalDumpError, "unknown distribution option"):
+            self._parse(path)
+
+    def test_rejects_duplicate_distribution_option(self):
+        rows = _base_rows()
+        rows["node__field_news_distribution_options"].append(
+            _field_row("integration_news_v1", 201, "Post to Slack", delta=2)
+        )
+        path = self._write(_dump_text(rows))
+
+        with self.assertRaisesRegex(DrupalDumpError, "duplicate distribution options"):
             self._parse(path)

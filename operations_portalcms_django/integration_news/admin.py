@@ -14,6 +14,17 @@ class IntegrationNewsAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Basic Information", {"fields": ("title", "content", "is_active")}),
         ("Integration Details", {"fields": ("news_type", "affected_elements", "effective_date", "expiration_date")}),
+        (
+            "Distribution Options",
+            {
+                "fields": (
+                    "distribution_email_everyone",
+                    "distribution_email_subscribers",
+                    "distribution_post_to_slack",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
         ("Metadata", {"fields": ("author", "created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
