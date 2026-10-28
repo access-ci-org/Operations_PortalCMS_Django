@@ -248,7 +248,7 @@ class ApiIntegrationNewsTests(TestCase):
             ),
         )
 
-    def test_items_are_ordered_by_stable_integration_news_id_with_nulls_last(self):
+    def test_items_are_ordered_newest_posted_first(self):
         IntegrationNews.objects.create(
             title="Earlier stable identifier",
             content="Earlier identifier content",
@@ -271,7 +271,7 @@ class ApiIntegrationNewsTests(TestCase):
         response = self.client.get("/api/integration_news")
         data = json.loads(response.content)
 
-        self.assertEqual([item["integration_news_id"] for item in data], ["100", "900", None])
+        self.assertEqual([item["integration_news_id"] for item in data], [None, "100", "900"])
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
         page_response = self.client.get("/integration_news")

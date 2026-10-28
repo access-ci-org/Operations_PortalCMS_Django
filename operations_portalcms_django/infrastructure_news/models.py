@@ -119,11 +119,15 @@ class SystemStatusNews(models.Model):
         related_items = sorted(
             self.affected_infrastructure_items.all(), key=lambda item: item.resource_descriptive_name or ""
         )
-        if related_items:
-            return [item.info_resourceid for item in related_items]
-        if not self.affected_infrastructure:
-            return []
-        return [v.strip() for v in self.affected_infrastructure.split(",") if v.strip()]
+        values = [item.info_resourceid for item in related_items]
+        known_values = set(values)
+        if self.affected_infrastructure:
+            for value in self.affected_infrastructure.split(","):
+                value = value.strip()
+                if value and value not in known_values:
+                    values.append(value)
+                    known_values.add(value)
+        return values
 
     def get_affected_infrastructure_display(self):
         values = self.get_affected_infrastructure_values()

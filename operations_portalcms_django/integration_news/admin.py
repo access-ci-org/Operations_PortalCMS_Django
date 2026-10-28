@@ -5,6 +5,7 @@ from .models import IntegrationNews
 
 @admin.register(IntegrationNews)
 class IntegrationNewsAdmin(admin.ModelAdmin):
+    ordering = ("-created_at", "-pk")
     list_display = ["title", "affected_elements_display", "author", "created_at", "is_active"]
     list_filter = ["is_active", "created_at"]
     search_fields = ["title", "content"]

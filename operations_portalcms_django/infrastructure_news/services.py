@@ -1,7 +1,6 @@
 from datetime import timezone as datetime_timezone
 from zoneinfo import ZoneInfo
 
-from django.db.models import F
 from django.urls import reverse
 from django.utils import timezone
 
@@ -22,8 +21,8 @@ def _format_timestamp(value):
 def get_public_news_queryset():
     """Return records shared by the public page and compatibility API.
 
-    Callers apply presentation-specific ordering: the HTML page keeps the model's
-    newest-first ordering, while the legacy API is organized by ``outage_id``.
+    Callers apply presentation-specific ordering. Both the HTML page and compatibility
+    API show the newest originally posted news first.
     """
     return SystemStatusNews.objects.filter(status="published", is_active=True)
 
@@ -54,6 +53,6 @@ def get_public_news_feed(request):
     news_items = (
         get_public_news_queryset()
         .prefetch_related("affected_infrastructure_items")
-        .order_by(F("outage_id").asc(nulls_last=True), "pk")
+        .order_by("-created_at", "-pk")
     )
     return [_news_item_to_dict(news, request) for news in news_items]

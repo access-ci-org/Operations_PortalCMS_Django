@@ -490,7 +490,7 @@ class AtomicReplaceCommandTests(TestCase):
         self.assertIn("Exact derived-username matches: `1`", report)
         self.assertIn("Explicit import-user fallbacks: `1`", report)
         plan = json.loads(self.plan_path.read_text(encoding="utf-8"))
-        self.assertEqual(plan["version"], 4)
+        self.assertEqual(plan["version"], 5)
         self.assertEqual(
             plan["expected"]["distribution_option_counts"]["SystemStatusNews"],
             {

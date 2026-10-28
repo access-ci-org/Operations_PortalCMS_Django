@@ -43,15 +43,16 @@ REQUIRED_TABLES = {
 
 OPTIONAL_TABLES = {
     "node__field_news_distribution_options",
+    "node_revision",
 }
 
 TABLES = REQUIRED_TABLES | OPTIONAL_TABLES
 
-# Retain only the non-secret fields needed to resolve Drupal authors.  In
-# particular, never decode or store password hashes or email addresses from the
-# users table while parsing a dump.
+# Retain only the non-secret fields needed to resolve content authors. Never
+# decode or store password hashes or email addresses from the users table.
 PROJECTED_COLUMNS = {
     "users_field_data": ("uid", "name"),
+    "node_revision": ("nid", "revision_uid"),
 }
 
 AUTHOR_USERNAME_DERIVATIONS = {
@@ -85,13 +86,18 @@ def derive_drupal_username(value) -> tuple[str, str]:
     if not isinstance(value, str):
         return "", "invalid"
     at_count = value.count("@")
-    if at_count == 0:
-        return value, "plain"
     if at_count == 1:
         local_part, domain = value.split("@", 1)
-        if local_part and domain:
+        if not local_part or not domain:
+            return "", "malformed-email-shaped-login"
+        if re.fullmatch(r"[\w.@+-]+", local_part):
             return local_part, "local-part"
-    return "", "malformed-email-shaped-login"
+        return "", "invalid"
+    if at_count > 1:
+        return "", "malformed-email-shaped-login"
+    if re.fullmatch(r"[\w.@+-]+", value):
+        return value, "plain"
+    return "", "invalid"
 
 
 @dataclass(frozen=True)
@@ -101,6 +107,7 @@ class ParsedDump:
     warnings: List[str]
     excluded_system_nids: List[int]
     source_corrections: List[str]
+    content_authors: List[dict]
 
 
 def sha256_file(path: Path) -> str:
@@ -456,6 +463,25 @@ def parse_drupal_news_dump(
         if existing_username is not None and existing_username != username:
             raise DrupalDumpError(f"users_field_data uid={uid} has conflicting usernames.")
         usernames_by_uid[uid] = username
+    content_author_uids = {
+        _nonnegative_int(row.get("uid"), "node_field_data uid")
+        for row in table_rows["node_field_data"]
+        if row.get("uid") not in (None, "")
+    }
+    content_author_uids.update(
+        _nonnegative_int(row.get("revision_uid"), "node_revision revision_uid")
+        for row in table_rows.get("node_revision", [])
+        if row.get("revision_uid") not in (None, "")
+    )
+    content_authors = []
+    for uid in sorted(content_author_uids - {0}):
+        username, derivation = usernames_by_uid.get(uid, ("", "missing-user"))
+        if not username:
+            username = f"drupal_uid_{uid}"
+            usernames_by_uid[uid] = (username, derivation)
+        content_authors.append(
+            {"uid": uid, "username": username, "username_derivation": derivation}
+        )
     # The raw email-shaped login values are no longer needed after deriving the
     # non-sensitive candidates above.
     table_rows["users_field_data"].clear()
@@ -530,6 +556,10 @@ def parse_drupal_news_dump(
             element_code_by_nid[nid] = code
 
     warnings: List[str] = []
+    if not table_rows.get("node_revision"):
+        warnings.append(
+            "Drupal node_revision history is missing; historical content editors cannot be fully identified."
+        )
     excluded_system_nids_found: List[int] = []
     source_corrections: List[str] = []
     corrected_system_nids: set[int] = set()
@@ -776,4 +806,5 @@ def parse_drupal_news_dump(
         warnings=warnings,
         excluded_system_nids=sorted(excluded_system_nids_found),
         source_corrections=source_corrections,
+        content_authors=content_authors,
     )

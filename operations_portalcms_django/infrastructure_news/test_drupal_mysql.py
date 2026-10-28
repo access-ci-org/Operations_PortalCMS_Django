@@ -42,6 +42,7 @@ TABLE_COLUMNS = {
         "default_langcode",
         "revision_translation_affected",
     ],
+    "node_revision": ["nid", "revision_uid"],
     "node__field_affected_infrastructure": FIELD_PREFIX + ["field_affected_infrastructure_target_id"],
     "node__field_affected_intelm": FIELD_PREFIX + ["field_affected_intelm_target_id"],
     "node__field_effective_date": FIELD_PREFIX + ["field_effective_date_value"],
@@ -102,6 +103,13 @@ def _base_rows():
                 "accessusage - command line allocation usage lookup",
                 1700000400,
             ),
+        ],
+        "node_revision": [
+            [101, 1],
+            [201, 1],
+            [301, 1],
+            [401, 1],
+            [402, 1],
         ],
         "node__field_affected_infrastructure": [
             _field_row("infrastructure_news_v2", 101, 301),
