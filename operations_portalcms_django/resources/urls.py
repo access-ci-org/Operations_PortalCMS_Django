@@ -5,6 +5,7 @@ from . import views
 app_name = "resources"
 
 urlpatterns = [
+    path("infrastructure", views.infrastructure, name="infrastructure"),
     path("resources/access-allocated/", views.access_allocated_resources, name="access_allocated"),
     path("resources/access-online-services/", views.access_online_services, name="access_online_services"),
     path("software_discovery/", views.software_discovery, name="software_discovery"),

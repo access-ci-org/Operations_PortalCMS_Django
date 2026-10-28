@@ -6,6 +6,49 @@ from django.views.decorators.cache import cache_page
 from . import services
 
 
+@cache_page(60 * 15)
+def infrastructure(request):
+    """List active ACCESS resources individually with a word filter."""
+    resources_by_org, error_message = services.get_resource_listing("allocated")
+    resources = [
+        resource
+        for organization_resources in resources_by_org.values()
+        for resource in organization_resources
+    ]
+    resources.sort(key=lambda resource: str(resource.get("resource_descriptive_name") or "").casefold())
+
+    search_query = request.GET.get("q", "").strip()
+    if search_query:
+        search_term = search_query.casefold()
+        searchable_fields = (
+            "resource_descriptive_name",
+            "organization_name",
+            "resource_description",
+            "cider_type",
+            "info_resourceid",
+            "info_siteid",
+        )
+        resources = [
+            resource
+            for resource in resources
+            if any(search_term in str(resource.get(field) or "").casefold() for field in searchable_fields)
+        ]
+
+    paginator = Paginator(resources, 20)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    return render_resources_page(
+        request,
+        "portal/infrastructure_list.html",
+        {
+            "page": "infrastructure",
+            "page_obj": page_obj,
+            "search_query": search_query,
+            "error_message": error_message,
+        },
+    )
+
+
 def render_resources_page(request, template_name, context):
     response = render(request, template_name, context)
     if context.get("error_message"):
