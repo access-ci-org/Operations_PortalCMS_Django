@@ -17,6 +17,11 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+# djangocms_versioning to allow some deletes
+from djangocms_versioning.constants import DELETE_NON_PUBLIC_ONLY
+
+DJANGOCMS_VERSIONING_ALLOW_DELETING_VERSIONS = DELETE_NON_PUBLIC_ONLY
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
