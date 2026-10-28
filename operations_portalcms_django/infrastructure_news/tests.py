@@ -209,7 +209,7 @@ class ApiInfrastructureNewsTests(TestCase):
         )
 
     def test_only_published_active_items_included(self):
-        response = self.client.get("/api/infrastructure_news_v1")
+        response = self.client.get("/api/infrastructure_news_v2")
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.content)
@@ -219,14 +219,14 @@ class ApiInfrastructureNewsTests(TestCase):
         self.assertNotIn(str(self.draft.outage_id), outage_ids)
         self.assertNotIn(str(self.inactive.outage_id), outage_ids)
 
-    def test_api_url_name_resolves_to_versioned_path(self):
+    def test_api_url_name_resolves_to_stable_path(self):
         self.assertEqual(
             reverse("infrastructure_news:api_infrastructure_news"),
-            "/api/infrastructure_news_v1",
+            "/api/infrastructure_news",
         )
 
     def test_published_item_field_shape(self):
-        response = self.client.get("/api/infrastructure_news_v1")
+        response = self.client.get("/api/infrastructure_news_v2")
         data = json.loads(response.content)
         item = next(i for i in data if i["outage_id"] == str(self.published.outage_id))
 
@@ -261,7 +261,7 @@ class ApiInfrastructureNewsTests(TestCase):
         self.published.distribution_email_everyone = False
         self.published.save(update_fields=["distribution_email_everyone"])
 
-        response = self.client.get("/api/infrastructure_news_v1")
+        response = self.client.get("/api/infrastructure_news_v2")
         data = json.loads(response.content)
         item = next(i for i in data if i["outage_id"] == str(self.published.outage_id))
 
@@ -287,7 +287,7 @@ class ApiInfrastructureNewsTests(TestCase):
             is_active=True,
         )
 
-        response = self.client.get("/api/infrastructure_news_v1")
+        response = self.client.get("/api/infrastructure_news_v2")
         data = json.loads(response.content)
 
         self.assertEqual([item["outage_id"] for item in data], ["100", "900", None])
@@ -297,7 +297,7 @@ class ApiInfrastructureNewsTests(TestCase):
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
         page_response = self.client.get("/infrastructure_news_view")
-        api_response = self.client.get("/api/infrastructure_news_v1")
+        api_response = self.client.get("/api/infrastructure_news_v2")
 
         page_outage_ids = {
             str(item.outage_id) if item.outage_id is not None else None
@@ -307,10 +307,12 @@ class ApiInfrastructureNewsTests(TestCase):
 
         self.assertEqual(page_outage_ids, api_outage_ids)
 
-    def test_unversioned_api_url_is_not_exposed(self):
+    def test_stable_api_url_returns_the_legacy_compatible_feed(self):
         response = self.client.get("/api/infrastructure_news")
+        versioned_response = self.client.get("/api/infrastructure_news_v2")
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content), json.loads(versioned_response.content))
 
     def test_anonymous_page_shows_published_author_name_without_email(self):
         response = self.client.get("/infrastructure_news_view")

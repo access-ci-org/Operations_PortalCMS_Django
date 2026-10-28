@@ -137,10 +137,10 @@ def update_system_status_news(request, pk):
 @require_safe
 @cache_page(60 * 15)
 def api_infrastructure_news(request):
-    """Public JSON feed served at /api/infrastructure_news_v1.
+    """Public JSON feed served at the stable and versioned API paths.
 
-    The payload matches the legacy Drupal /api/infrastructure_news endpoint for
-    downstream consumers.
+    Every path returns the legacy Drupal-compatible payload for downstream
+    consumers.
     """
     if request.method not in ("GET", "HEAD"):
         from django.http import HttpResponseNotAllowed

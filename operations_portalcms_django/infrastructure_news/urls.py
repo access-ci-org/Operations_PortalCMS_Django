@@ -14,5 +14,6 @@ urlpatterns = [
         workflow.unpublish_systemstatus_news,
         name="unpublish_systemstatus_news",
     ),
-    path("api/infrastructure_news_v1", views.api_infrastructure_news, name="api_infrastructure_news"),
+    path("api/infrastructure_news", views.api_infrastructure_news, name="api_infrastructure_news"),
+    path("api/infrastructure_news_v2", views.api_infrastructure_news, name="api_infrastructure_news_v2"),
 ]

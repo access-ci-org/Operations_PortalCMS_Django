@@ -1,3 +1,7 @@
+v0.9.00 jlambertson 2026-10-28
+- adding new infrastructure_view as /infrastructure
+- adding updated infrastructure_news_v2 api url as /api/infrastructure_news
+
 v0.8.12 jlambertson 2026-10-27
 - persist independent distribution choices for both news feeds, expose them through the compatibility APIs, and import them exactly from Drupal without enabling delivery side effects
 
