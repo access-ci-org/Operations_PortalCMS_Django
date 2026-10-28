@@ -5,6 +5,7 @@ from .models import SystemStatusNews
 
 @admin.register(SystemStatusNews)
 class SystemStatusNewsAdmin(admin.ModelAdmin):
+    ordering = ("-created_at", "-pk")
     list_display = [
         "subject",
         "infrastructure_news_type",

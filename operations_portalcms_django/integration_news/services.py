@@ -1,4 +1,3 @@
-from django.db.models import F
 from django.urls import reverse
 
 from .models import IntegrationNews
@@ -30,6 +29,6 @@ def get_public_news_feed(request):
     news_items = (
         get_public_news_queryset()
         .prefetch_related("affected_elements")
-        .order_by(F("integration_news_id").asc(nulls_last=True), "pk")
+        .order_by("-created_at", "-pk")
     )
     return [_news_item_to_dict(news, request) for news in news_items]

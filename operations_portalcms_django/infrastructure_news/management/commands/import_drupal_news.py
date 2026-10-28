@@ -39,8 +39,8 @@ from resources.models import CiderInfrastructure
 DEFAULT_INPUT = Path("database/drupal_backups/generated/drupal_news_normalized_for_django.json")
 DEFAULT_REPORT = Path("database/drupal_backups/generated/drupal_news_import_dry_run.md")
 IMPORT_PLAN_SCHEMA = "access-ci.drupal-news-import-plan"
-IMPORT_PLAN_VERSION = 4
-IMPORT_CONTRACT_VERSION = 4
+IMPORT_PLAN_VERSION = 5
+IMPORT_CONTRACT_VERSION = 5
 MYSQL_BACKUP_NAME_RE = re.compile(
     r"^backup_database-(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}" r"(?:Z|[+-]\d{2}:\d{2}))\.mysql\.gz$"
 )
@@ -74,6 +74,7 @@ class ImportResult:
     source_corrections: List[str] = field(default_factory=list)
     system_attribution: List[Dict[str, Any]] = field(default_factory=list)
     integration_attribution: List[Dict[str, Any]] = field(default_factory=list)
+    content_author_attribution: List[Dict[str, Any]] = field(default_factory=list)
     plan_file: Optional[str] = None
     plan_sha256: Optional[str] = None
     created_system: int = 0
@@ -83,6 +84,7 @@ class ImportResult:
     deleted_system: int = 0
     deleted_integration: int = 0
     system_na_infrastructure: int = 0
+    unresolved_infrastructure_references: List[Dict[str, Any]] = field(default_factory=list)
     integration_na_element: int = 0
     unresolved_allowed_na: int = 0
     warnings: List[str] = field(default_factory=list)
@@ -329,9 +331,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--system-news-as-of",
             help=(
-                "Required for replacement imports. Retain only current or future "
-                "Infrastructure News as of this timezone-aware ISO-8601 timestamp. "
-                "Apply loads the exact value from the reviewed plan."
+                "Optional date filter. Retain only current or future Infrastructure "
+                "News as of this timezone-aware ISO-8601 timestamp. Without this option, "
+                "all valid Infrastructure News is imported. Apply loads the exact value "
+                "from the reviewed plan."
             ),
         )
         parser.add_argument(
@@ -450,10 +453,6 @@ class Command(BaseCommand):
         if source_kind not in {"mysql-dump", "normalized-json"}:
             raise CommandError(f"Unsupported import-plan source kind: {source_kind!r}.")
 
-        if replace and not system_news_as_of_raw:
-            raise CommandError(
-                "--replace requires --system-news-as-of so past Infrastructure News " "is excluded deterministically."
-            )
         system_news_as_of = self._parse_system_news_as_of(system_news_as_of_raw) if system_news_as_of_raw else None
 
         if len(excluded_system_nids) != len(set(excluded_system_nids)):
@@ -545,6 +544,7 @@ class Command(BaseCommand):
 
         # Parse source records and apply only explicitly requested corrections.
         source_warnings: List[str] = []
+        content_authors: List[Dict[str, Any]] = []
         excluded_system_nids_found: List[int] = []
         source_corrections_applied: List[str] = []
         result = ImportResult(
@@ -576,6 +576,7 @@ class Command(BaseCommand):
             if parsed_dump.sha256 != source_sha256:
                 raise CommandError("Source changed while it was being parsed; rerun the dry-run.")
             payload = parsed_dump.payload
+            content_authors = parsed_dump.content_authors
             source_warnings.extend(parsed_dump.warnings)
             excluded_system_nids_found.extend(parsed_dump.excluded_system_nids)
             source_corrections_applied.extend(parsed_dump.source_corrections)
@@ -585,7 +586,7 @@ class Command(BaseCommand):
         integration_records = payload.get("IntegrationNews", [])
         if replace and (not isinstance(system_records, list) or not system_records):
             raise CommandError(
-                "Replacement requires a nonempty SystemStatusNews source list " "before cutoff filtering."
+                "Replacement requires a nonempty SystemStatusNews source list."
             )
         if not mysql_dump and (excluded_system_nids or start_datetime_corrections):
             (
@@ -673,6 +674,7 @@ class Command(BaseCommand):
                     create_missing=bool(options["create_import_user"]),
                     result=result,
                 )
+                result.content_author_attribution = self._report_content_authors(content_authors)
                 system_authors, result.system_attribution = self._resolve_record_authors(
                     records=system_records,
                     feed_name="SystemStatusNews",
@@ -685,13 +687,6 @@ class Command(BaseCommand):
                     fallback_user=fallback_user,
                     require_posted_at=replace,
                 )
-                if plan_data is not None:
-                    self._validate_plan_staging(
-                        plan_data=plan_data,
-                        result=result,
-                        expected_system_ids=expected_system_ids,
-                        expected_integration_ids=expected_integration_ids,
-                    )
                 integration_elements = self._ensure_integration_elements(
                     dry_run=dry_run,
                     result=result,
@@ -724,6 +719,17 @@ class Command(BaseCommand):
                         dry_run=dry_run,
                         result=result,
                         force_create=replace,
+                    )
+
+                result.unresolved_infrastructure_references.sort(
+                    key=lambda value: (str(value["nid"]), value["resource_id"])
+                )
+                if plan_data is not None:
+                    self._validate_plan_staging(
+                        plan_data=plan_data,
+                        result=result,
+                        expected_system_ids=expected_system_ids,
+                        expected_integration_ids=expected_integration_ids,
                     )
 
                 if replace and not dry_run:
@@ -893,6 +899,8 @@ class Command(BaseCommand):
                 "source_corrections_applied": result.source_corrections,
                 "system_attribution": result.system_attribution,
                 "integration_attribution": result.integration_attribution,
+                "content_author_attribution": result.content_author_attribution,
+                "unresolved_infrastructure_references": result.unresolved_infrastructure_references,
                 "outcome": self._result_outcome_contract(result),
             },
         }
@@ -969,6 +977,8 @@ class Command(BaseCommand):
             "source_corrections_applied",
             "system_attribution",
             "integration_attribution",
+            "content_author_attribution",
+            "unresolved_infrastructure_references",
             "outcome",
         }
         outcome_keys = set(self._result_outcome_contract(ImportResult()))
@@ -1049,7 +1059,8 @@ class Command(BaseCommand):
             raise CommandError("Import plan import user is invalid.")
 
         adjustments = contract["adjustments"]
-        self._parse_system_news_as_of(adjustments["system_news_as_of"])
+        if adjustments["system_news_as_of"] is not None:
+            self._parse_system_news_as_of(adjustments["system_news_as_of"])
         self._validate_plan_id_list(
             adjustments["excluded_system_nids"],
             "explicit SystemStatusNews exclusions",
@@ -1297,6 +1308,8 @@ class Command(BaseCommand):
             "source_corrections_applied": result.source_corrections,
             "system_attribution": result.system_attribution,
             "integration_attribution": result.integration_attribution,
+            "content_author_attribution": result.content_author_attribution,
+            "unresolved_infrastructure_references": result.unresolved_infrastructure_references,
         }
         mismatches = [name for name, value in actual.items() if expected[name] != value]
         if mismatches:
@@ -1579,8 +1592,13 @@ class Command(BaseCommand):
                 expected_resources = {
                     value.strip() for value in obj.affected_infrastructure.split(",") if value.strip()
                 }
+            expected_mapped_resources = set(
+                CiderInfrastructure.objects.filter(info_resourceid__in=expected_resources).values_list(
+                    "info_resourceid", flat=True
+                )
+            )
             actual_resources = set(obj.affected_infrastructure_items.values_list("info_resourceid", flat=True))
-            if actual_resources != expected_resources:
+            if actual_resources != expected_mapped_resources:
                 raise CommandError(
                     "Replacement validation failed for SystemStatusNews "
                     f"nid={stable_id} affected infrastructure relationships."
@@ -1659,6 +1677,31 @@ class Command(BaseCommand):
         raise CommandError(
             f"Import user '{username}' does not exist. " "Re-run with --create-import-user or set --import-user."
         )
+
+    def _report_content_authors(
+        self,
+        content_authors: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Report historical identities and whether their Django account exists."""
+        usernames = {str(author["username"]) for author in content_authors}
+        existing_users = {
+            user.username: user for user in User.objects.filter(username__in=usernames)
+        }
+        attribution = []
+        for source_author in content_authors:
+            uid = int(source_author["uid"])
+            username = str(source_author["username"])
+            derivation = str(source_author["username_derivation"])
+            user = existing_users.get(username)
+            attribution.append(
+                {
+                    "drupal_uid": uid,
+                    "username": username,
+                    "username_derivation": derivation,
+                    "account_state": "existing" if user is not None else "missing",
+                }
+            )
+        return attribution
 
     def _resolve_record_authors(
         self,
@@ -1859,9 +1902,16 @@ class Command(BaseCommand):
         matched_ids = {infra.info_resourceid for infra in matched_infra}
         missing_ids = sorted(set(resource_ids) - matched_ids)
         if missing_ids:
-            result.add_warning(f"SystemStatusNews nid={_nid(record)} has unmatched infrastructure IDs: {missing_ids}")
+            raw_nid = _nid(record)
+            try:
+                unresolved_nid: Any = int(raw_nid)
+            except (TypeError, ValueError):
+                unresolved_nid = raw_nid
+            result.unresolved_infrastructure_references.extend(
+                {"nid": unresolved_nid, "resource_id": resource_id} for resource_id in missing_ids
+            )
 
-        if not resource_ids:
+        if not matched_infra:
             result.system_na_infrastructure += 1
 
         if not dry_run and obj.pk:
@@ -1999,7 +2049,7 @@ class Command(BaseCommand):
             f"- Total staged records: `{result.total_records}`",
             f"- `SystemStatusNews` staged: `{result.system_records}`",
             f"- `IntegrationNews` staged: `{result.integration_records}`",
-            f"- Expected infrastructure relationships: `{result.system_relationships}`",
+            f"- Source infrastructure relationships: `{result.system_relationships}`",
             f"- Expected integration-element relationships: `{result.integration_relationships}`",
             "- Distribution-option counts:",
             *[
@@ -2009,6 +2059,8 @@ class Command(BaseCommand):
             ],
             f"- `IntegrationElement` rows created: `{result.integration_elements_created}`",
             f"- `IntegrationElement` labels updated: `{result.integration_elements_updated}`",
+            f"- Historical content-author identities with existing accounts: `{sum(item['account_state'] == 'existing' for item in result.content_author_attribution)}`",
+            f"- Historical content-author identities missing Django accounts: `{sum(item['account_state'] == 'missing' for item in result.content_author_attribution)}`",
             "",
             "## Explicit Source Adjustments",
             "",
@@ -2066,6 +2118,17 @@ class Command(BaseCommand):
             if not values:
                 lines.append("- None")
 
+        lines.extend(["", "## Historical Content Authors and Editors", ""])
+        for value in result.content_author_attribution:
+            lines.append(
+                f"- Drupal uid=`{value['drupal_uid']}`; "
+                f"Django username=`{value['username']}`; "
+                f"username derivation=`{value['username_derivation']}`; "
+                f"account=`{value['account_state']}`"
+            )
+        if not result.content_author_attribution:
+            lines.append("- None (source was not a raw Drupal dump or contained no identified authors).")
+
         lines.extend(
             [
                 "",
@@ -2083,11 +2146,21 @@ class Command(BaseCommand):
                 f"- `SystemStatusNews` records with no mapped infrastructure (`N/A`): `{result.system_na_infrastructure}`",
                 f"- `IntegrationNews` records with no affected element (`N/A`): `{result.integration_na_element}`",
                 f"- Ambiguous integration mappings accepted as `N/A`: `{result.unresolved_allowed_na}`",
+                f"- Unresolved historical infrastructure references retained as source IDs: `{len(result.unresolved_infrastructure_references)}`",
                 "",
-                "## Warnings",
+                "## Unresolved Historical Infrastructure References",
                 "",
             ]
         )
+
+        if result.unresolved_infrastructure_references:
+            lines.extend(
+                f"- SystemStatusNews nid=`{item['nid']}`; source resource ID=`{item['resource_id']}`"
+                for item in result.unresolved_infrastructure_references
+            )
+        else:
+            lines.append("- None")
+        lines.extend(["", "## Warnings", ""])
 
         if result.warnings:
             lines.extend([f"- {warning}" for warning in result.warnings])
@@ -2114,8 +2187,18 @@ class Command(BaseCommand):
             f"Integration: {result.created_integration}/{result.updated_integration}"
         )
         self.stdout.write(
+            "Historical content authors/editors -> existing accounts: "
+            f"{sum(item['account_state'] == 'existing' for item in result.content_author_attribution)}, "
+            "missing accounts: "
+            f"{sum(item['account_state'] == 'missing' for item in result.content_author_attribution)}"
+        )
+        self.stdout.write(
             f"N/A -> infrastructure: {result.system_na_infrastructure}, "
             f"integration element: {result.integration_na_element}"
+        )
+        self.stdout.write(
+            "Unresolved historical infrastructure references retained as source IDs: "
+            f"{len(result.unresolved_infrastructure_references)}"
         )
         self.stdout.write(
             "Source adjustments -> excluded system nids: "

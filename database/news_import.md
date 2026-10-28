@@ -33,7 +33,7 @@ The identities involved are different:
 | OS process owner | `software` |
 | Python runtime | `<approved-release>/.venv/bin/python` |
 | PostgreSQL role | Loaded by Django from the host-specific `APP_CONFIG` |
-| Django author for imported rows | Exact case-sensitive match of the derived Drupal username candidate, otherwise the existing user supplied with `--import-user` |
+| Django author for imported rows | Existing exact username match; unmatched source authors are reported and the configured existing `--import-user` is used as a temporary attribution |
 
 Never print the configuration file or credentials. The importer reports the database
 name, write host, source path and checksum, Python executable, counts, usernames,
@@ -52,25 +52,29 @@ Raw-dump imports enforce all of the following:
 5. `--dry-run` and `--apply` are mutually exclusive; replacement without either is refused.
 6. A strict dry-run writes a versioned JSON plan binding the source path and SHA-256,
    release interpreter, target, options, adjustments, IDs, counts, relationships,
-   distribution-option counts, per-record author/post-date attribution and planned
-   database outcome.
+   distribution-option counts, per-record author/post-date attribution, historical
+   creator/editor mappings and account presence, and planned database outcome.
 7. A raw-dump write requires `--strict`, an existing import user, and
-   `--suppress-notifications`. This keeps the legacy delivery-action fields off; it does
-   not erase the separately stored distribution choices.
+   `--suppress-notifications`. Raw-dump replacement does not create or modify accounts
+   for historical content creators/editors. Those identities are matched to existing
+   usernames and missing accounts are listed in the report. Unmatched news authors use the configured
+   existing `--import-user` as temporary attribution, and are individually flagged in
+   the report so the missing account can be added and the import rerun. This does not
+   erase the separately stored distribution choices.
 8. Drupal node IDs and revisions, field-table revisions, types, dates, references and
    choice mappings are validated before PostgreSQL replacement begins. Unknown or
    duplicate distribution choices fail rather than being dropped.
-9. Only Infrastructure News that is current or future at the operator-approved cutover
-   timestamp is retained. Every affected infrastructure and integration-element reference
-   on a retained record is preserved; unknown, missing or duplicate relationships fail
-   validation or become strict-mode failures.
+9. All valid Infrastructure News is retained regardless of its start/end dates. Current
+   CIDER matches are stored as relationships. Historical resource IDs without a current
+   CIDER match remain in the source field and API output, and are listed in the reviewed
+   plan/report. Duplicate or ambiguous CIDER matches remain strict-mode failures.
 10. Delete, import, stable-ID assignment, relationship creation, distribution-choice
     persistence, full field/relationship verification and final stable-ID-set verification
     share one PostgreSQL transaction.
 11. Any failure rolls back the complete replacement.
-12. Replacement dry-runs require a timezone-aware `--system-news-as-of` value. Apply
-    loads the exact value from the reviewed plan, and every cutoff-excluded Drupal nid is
-    recorded in both artifacts.
+12. Replacement imports include all Infrastructure News by default, regardless of start
+    or end date. An optional `--system-news-as-of` may be used for a deliberately filtered
+    run; the reviewed plan records the choice and any excluded Drupal nids.
 13. Requested explicit exclusions must exist exactly once. Named source corrections
     require an exact original-value match and fail rather than changing an unexpected
     value.
@@ -78,48 +82,43 @@ Raw-dump imports enforce all of the following:
     refuses a changed plan, source, release interpreter, target, correction definition,
     staged dataset or database outcome and rolls back transactional drift.
 15. Each retained record preserves its original Drupal post timestamp in Django's
-    displayed `created_at` field (and in `published_at` when published). For both feeds,
-    a Drupal login containing one `@` is reduced to the local part before an exact,
-    case-sensitive Django username match; a plain login is unchanged. Blank, deleted,
-    malformed or unmatched names use the explicit `--import-user` fallback. Drupal uid,
-    derived username candidate and method, selected Django username, resolution reason and
-    post timestamp are bound per nid in the plan. Raw email-shaped logins, their domains,
-    Drupal mail columns and password data are never retained or emitted.
-16. Every run writes a Markdown report, including the plan identity, cutoff, cutoff
+    displayed `created_at` field (and in `published_at` when published). A Drupal login
+    containing one `@` is reduced to its local part; a plain login is unchanged. Every
+    non-anonymous uid in `node_field_data.uid` or `node_revision.revision_uid` is mapped
+    to an existing account; missing accounts are reported without being created. Missing
+    or unusable source names use a `drupal_uid_<uid>` placeholder and are reported as
+    missing. Raw email-shaped logins, their domains, Drupal mail columns and password
+    data are never retained or emitted. Infrastructure News pages and APIs order records
+    newest-first by this original post timestamp.
+16. Every run writes a Markdown report, including the plan identity, optional cutoff,
     exclusions, explicit exclusions, corrections, distribution-option counts and every
     author/post-date decision. Parser failures are also recorded.
 
-The parser reads only the current Drupal node/field tables plus `uid` and `name` from the
-Drupal users table, and ignores unrelated dump tables and user columns. It uses no live
-MySQL or Drupal API connection.
+The parser reads the current Drupal node/field tables, `revision_uid` from
+`node_revision`, and only `uid` and `name` from the Drupal users table. It ignores
+unrelated dump tables and user columns. It uses no live MySQL or Drupal API connection.
+The October 26, 2026 dump contains 49 distinct non-anonymous creator/editor identities;
+the 41 current node creators are included in that total, and all 49 normalize to unique
+local-part usernames.
 
-## Approved cutover window and source correction
+## Full-history news import and source correction
 
-Infrastructure News is a cutover snapshot, not a historical archive. The importer keeps
-the union of records that are current or future at `--system-news-as-of`:
+The replacement imports all valid Infrastructure News and Integration News, including
+past, current, and future Infrastructure News. No cutover date is supplied. Operators can
+still request a filtered run with `--system-news-as-of`, but that option is not used for
+the full-history import described here. Both Integration and Infrastructure News pages
+and APIs display records newest-first according to the original Drupal post timestamp.
 
-- current: start is at or before the cutoff and end is absent or at or after the cutoff;
-- future: start is at or after the cutoff.
-
-Everything else is past and is excluded with its Drupal nid recorded in the report. The
-cutoff must be an explicit timezone-aware ISO-8601 timestamp. Select it once for each
-rehearsal or cutover and reuse the exact string for dry-run and apply. The importer never
-uses its live clock or calls the Operations API to make this decision. Integration News
-is not date-filtered.
-
-Two reviewed source exclusions are required for the August 31 and September 1 source
-family:
-
-- nid `404` has empty content. The raw parser validates content before applying the date
-  cutoff, so strict mode requires its explicit exclusion even though it is past;
-- nid `797` is the historical Hive Gateway retirement. Its absent end date makes it look
-  current to the generic cutoff rule, but its resource is no longer in active CIDER.
+For the reviewed August 31 and September 1 source family, nid `404` has empty content and
+must be explicitly excluded because the importer cannot create a valid news item from it.
+Historical nid `797` is included; its retired resource may be unresolved in current CIDER,
+in which case the source resource ID remains visible in the news/API output and is listed
+for review as an unresolved historical reference.
 
 The September 14 dump surfaced a `Replacement validation failed for SystemStatusNews
 nid=914 field content` error during `--apply`. This was not a bad-source-data case like
-`404`/`797` above and was not excluded: nid `914` is retained content (it already passed
-the cutoff filter before validation ran), so dropping it would have been a real content
-loss. The actual cause was a validator bug - `_validate_replacement` compared the raw
+`404` above and was not excluded: nid `914` is valid content, so dropping it would have
+been a real content loss. The actual cause was a validator bug - `_validate_replacement` compared the raw
 Drupal source string against the saved value, but `_import_system_record` calls
 `obj.full_clean(...)` before saving, which runs `HTMLField.clean()` ->
 `djangocms_text_ckeditor.html.clean_html()` and rewrites almost any markup not already in
@@ -128,19 +127,18 @@ older Drupal-exported HTML). Fixed in the validator itself (see
 `_validate_replacement` in `import_drupal_news.py`) by normalizing the expected content
 through the same `clean_html()` call before comparing, rather than excluding the record.
 
-One source correction remains necessary before the cutoff can be evaluated: correct only
+One source correction remains necessary before importing all records: correct only
 nid `928`'s start datetime from the exact source value
   `0026-01-07T12:50:36` to `2026-01-07T12:50:36` by supplying
 `--source-correction infrastructure-928-start-year`. Its Drupal creation timestamp and
 end datetime are both in January 2026. If the original start value changes, the importer
-refuses the correction. Whether this corrected record is retained then depends only on the
-approved cutoff.
+refuses the correction.
 
-Do not reuse the previous full-history counts. Record the retained SystemStatusNews count,
-infrastructure-relationship count and cutoff-excluded nid list from the successful strict
-dry-run. For the reviewed August 31 dump, the unfiltered Integration News count remains 17
-and its expected relationship count remains 39. Later dumps must be reviewed from their
-own report.
+Do not reuse previous counts. For the October 26, 2026 dump, the source contains 289
+Infrastructure News rows and 19 Integration News rows; after excluding empty-content nid
+`404`, the expected full-history import has 288 Infrastructure News records and 19
+Integration News records. Record relationships and unresolved CIDER references from the
+successful strict dry-run. Later dumps must be reviewed from their own report.
 
 Do not edit the dump. Its SHA-256 continues to identify the exact source artifact, while
 the report records the exclusion and correction separately.
@@ -205,7 +203,6 @@ news_state() {
   printf 'Environment: %s\n' "${ENVIRONMENT:-<unset>}"
   printf 'Release: %s\n' "${RELEASE:-<unset>}"
   printf 'Python: %s\n' "${PYTHON:-<unset>}"
-  printf 'Cutoff: %s\n' "${SYSTEM_NEWS_AS_OF:-<unset>}"
   printf 'Evidence directory: %s\n' "${CHANGE_RECORD:-<unset>}"
   printf 'Plan: %s\n' "${IMPORT_PLAN:-<unset>}"
   printf 'Target backup: %s\n' "${TARGET_BACKUP:-<unset>}"
@@ -214,7 +211,6 @@ news_state() {
 news_setup() {
   local environment="${1:-}"
   local release_name="${2:-}"
-  local requested_cutoff="${3:-}"
 
   case "$release_name" in
     ''|*'<'*|*'>'*|*/*)
@@ -271,12 +267,6 @@ news_setup() {
   APPLY_REPORT="$CHANGE_RECORD/import-apply.md"
   TARGET_BACKUP="$CHANGE_RECORD/$BACKUP_NAME"
   BACKUP_CHECKSUM_FILE="$CHANGE_RECORD/target-backup.sha256"
-  if test -n "$requested_cutoff"; then
-    SYSTEM_NEWS_AS_OF="$requested_cutoff"
-  else
-    SYSTEM_NEWS_AS_OF="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  fi
-
   export APP_CONFIG RELEASE ENVIRONMENT EXPECTED_DATABASE EXPECTED_WRITE_HOST
   export IMPORT_USER CHANGE_RECORD IMPORT_PLAN BACKUP_PHRASE APPLY_PHRASE
 
@@ -331,8 +321,6 @@ news_setup \
 ```
 
 Keep this shell open and do not redefine the variables. Do not export `PYTHONPATH`.
-For a deterministic replay only, pass the previously reviewed cutoff as a third argument
-to `news_setup`; otherwise setup captures the current UTC time exactly once.
 
 ### 3. Confirm the importer release and target
 
@@ -392,8 +380,8 @@ print("fallback user:", os.environ["IMPORT_USER"])
 
 if Path(sys.executable) != expected_python:
     raise SystemExit("Python executable does not match RELEASE")
-if (IMPORT_PLAN_VERSION, IMPORT_CONTRACT_VERSION) != (4, 4):
-    raise SystemExit("Release does not contain plan/contract version 4")
+if (IMPORT_PLAN_VERSION, IMPORT_CONTRACT_VERSION) != (5, 5):
+    raise SystemExit("Release does not contain plan/contract version 5")
 if str(database.get("NAME") or "") != os.environ["EXPECTED_DATABASE"]:
     raise SystemExit("Database does not match EXPECTED_DATABASE")
 if str(database.get("HOST") or "") != os.environ["EXPECTED_WRITE_HOST"]:
@@ -415,7 +403,7 @@ news_preflight
 ```
 
 This reads settings but never prints credentials. Continue only after the output confirms
-plan and contract version 4, the release interpreter, the expected database for the
+plan and contract version 5, the release interpreter, the expected database for the
 environment passed to `news_setup` (`portal_beta` or `portal1`), the independently
 approved write host, fallback user `jlambertson`, and both distribution migrations.
 
@@ -438,9 +426,7 @@ news_dry_run() {
     --dry-run \
     --strict \
     --suppress-notifications \
-    --system-news-as-of "$SYSTEM_NEWS_AS_OF" \
     --exclude-system-nid 404 \
-    --exclude-system-nid 797 \
     --source-correction infrastructure-928-start-year \
     --confirm-database "$EXPECTED_DATABASE" \
     --confirm-host "$EXPECTED_WRITE_HOST" \
@@ -470,7 +456,7 @@ news_dry_run() {
 news_dry_run
 ```
 
-The importer chooses the newest valid dump and records its exact path and SHA-256, cutoff,
+The importer chooses the newest valid dump and records its exact path and SHA-256, optional cutoff,
 retained IDs, counts, relationships, exclusions, correction, author/post-date attribution,
 and planned database outcome. If a newer dump was selected than intended, stop and start a
 new rehearsal with a controlled source directory.
@@ -484,7 +470,7 @@ less "$DRY_RUN_REPORT"
 less "$PRETTY_PLAN"
 ```
 
-Print and validate the compact version 4 contract:
+Print and validate the compact version 5 contract:
 
 ```bash
 news_review_contract() {
@@ -499,8 +485,8 @@ expected = plan["expected"]
 
 if plan["schema"] != "access-ci.drupal-news-import-plan":
     raise SystemExit("Unexpected plan schema")
-if (plan["version"], contract["contract_version"]) != (4, 4):
-    raise SystemExit("Expected plan/contract version 4")
+if (plan["version"], contract["contract_version"]) != (5, 5):
+    raise SystemExit("Expected plan/contract version 5")
 
 fallback_user = contract["options"]["import_user"]
 for feed, key in (
@@ -526,7 +512,7 @@ print("source:", contract["source"]["path"])
 print("source SHA-256:", contract["source"]["sha256"])
 print("database/host/port:", contract["target"])
 print("fallback user:", fallback_user)
-print("cutoff:", contract["adjustments"]["system_news_as_of"])
+print("optional cutoff:", contract["adjustments"]["system_news_as_of"])
 print("explicit exclusions:", contract["adjustments"]["excluded_system_nids"])
 print("corrections:", contract["adjustments"]["source_corrections"])
 print("system IDs:", expected["system_ids"])
@@ -536,6 +522,15 @@ print("system relationships:", expected["system_relationships"])
 print("integration relationships:", expected["integration_relationships"])
 print("distribution options:", expected["distribution_option_counts"])
 print("planned outcome:", expected["outcome"])
+print("unresolved historical infrastructure references:", expected["unresolved_infrastructure_references"])
+print("historical content authors/editors:", len(expected["content_author_attribution"]))
+for item in expected["content_author_attribution"]:
+    print(
+        "  Drupal uid:", item["drupal_uid"],
+        "Django username:", item["username"],
+        "source:", item["username_derivation"],
+        "account:", item["account_state"],
+    )
 
 for feed, key in (
     ("SystemStatusNews", "system_attribution"),
@@ -567,9 +562,13 @@ news_review_contract
 Do not continue until a human confirms all of the following:
 
 - the selected source path and SHA-256 identify the intended dump;
-- the Python executable, database, write host, fallback user and cutoff are exact;
-- only operationally appropriate current/future Infrastructure News IDs are retained;
-- explicit exclusions are exactly `404` and `797`, and the only correction is nid `928`;
+- the Python executable, database, write host and fallback user are exact;
+- all valid Infrastructure News IDs are retained, including historical nid `797`;
+- the expected source exclusion is empty-content nid `404`, and the only correction is nid `928`;
+- every unresolved historical resource reference is accounted for in the plan/report;
+- the October 26 dump's 49 historical creator/editor identities are all present, with
+  usernames stored only as the local part before `@`;
+- no users are created or modified; missing historical accounts are listed in the report;
 - relationship and planned delete/create counts are sensible;
 - every post date and exact username match in the full report is correct;
 - every fallback is understood and resolves to `jlambertson`; and
@@ -814,7 +813,7 @@ reported artifact, correct the cause, and rerun only that phase. The functions n
 top-level `exit`, so they do not log out `software`, and their global rehearsal variables
 remain set. Do not retry a failed or uncertain apply until its report and database outcome
 are understood. Use a new evidence directory and a new dry-run if any reviewed input,
-release, target, source dump, cutoff, user resolution or correction changes.
+release, target, source dump, optional cutoff, user resolution or correction changes.
 
 If the login shell itself is closed or disconnected, its variables and functions cannot
 be recovered from Bash. Start a new `software` shell and either begin a new rehearsal or

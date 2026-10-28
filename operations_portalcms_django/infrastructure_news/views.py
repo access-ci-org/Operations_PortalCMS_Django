@@ -29,7 +29,11 @@ def system_status_news(request):
     else:
         news_items = services.get_public_news_queryset()
 
-    news_items = news_items.select_related("author").prefetch_related(infrastructure_prefetch)
+    news_items = (
+        news_items.select_related("author")
+        .prefetch_related(infrastructure_prefetch)
+        .order_by("-created_at", "-pk")
+    )
     paginator = Paginator(news_items, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
 

@@ -267,7 +267,7 @@ class ApiInfrastructureNewsTests(TestCase):
 
         self.assertEqual(item["distribution_options"], "Email only subscribers, Post to Slack")
 
-    def test_items_are_ordered_by_stable_outage_id_with_nulls_last(self):
+    def test_items_are_ordered_newest_posted_first(self):
         SystemStatusNews.objects.create(
             subject="Earlier stable identifier",
             content="Earlier identifier content",
@@ -290,7 +290,7 @@ class ApiInfrastructureNewsTests(TestCase):
         response = self.client.get("/api/infrastructure_news_v2")
         data = json.loads(response.content)
 
-        self.assertEqual([item["outage_id"] for item in data], ["100", "900", None])
+        self.assertEqual([item["outage_id"] for item in data], [None, "100", "900"])
         missing_timestamp_item = next(item for item in data if item["outage_id"] is None)
         self.assertEqual(missing_timestamp_item["start_timestamp"], "")
         self.assertEqual(missing_timestamp_item["end_timestamp"], "")
