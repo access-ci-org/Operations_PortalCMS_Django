@@ -13,6 +13,7 @@ from collections import defaultdict
 import requests
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from resources.models import (
@@ -27,8 +28,9 @@ from resources.services import operations_api_base
 class Command(BaseCommand):
     """Synchronize CIDER infrastructure, groups, organizations, and features.
 
-    All selected operations share one transaction. Dry-run mode performs the
-    same lookups and comparisons, then rolls the transaction back.
+    Selected payloads are fetched and validated before database changes begin.
+    All writes then share one transaction; dry-run performs the same lookups
+    and comparisons, then rolls that transaction back.
     """
 
     help = "Syncs CIDER data from Operations API (infrastructure, groups, organizations, features)"
@@ -102,31 +104,48 @@ class Command(BaseCommand):
         self.stdout.write("=" * 70)
         self.stdout.write(f"Base URL: {api_base}")
         self.stdout.write(f"Mode: {'dry-run' if dry_run else 'write'}")
+        self.stdout.write(f"Started at: {timezone.now().isoformat()}")
         self.stdout.write("")
 
         counts = defaultdict(int)
+        infrastructure_resources = None
+        groups_data = None
 
         try:
-            with transaction.atomic():
-                if not skip_infrastructure:
-                    self.sync_infrastructure(api_base=api_base, timeout=timeout, dry_run=dry_run, counts=counts)
-                if not skip_groups_bundle:
-                    self.sync_groups_bundle(
-                        api_base=api_base,
-                        timeout=timeout,
-                        dry_run=dry_run,
-                        group_prefix=group_prefix,
-                        prune_stale_groups=prune_stale_groups,
-                        counts=counts,
-                    )
-                if dry_run:
-                    transaction.set_rollback(True)
+            if not skip_infrastructure:
+                infrastructure_url = f"{api_base}/cider/v2/access-active/"
+                infrastructure_data = self.fetch_json(infrastructure_url, timeout=timeout)
+                infrastructure_resources = self.validate_infrastructure_payload(infrastructure_data)
+            if not skip_groups_bundle:
+                groups_url = f"{api_base}/cider/v2/access-active-groups/"
+                groups_data = self.fetch_json(groups_url, timeout=timeout)
+                self.validate_groups_payload(groups_data)
         except requests.RequestException as e:
-            self.stdout.write(self.style.ERROR(f"✗ Sync failed: {e}"))
-            return
+            raise CommandError(f"CIDER API request failed: {e}") from e
+        except ValueError as e:
+            raise CommandError(f"CIDER API returned invalid JSON: {e}") from e
+
+        with transaction.atomic():
+            if infrastructure_resources is not None:
+                self.sync_infrastructure(
+                    resources=infrastructure_resources,
+                    dry_run=dry_run,
+                    counts=counts,
+                )
+            if groups_data is not None:
+                self.sync_groups_bundle(
+                    data=groups_data,
+                    dry_run=dry_run,
+                    group_prefix=group_prefix,
+                    prune_stale_groups=prune_stale_groups,
+                    counts=counts,
+                )
+            if dry_run:
+                transaction.set_rollback(True)
 
         self.stdout.write("\n" + "=" * 70)
         self.stdout.write(self.style.SUCCESS("✓ CIDER Data Sync Complete"))
+        self.stdout.write(f"Finished at: {timezone.now().isoformat()}")
         self.stdout.write("=" * 70)
         self.stdout.write("Summary:")
         for key in sorted(counts):
@@ -137,9 +156,40 @@ class Command(BaseCommand):
 
     def fetch_json(self, url: str, timeout: int):
         """Fetch and decode one API response."""
-        response = requests.get(url, timeout=timeout)
+        response = requests.get(url, headers={"Accept": "application/json"}, timeout=timeout)
         response.raise_for_status()
         return response.json()
+
+    def validate_infrastructure_payload(self, data) -> list[dict]:
+        """Reject incomplete snapshots before they can deactivate local rows."""
+        if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+            raise CommandError("Invalid CIDER infrastructure response: expected a results list.")
+
+        resources = data["results"]
+        if not resources:
+            raise CommandError("Refusing to sync an empty CIDER infrastructure snapshot.")
+
+        seen_ids = set()
+        for index, resource in enumerate(resources):
+            if not isinstance(resource, dict):
+                raise CommandError(f"Invalid CIDER infrastructure record at index {index}.")
+            resource_id = resource.get("cider_resource_id")
+            if not isinstance(resource_id, int) or isinstance(resource_id, bool):
+                raise CommandError(f"CIDER infrastructure record at index {index} has no resource ID.")
+            if resource_id in seen_ids:
+                raise CommandError(f"Duplicate CIDER infrastructure resource ID: {resource_id}.")
+            seen_ids.add(resource_id)
+        return resources
+
+    def validate_groups_payload(self, data) -> None:
+        """Reject malformed bundle envelopes before applying any selected sync."""
+        if not isinstance(data, dict) or not isinstance(data.get("results"), dict):
+            raise CommandError("Invalid CIDER groups response: expected a results object.")
+        results = data["results"]
+        for key in ("active_groups", "organizations", "feature_categories", "features"):
+            records = results.get(key)
+            if not isinstance(records, list) or any(not isinstance(record, dict) for record in records):
+                raise CommandError(f"Invalid CIDER groups response: expected {key} to be a list of objects.")
 
     def clip(self, value, length: int) -> str:
         """Convert a value to text and limit it to a model field length."""
@@ -150,25 +200,19 @@ class Command(BaseCommand):
 
     # Infrastructure records
 
-    def sync_infrastructure(self, api_base: str, timeout: int, dry_run: bool, counts) -> None:
+    def sync_infrastructure(self, resources: list[dict], dry_run: bool, counts) -> None:
         """Upsert active infrastructure and deactivate records absent upstream.
 
         Missing rows are retained as inactive so historical news relationships
         continue to resolve.
         """
         self.stdout.write("--- Syncing Infrastructure (/v2/access-active/) ---")
-        url = f"{api_base}/cider/v2/access-active/"
-        data = self.fetch_json(url, timeout=timeout)
-        resources = data.get("results", [])
         self.stdout.write(f"Fetched resources: {len(resources)}")
 
         seen_ids: set[int] = set()
 
         for resource in resources:
-            resource_id = resource.get("cider_resource_id")
-            if resource_id is None:
-                counts["infrastructure_skipped_missing_id"] += 1
-                continue
+            resource_id = resource["cider_resource_id"]
             seen_ids.add(resource_id)
 
             updated_at_raw = resource.get("updated_at")
@@ -240,8 +284,7 @@ class Command(BaseCommand):
 
     def sync_groups_bundle(
         self,
-        api_base: str,
-        timeout: int,
+        data: dict,
         dry_run: bool,
         group_prefix: str,
         prune_stale_groups: bool,
@@ -253,8 +296,6 @@ class Command(BaseCommand):
         at least one source group ID has been processed.
         """
         self.stdout.write("--- Syncing Groups Bundle (/v2/access-active-groups/) ---")
-        url = f"{api_base}/cider/v2/access-active-groups/"
-        data = self.fetch_json(url, timeout=timeout)
         results = data.get("results", {})
         active_groups = results.get("active_groups", [])
         organizations = results.get("organizations", [])

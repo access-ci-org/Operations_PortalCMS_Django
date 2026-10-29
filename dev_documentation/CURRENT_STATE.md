@@ -286,6 +286,43 @@ that now-removed command; those are not cleaned up automatically.
 Run Django management commands from the Django project directory
 `operations_portalcms_django/` or through the deployed management wrapper.
 
+Until the Ansible-managed cron is enabled, manually run the CIDER sync from the
+production release as `software`. Set `APP_CONFIG` to the intended database;
+commands without `--dry-run` write to it:
+
+```bash
+sudo -iu software
+cd /soft/django-cms-01/PROD/operations_portalcms_django
+export APP_CONFIG=/soft/django-cms-01/conf/portal.conf
+```
+
+For the normal full sync (infrastructure, groups, organizations, feature
+categories, and features), review the dry run and then run the write command:
+
+```bash
+uv run python manage.py sync_cider_from_api --dry-run
+uv run python manage.py sync_cider_from_api
+```
+
+To refresh only the infrastructure table, run:
+
+```bash
+uv run python manage.py sync_cider_from_api --skip-groups-bundle --dry-run
+uv run python manage.py sync_cider_from_api --skip-groups-bundle
+```
+
+To deliberately prune stale local groups, first preview the deletion counts;
+this is not part of the routine sync:
+
+```bash
+uv run python manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups --dry-run
+uv run python manage.py sync_cider_from_api --skip-infrastructure --prune-stale-groups
+```
+
+`--prune-stale-groups` deletes local `CiderGroups` rows absent from the fetched
+group list. It does not prune infrastructure rows. Review the dry-run before
+running the write command.
+
 | Command | Current use |
 |---|---|
 | `manage.py setup_groups` | Creates focus-area auth groups; grants shared CMS/plugin/page permissions; gives `Focus_area_editors` publish/unlock rights; removes publish from page-specific focus groups. Does not touch news publisher groups - see News Workflow above |
