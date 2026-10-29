@@ -1,7 +1,8 @@
 """Fetch and shape resource and software data for public portal views.
 
-Public listings use the Operations API. Local CIDER rows remain available only
-for form choices and administrative workflows.
+Public listings use the Operations API when available. The allocated-resource
+listings can fall back to the last synchronized local CIDER projection during
+an API outage; other resource views remain API-backed.
 """
 
 from collections import Counter, defaultdict
@@ -141,8 +142,13 @@ def _publishable_resources(kind, resources):
             continue
         if not _has_value(resource.get("organization_name")):
             continue
-        if kind == "allocated" and not _is_access_resource(resource):
-            continue
+        if kind == "allocated":
+            # v2/access-active/ includes online services too. Keep this
+            # allocated listing aligned with its established Compute/Storage
+            # scope, even if v2 later adds another resource type.
+            resource_type = str(resource.get("cider_type", "")).strip().casefold()
+            if resource_type not in {"compute", "storage"} or not _is_access_resource(resource):
+                continue
         publishable.append(resource)
     return publishable
 
@@ -155,7 +161,9 @@ def _resource_kind(resource):
 
 
 def _is_publishable_resource(resource):
-    return bool(_publishable_resources(_resource_kind(resource), [resource]))
+    if not _has_value(resource.get("organization_name")):
+        return False
+    return _resource_kind(resource) == "online_services" or _is_access_resource(resource)
 
 
 def _results_from_payload(data, label):
@@ -169,7 +177,7 @@ def _results_from_payload(data, label):
 
 
 def _local_resource_dicts(kind):
-    queryset = CiderInfrastructure.objects.all()
+    queryset = CiderInfrastructure.objects.filter(is_active=True)
     if kind == "online_services":
         queryset = queryset.filter(cider_type__iexact=ONLINE_SERVICE_TYPE)
     else:
@@ -180,7 +188,7 @@ def _local_resource_dicts(kind):
 
 def _remote_resource_listing(kind):
     path = {
-        "allocated": "/cider/v1/access-active/",
+        "allocated": "/cider/v2/access-active/",
         "online_services": "/cider/v1/access-online-services/",
     }[kind]
 
@@ -196,7 +204,10 @@ def _remote_resource_listing(kind):
     results, error_message = _results_from_payload(data, "resources")
     if error_message:
         return {}, error_message
-    return _group_resources_by_org(_publishable_resources(kind, results)), None
+    publishable = _publishable_resources(kind, results)
+    if kind == "allocated" and not publishable:
+        return {}, "CIDER returned no allocated resources."
+    return _group_resources_by_org(publishable), None
 
 
 # Public resource queries
@@ -205,17 +216,32 @@ def _remote_resource_listing(kind):
 def get_resource_listing(kind):
     """Return public resource listing grouped by organisation.
 
-    Data comes exclusively from the Warehouse API. An unavailable API returns
-    an error message rather than silently serving stale local projection data.
+    The Warehouse API is authoritative. If the allocated-resource endpoint is
+    unavailable, use the last synchronized active Compute/Storage projection
+    as a fallback. Online services and other listings remain API-only.
     """
-    return _remote_resource_listing(kind)
+    resources_by_org, error_message = _remote_resource_listing(kind)
+    if error_message is None or kind != "allocated":
+        return resources_by_org, error_message
+
+    try:
+        local_resources = _local_resource_dicts("allocated")
+    except DatabaseError:
+        return resources_by_org, error_message
+
+    fallback_resources = _publishable_resources("allocated", local_resources)
+    fallback_by_org = _group_resources_by_org(fallback_resources)
+    if not fallback_by_org:
+        return resources_by_org, error_message
+
+    return fallback_by_org, "CIDER is temporarily unavailable; showing the last synchronized resource data."
 
 
 def get_active_infrastructure_queryset():
     """Return the queryset of active local CIDER infrastructure rows.
 
-    Intended for use by news entry forms and admin selectors only.
-    Public resource pages must use the Warehouse API via get_resource_listing().
+    Intended for news entry forms and admin selectors. Public resource pages
+    use the Warehouse API first, with a limited allocated-resource fallback.
     """
     return CiderInfrastructure.objects.filter(is_active=True).order_by("resource_descriptive_name")
 

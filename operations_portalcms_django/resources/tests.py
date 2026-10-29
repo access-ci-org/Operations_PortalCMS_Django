@@ -1,10 +1,12 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import requests
+from django.core.management.base import CommandError
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
 from . import services, views
+from .management.commands.sync_cider_from_api import Command as SyncCiderCommand
 
 
 class MockResponse:
@@ -38,11 +40,13 @@ class ResourceServiceTests(SimpleTestCase):
             payload={
                 "results": [
                     {
+                        "cider_type": "Compute",
                         "resource_descriptive_name": "Beta",
                         "organization_name": "Org B",
                         "project_affiliation": "ACCESS",
                     },
                     {
+                        "cider_type": "Compute",
                         "resource_descriptive_name": "Alpha",
                         "organization_name": "Org A",
                         "project_affiliation": "ACCESS",
@@ -58,8 +62,9 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertEqual(resources_by_org["Org A"][0]["resource_descriptive_name"], "Alpha")
         mock_get.assert_called_once()
 
+    @patch("resources.services._local_resource_dicts", return_value=[])
     @patch("resources.services.requests.get")
-    def test_empty_resource_api_response_returns_error(self, mock_get):
+    def test_empty_resource_api_response_returns_error(self, mock_get, _mock_local):
         mock_get.return_value = MockResponse(content=b"")
 
         resources_by_org, error_message = services.get_resource_listing("allocated")
@@ -67,8 +72,9 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertEqual(resources_by_org, {})
         self.assertEqual(error_message, "API returned empty response")
 
+    @patch("resources.services._local_resource_dicts", return_value=[])
     @patch("resources.services.requests.get")
-    def test_upstream_resource_error_returns_error(self, mock_get):
+    def test_upstream_resource_error_returns_error_when_cache_is_empty(self, mock_get, _mock_local):
         mock_get.return_value = MockResponse(http_error=requests.HTTPError("503"))
 
         resources_by_org, error_message = services.get_resource_listing("allocated")
@@ -77,19 +83,81 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertIn("Unable to fetch resources", error_message)
         self.assertIn("503", error_message)
 
+    @patch("resources.services._local_resource_dicts")
     @patch("resources.services.requests.get")
-    def test_api_failure_does_not_fall_back_to_local_data(self, mock_get):
-        """An unavailable API must produce an error, not silently serve local rows."""
+    def test_allocated_api_failure_uses_local_active_resource_fallback(self, mock_get, mock_local):
         mock_get.return_value = MockResponse(http_error=requests.HTTPError("503"))
+        mock_local.return_value = [
+            {
+                "cider_type": "Compute",
+                "resource_descriptive_name": "Cached Compute",
+                "organization_name": "Cached Org",
+                "project_affiliation": "ACCESS",
+            },
+            {
+                "cider_type": "Storage",
+                "resource_descriptive_name": "Cached Storage",
+                "organization_name": "Cached Org",
+                "project_affiliation": "ACCESS",
+            },
+        ]
 
         resources_by_org, error_message = services.get_resource_listing("allocated")
 
-        self.assertEqual(resources_by_org, {})
-        self.assertIsNotNone(error_message)
+        self.assertEqual(
+            [resource["resource_descriptive_name"] for resource in resources_by_org["Cached Org"]],
+            ["Cached Compute", "Cached Storage"],
+        )
+        self.assertIn("last synchronized", error_message)
+        mock_local.assert_called_once_with("allocated")
         mock_get.assert_called_once()
 
+    @patch("resources.services._local_resource_dicts")
     @patch("resources.services.requests.get")
-    def test_invalid_resource_json_returns_error(self, mock_get):
+    def test_online_services_api_failure_does_not_use_allocated_fallback(self, mock_get, mock_local):
+        mock_get.return_value = MockResponse(http_error=requests.HTTPError("503"))
+
+        resources_by_org, error_message = services.get_resource_listing("online_services")
+
+        self.assertEqual(resources_by_org, {})
+        self.assertIn("Unable to fetch resources", error_message)
+        mock_local.assert_not_called()
+
+    @patch("resources.services._local_resource_dicts")
+    @patch("resources.services.requests.get")
+    def test_empty_allocated_response_uses_local_fallback(self, mock_get, mock_local):
+        mock_get.return_value = MockResponse(payload={"results": []})
+        mock_local.return_value = [
+            {
+                "cider_type": "Compute",
+                "resource_descriptive_name": "Cached Compute",
+                "organization_name": "Cached Org",
+                "project_affiliation": "ACCESS",
+            }
+        ]
+
+        resources_by_org, error_message = services.get_resource_listing("allocated")
+
+        self.assertEqual(resources_by_org["Cached Org"][0]["resource_descriptive_name"], "Cached Compute")
+        self.assertIn("no allocated resources", error_message)
+        mock_local.assert_called_once_with("allocated")
+
+    @patch("resources.services.CiderInfrastructure.objects.filter")
+    def test_local_allocated_query_excludes_inactive_and_online_services(self, mock_filter):
+        queryset = Mock()
+        queryset.exclude.return_value = queryset
+        queryset.order_by.return_value = []
+        mock_filter.return_value = queryset
+
+        self.assertEqual(services._local_resource_dicts("allocated"), [])
+
+        mock_filter.assert_called_once_with(is_active=True)
+        queryset.exclude.assert_called_once_with(cider_type__iexact="Online Service")
+        queryset.order_by.assert_called_once_with("resource_descriptive_name")
+
+    @patch("resources.services._local_resource_dicts", return_value=[])
+    @patch("resources.services.requests.get")
+    def test_invalid_resource_json_returns_error(self, mock_get, _mock_local):
         mock_get.return_value = MockResponse(json_error=ValueError("bad json"))
 
         resources_by_org, error_message = services.get_resource_listing("allocated")
@@ -103,16 +171,19 @@ class ResourceServiceTests(SimpleTestCase):
             payload={
                 "results": [
                     {
+                        "cider_type": "Compute",
                         "resource_descriptive_name": "Canonical",
                         "organization_name": "Known Org",
                         "project_affiliation": "ACCESS",
                     },
                     {
+                        "cider_type": "Compute",
                         "resource_descriptive_name": "Missing Org",
                         "organization_name": "",
                         "project_affiliation": "ACCESS",
                     },
                     {
+                        "cider_type": "Compute",
                         "resource_descriptive_name": "Non ACCESS",
                         "organization_name": "Known Org",
                         "project_affiliation": "",
@@ -126,6 +197,42 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertIsNone(error_message)
         self.assertEqual([item["resource_descriptive_name"] for item in resources_by_org["Known Org"]], ["Canonical"])
         self.assertNotIn("Unknown Organization", resources_by_org)
+
+    @patch("resources.services.requests.get")
+    def test_v2_allocated_listing_excludes_online_services(self, mock_get):
+        mock_get.return_value = MockResponse(
+            payload={
+                "results": [
+                    {
+                        "cider_type": "Compute",
+                        "resource_descriptive_name": "Allocated Compute",
+                        "organization_name": "ACCESS Org",
+                        "project_affiliation": "ACCESS",
+                    },
+                    {
+                        "cider_type": "Online Service",
+                        "resource_descriptive_name": "Online Service",
+                        "organization_name": "ACCESS Org",
+                        "project_affiliation": "ACCESS",
+                    },
+                    {
+                        "cider_type": "Future Type",
+                        "resource_descriptive_name": "Unrecognized Type",
+                        "organization_name": "ACCESS Org",
+                        "project_affiliation": "ACCESS",
+                    },
+                ],
+            }
+        )
+
+        resources_by_org, error_message = services.get_resource_listing("allocated")
+
+        self.assertIsNone(error_message)
+        self.assertEqual(
+            [item["resource_descriptive_name"] for item in resources_by_org["ACCESS Org"]],
+            ["Allocated Compute"],
+        )
+        self.assertTrue(mock_get.call_args.args[0].endswith("/cider/v2/access-active/"))
 
     @patch("resources.services.requests.get")
     def test_remote_online_services_require_org_but_not_access_project(self, mock_get):
@@ -233,6 +340,72 @@ class ResourceServiceTests(SimpleTestCase):
         self.assertIsNone(resource)
         self.assertEqual(error_message, "Resource not found")
 
+    @patch("resources.services.fetch_json")
+    def test_resource_detail_keeps_access_types_outside_allocated_listing_filter(self, mock_fetch):
+        mock_fetch.return_value = {
+            "results": {
+                "cider_type": "Future Type",
+                "resource_descriptive_name": "Other ACCESS Resource",
+                "organization_name": "ACCESS Org",
+                "project_affiliation": "ACCESS",
+            },
+        }
+
+        resource, error_message = services.get_resource_detail(104)
+
+        self.assertIsNone(error_message)
+        self.assertEqual(resource["resource_descriptive_name"], "Other ACCESS Resource")
+
+
+class CiderSyncValidationTests(SimpleTestCase):
+    def setUp(self):
+        self.command = SyncCiderCommand()
+
+    def test_infrastructure_payload_must_be_complete_and_have_unique_ids(self):
+        valid = {"results": [{"cider_resource_id": 10}, {"cider_resource_id": 11}]}
+        self.assertEqual(self.command.validate_infrastructure_payload(valid), valid["results"])
+
+        invalid_payloads = (
+            {},
+            {"results": []},
+            {"results": [{"cider_resource_id": None}]},
+            {"results": [{"cider_resource_id": 10}, {"cider_resource_id": 10}]},
+            {"results": ["not a resource object"]},
+        )
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload), self.assertRaises(CommandError):
+                self.command.validate_infrastructure_payload(payload)
+
+    def test_groups_payload_requires_expected_collections(self):
+        valid = {
+            "results": {
+                "active_groups": [],
+                "organizations": [],
+                "feature_categories": [],
+                "features": [],
+            }
+        }
+        self.command.validate_groups_payload(valid)
+
+        with self.assertRaises(CommandError):
+            self.command.validate_groups_payload({"results": {"active_groups": []}})
+
+    @patch("resources.management.commands.sync_cider_from_api.requests.get")
+    def test_api_request_failure_raises_command_error(self, mock_get):
+        mock_get.side_effect = requests.ConnectionError("offline")
+        options = {
+            "api_url": "https://example.invalid",
+            "timeout": 1,
+            "group_prefix": "",
+            "dry_run": False,
+            "skip_infrastructure": False,
+            "skip_groups_bundle": True,
+            "prune_stale_groups": False,
+        }
+
+        with self.assertRaisesRegex(CommandError, "CIDER API request failed"):
+            self.command.handle(**options)
+
 
 class ResourceViewTests(SimpleTestCase):
     def setUp(self):
@@ -249,6 +422,20 @@ class ResourceViewTests(SimpleTestCase):
         self.assertEqual(response.context_data["page"], "access_allocated")
         self.assertEqual(response.context_data["resources_by_org"]["Org"][0]["resource_descriptive_name"], "Alpha")
         self.assertIsNone(response.context_data["error_message"])
+
+    @patch("resources.views.render", side_effect=fake_render)
+    @patch("resources.views.services.get_resource_listing")
+    def test_infrastructure_view_renders_fallback_resources_with_warning(self, mock_listing, _mock_render):
+        mock_listing.return_value = (
+            {"Org": [{"resource_descriptive_name": "Cached Compute"}]},
+            "CIDER is temporarily unavailable; showing the last synchronized resource data.",
+        )
+
+        response = views.infrastructure.__wrapped__(self.factory.get("/infrastructure"))
+
+        self.assertEqual(response.template_name, "portal/infrastructure_list.html")
+        self.assertEqual(response.context_data["page_obj"].object_list[0]["resource_descriptive_name"], "Cached Compute")
+        self.assertIn("last synchronized", response.context_data["error_message"])
 
     @patch("resources.views.render", side_effect=fake_render)
     @patch("resources.views.services.get_resource_listing")

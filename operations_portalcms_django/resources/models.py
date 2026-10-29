@@ -15,8 +15,9 @@ class CiderInfrastructure(models.Model):
     - historical news record display
     - Resource Provider permission setup (via CiderGroups)
 
-    Public resource listings and detail pages must use the Warehouse API directly,
-    not these local rows.
+    Public resource listings use the Warehouse API when available. The allocated
+    resource listings may fall back to active local Compute and Storage rows
+    during an API outage; resource detail pages remain API-backed.
     """
 
     cider_resource_id = models.IntegerField(primary_key=True)
