@@ -397,6 +397,7 @@ _BASIC_CONTENT_PLUGINS = [
     "VideoPlayerPlugin",
     "VideoSourcePlugin",
     "VideoTrackPlugin",
+    "SnippetPlugin",
 ]
 _BASIC_PLUGIN_LABELS = {
     "TextPlugin": "Add text",
@@ -406,6 +407,7 @@ _BASIC_PLUGIN_LABELS = {
     "VideoPlayerPlugin": "Add a video",
     "VideoSourcePlugin": "Add a video source",
     "VideoTrackPlugin": "Add captions or subtitles",
+    "SnippetPlugin": "Add a snippet",
 }
 _BASIC_PLUGIN_MODULES = {
     "TextPlugin": "Basic content",
@@ -415,6 +417,7 @@ _BASIC_PLUGIN_MODULES = {
     "VideoPlayerPlugin": "Media",
     "VideoSourcePlugin": "Media",
     "VideoTrackPlugin": "Media",
+    "SnippetPlugin": "Basic content",
 }
 _NESTED_PLUGIN_RULES = {
     "child_classes": {
@@ -589,6 +592,7 @@ CMS_PLACEHOLDER_CONF = {
 }
 DJANGOCMS_VERSIONING_LOCK_VERSIONS = True
 DJANGOCMS_VERSIONING_ON_PUBLISH_REDIRECT = "published"
+DJANGOCMS_SNIPPET_VERSIONING = True
 X_FRAME_OPTIONS = "SAMEORIGIN"
 
 # Thumbnail Settings

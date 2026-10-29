@@ -1,3 +1,6 @@
+v0.10.0 dinukadesilva 2026-10-29
+- Adding back "Snippets" to the basic content editing options (CTT-1171)
+
 v0.9.1 jlambertson 2026-10-29
 - updating news_import to import all infrastructure news
 - updating news_import to import all users who have interacted with any content
