@@ -1,4 +1,7 @@
-v0.10.1 jlambertson 2026-10-30
+v0.10.2 jlambertson 2026-10-29
+- updating Edit language for news items
+
+v0.10.1 jlambertson 2026-10-29
 - upgrading how the synchronizer works to keep views up to date with cider data
 
 v0.10.0 dinukadesilva 2026-10-29
