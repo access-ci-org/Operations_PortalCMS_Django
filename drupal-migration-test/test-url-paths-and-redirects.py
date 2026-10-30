@@ -6,8 +6,10 @@ from datetime import datetime
 import csv
 
 ## CHANGE the server urls here
+
 operations_portal_old_server = "https://operations.access-ci.org"
-operations_portal_new_server = "https://beta-operations.access-ci.org"
+# operations_portal_new_server = "https://beta-operations.access-ci.org"
+operations_portal_new_server = "https://cms1.operations.access-ci.org"
 
 operations_portal_url_checks = []
 with open('access-operations-portal-url-paths.csv', mode='r', encoding='utf-8') as file:
@@ -16,10 +18,10 @@ with open('access-operations-portal-url-paths.csv', mode='r', encoding='utf-8') 
         operations_portal_url_checks.append(row)
 
 operations_portal_url_checks_header = operations_portal_url_checks[0]
-operations_portal_url_checks = operations_portal_url_checks[1:]
+operations_portal_url_checks = operations_portal_url_checks[1:] #[18:19]  #
 
 
-def analyze_url(url: str):
+def analyze_url(server, url: str):
     url = url.rstrip('/ ')
 
     with sync_playwright() as p:
@@ -47,11 +49,10 @@ def analyze_url(url: str):
 
         # redirection flow
         def handle_request(request):
-            if request.redirected_from and request.redirected_from.url.rstrip('/ ') == url and request.url.rstrip(
-                    '/ ') != url:
+            if request.redirected_from and request.url.rstrip('/ ') != url:
                 redirects.append({
-                    "from": request.redirected_from.url,
-                    "to": request.url
+                    "from": request.redirected_from.url.replace(server, "").rstrip('/ '),
+                    "to": request.url.replace(server, "").rstrip('/ ')
                 })
 
         page.on("request", handle_request)
@@ -74,8 +75,9 @@ def analyze_url(url: str):
         browser.close()
 
         return {
-            "url": url,
-            "final_url": page.url,
+            "url_absolute": url,
+            "url": url.replace(server, "").rstrip('/ '),
+            "final_url": page.url.replace(server, "").rstrip('/ '),
             "status_code": status_code,
             "load_time_ms": load_time_ms,
             "total_size_kb": round(page_size_bytes / 1024, 2),
@@ -95,8 +97,8 @@ def validate_servers():
         writer = csv.writer(csv_file)
 
         columns = [
-            {"name": "URL", "variable": "url"},
-            {"name": "Final URL", "variable": "final_url"},
+            {"name": "URL", "variable": "url_absolute"},
+            {"name": "Final URL/Path", "variable": "final_url"},
             {"name": "Status Code", "variable": "status_code"},
             {"name": "Load time (ms)", "variable": "load_time_ms"},
             {"name": "Size (kb)", "variable": "total_size_kb"}
@@ -108,6 +110,8 @@ def validate_servers():
             [f"New server {column['name']}" for column in columns]
         )
 
+        all_errors_str = ""
+
         for i in range(len(operations_portal_url_checks)):
             operations_portal_url_check = operations_portal_url_checks[i]
             errors = []
@@ -116,8 +120,8 @@ def validate_servers():
             has_redirect = operations_portal_url_check[2]
             expected_redirect_url = operations_portal_url_check[3]
 
-            old_server_result = analyze_url(f"{operations_portal_old_server}{url_path}")
-            new_server_result = analyze_url(f"{operations_portal_new_server}{url_path}")
+            old_server_result = analyze_url(operations_portal_old_server, f"{operations_portal_old_server}{url_path}")
+            new_server_result = analyze_url(operations_portal_new_server, f"{operations_portal_new_server}{url_path}")
 
             if has_redirect == "Yes":
                 total_redirects += 1
@@ -128,7 +132,7 @@ def validate_servers():
                 elif old_server_result['final_url'] != new_server_result['final_url']:
                     errors.append("The redirected URLs do not match")
                     total_redirects_errors += 1
-                elif new_server_result['final_url'] != expected_redirect_url:
+                elif expected_redirect_url not in [r["to"] for r in new_server_result['redirects']]:
                     total_redirects_errors += 1
                     errors.append(
                         f"The new server redirect url does not match the expected redirect url ({expected_redirect_url})")
@@ -146,13 +150,16 @@ def validate_servers():
             )
 
             error_str = "".join([f"\n\t {i + 1}) {errors[i]}" for i in range(len(errors))])
-            error_str = f"\033[91m{'  Errors: ' if len(errors) > 0 else ''} {error_str} \033[0m"
+
+            if len(errors) > 0:
+                all_errors_str += f"\n   {new_server_result['url']} \033[91m{error_str}\033[0m"
+                error_str = f"\033[91m  Errors:  {error_str} \033[0m"
 
             print(f"""
 #######################################################
 --- Statistics for {url_path} --- ({i + 1} of {len(operations_portal_url_checks)})
-  URL: \t{old_server_result['url']}\t-->\t{new_server_result['url']}
-  Final URL: \t{old_server_result['final_url']}\t-->\t{new_server_result['final_url']}
+  URL: \t{old_server_result['url_absolute']}\t-->\t{new_server_result['url_absolute']}
+  Final URL/path: \t{old_server_result['final_url']}\t-->\t{new_server_result['final_url']}
   Status Code:      \t{old_server_result['status_code']}\t\t\t-->\t{new_server_result['status_code']}
   Page Load Time:  \t{old_server_result['load_time_ms']:.2f} ms\t\t-->\t{new_server_result['load_time_ms']:.2f} ms
   Page Size:       \t{old_server_result['total_size_kb']} KB\t\t-->\t{new_server_result['total_size_kb']} KB
@@ -161,6 +168,8 @@ def validate_servers():
 
     print(f"""
 Successfully wrote {len(operations_portal_url_checks)} results to {results_file_name}
+
+{"Summary of errors:" if len(all_errors_str) > 0 else ""}{all_errors_str}
 
 Summary:
     Page not found : {total_pages_not_found}/{total_pages}
