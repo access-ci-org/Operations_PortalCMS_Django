@@ -1,3 +1,6 @@
+v0.10.4 jlambertson 2026-10-30
+- Minor improvements to the "test-url-paths-and-redirects.py" (CTT-1129)
+
 v0.10.3 jlambertson 2026-10-30
 - adding access-sso package top uv env 08
 
