@@ -242,6 +242,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "access_ci_django_sso_middleware.middleware.ACCESSCISSOMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -636,7 +637,7 @@ MEDIA_URL = _config_value("MEDIA_URL", "/media/")
 MEDIA_ROOT = _config_value("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 # Authentication URLs
-LOGIN_URL = "/accounts/login/"
+LOGIN_URL = "/accounts/cilogon/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
@@ -701,6 +702,8 @@ SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_STORE_TOKENS = True
 SOCIALACCOUNT_PROFILE_FIELDS = ["email", "first_name", "last_name"]
+SOCIALACCOUNT_QUERY_EMAIL = True
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
