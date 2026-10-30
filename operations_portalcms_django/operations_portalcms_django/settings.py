@@ -637,7 +637,7 @@ MEDIA_URL = _config_value("MEDIA_URL", "/media/")
 MEDIA_ROOT = _config_value("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 # Authentication URLs
-LOGIN_URL = "/accounts/login/"
+LOGIN_URL = "/accounts/cilogon/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
