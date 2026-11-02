@@ -1,3 +1,6 @@
+v1.0.0 jlambertson 2026-11-03
+- wrapping up code into go live production version for November 3, 2026
+
 v0.10.4 jlambertson 2026-10-30
 - Minor improvements to the "test-url-paths-and-redirects.py" (CTT-1129)
 
