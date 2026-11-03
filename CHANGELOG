@@ -1,3 +1,6 @@
+v1.0.2 jlambertson 2026-11-03
+- updating imported to handle empty body news items
+
 v1.0.1 jlambertson 2026-11-03
 - adding a wrapping label for affecet elements to integration news
 

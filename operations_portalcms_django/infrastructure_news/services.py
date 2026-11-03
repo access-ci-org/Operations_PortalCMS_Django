@@ -32,7 +32,19 @@ def _distribution_options(news):
 
 
 def _affected_infrastructure(news):
-    return [{"infra_resourceid": resource_id} for resource_id in news.get_affected_infrastructure_values()]
+    related_items = sorted(
+        news.affected_infrastructure_items.all(), key=lambda item: item.resource_descriptive_name or ""
+    )
+    related_by_resource_id = {item.info_resourceid: item for item in related_items if item.info_resourceid}
+    affected = []
+    for resource_id in news.get_affected_infrastructure_values():
+        item = {"infra_resourceid": resource_id}
+        resource = related_by_resource_id.get(resource_id)
+        if resource is not None:
+            item["title"] = resource.resource_descriptive_name
+            item["infra_latest_status"] = resource.latest_status
+        affected.append(item)
+    return affected
 
 
 def _news_item_to_dict(news, request):

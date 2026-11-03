@@ -97,9 +97,43 @@ Raw-dump imports enforce all of the following:
 The parser reads the current Drupal node/field tables, `revision_uid` from
 `node_revision`, and only `uid` and `name` from the Drupal users table. It ignores
 unrelated dump tables and user columns. It uses no live MySQL or Drupal API connection.
-The October 26, 2026 dump contains 49 distinct non-anonymous creator/editor identities;
-the 41 current node creators are included in that total, and all 49 normalize to unique
-local-part usernames.
+For historical comparison, the October 26, 2026 dump contained 49 distinct non-anonymous
+creator/editor identities; use the selected dump's report for current counts rather than
+carrying that number forward.
+
+## Infrastructure News field mapping
+
+The November 2 dump's Infrastructure News data maps as follows:
+
+| Drupal source | Django destination or handling |
+|---|---|
+| `node_field_data.nid` | `SystemStatusNews.outage_id`; retained as the stable external ID |
+| `node_field_data.vid` | Import provenance in `review_comments`; not otherwise exposed |
+| `node_field_data.title` | `subject` |
+| `node_field_data.uid` | Existing Django `author` account, matched from the sanitized Drupal username |
+| `node_field_data.created` | `created_at`; also `published_at` for published items |
+| `node_field_data.status` | `status` and `is_active` |
+| `node__field_news_content.field_news_content_value` | `content`; null or empty Infrastructure News bodies become `<p>&nbsp;</p>` during import |
+| `node__field_news_content.field_news_content_format` | Not stored separately; content is normalized by Django's HTML field |
+| `node__field_infrastructure_news_type.field_infrastructure_news_type_value` | `infrastructure_news_type`, mapped from Drupal label to Django choice |
+| `node__field_start_date.field_start_date_value` | `start_datetime` |
+| `node__field_end_date.field_end_date_value` | `end_datetime` |
+| `node__field_affected_infrastructure.field_affected_infrastructure_target_id` | Resolve Drupal infrastructure node to its resource ID, then to the CIDER M2M relation; preserve unresolved resource IDs in `affected_infrastructure` |
+| `node__field_news_distribution_options.field_news_distribution_options_value` | Three independent distribution boolean fields |
+| Field-table `bundle`, `deleted`, `delta`, `langcode`, and `revision_id` | Used to select current field values; not stored as news attributes |
+| `node_field_data.changed`, `langcode`, `default_langcode`, `promote`, `sticky`, `revision_translation_affected` | Drupal entity/workflow metadata with no matching Django news field or current API field; not imported |
+| `node_revision.revision_uid` | Used only for the historical author report; not stored on news rows |
+
+The Drupal API's `affected_infrastructure` object also has Drupal node ID, Drupal URL,
+Drupal author and creation markup, plus `infra_id`. Django has no equivalent for those
+Drupal-specific values. The Django API exposes the matched CIDER resource's `title`
+(`resource_descriptive_name`), `infra_latest_status` (`latest_status`), and existing
+`infra_resourceid` (`info_resourceid`). It does not emit Drupal URLs or unmapped Drupal
+metadata. The top-level `web_url` remains the Django news listing URL.
+
+The beta Drupal endpoint is a structural reference only. The November 2 production MySQL
+dump is the source of record for import contents and counts; do not use the beta endpoint
+to filter records from that dump.
 
 ## Full-history news import and source correction
 
@@ -109,14 +143,17 @@ still request a filtered run with `--system-news-as-of`, but that option is not 
 the full-history import described here. Both Integration and Infrastructure News pages
 and APIs display records newest-first according to the original Drupal post timestamp.
 
-For the reviewed August 31 and September 1 source family, nid `404` has empty content and
-must be explicitly excluded because the importer cannot create a valid news item from it.
-Historical nid `797` is included; its retired resource may be unresolved in current CIDER,
+The November 2, 2026 dump includes nid `404`, titled “ACCESS Ticketing System has partial
+outage.” Its body is empty, while its start/end dates, type, affected resource, distribution
+choice, and published status are populated. The importer retains it and writes
+`<p>&nbsp;</p>` as the body so the existing non-null database column and required Django
+field validation are satisfied without a schema migration. The import report lists each
+ID that received this placeholder. Historical nid `797` is included; its retired resource may be unresolved in current CIDER,
 in which case the source resource ID remains visible in the news/API output and is listed
 for review as an unresolved historical reference.
 
 The September 14 dump surfaced a `Replacement validation failed for SystemStatusNews
-nid=914 field content` error during `--apply`. This was not a bad-source-data case like
+nid=914 field content` error during `--apply`. This was not the empty-body case for nid
 `404` above and was not excluded: nid `914` is valid content, so dropping it would have
 been a real content loss. The actual cause was a validator bug - `_validate_replacement` compared the raw
 Drupal source string against the saved value, but `_import_system_record` calls
@@ -134,14 +171,14 @@ nid `928`'s start datetime from the exact source value
 end datetime are both in January 2026. If the original start value changes, the importer
 refuses the correction.
 
-Do not reuse previous counts. For the October 26, 2026 dump, the source contains 289
-Infrastructure News rows and 19 Integration News rows; after excluding empty-content nid
-`404`, the expected full-history import has 288 Infrastructure News records and 19
-Integration News records. Record relationships and unresolved CIDER references from the
-successful strict dry-run. Later dumps must be reviewed from their own report.
+For the November 2, 2026 dump, the source contains 291 Infrastructure News rows and 20
+Integration News rows. The expected full-history import retains all 291 Infrastructure
+News records, including nid `404` with the empty-body placeholder, and all 20 Integration
+News records. Record relationships and unresolved CIDER references from the successful
+strict dry-run. Later dumps must be reviewed from their own report.
 
 Do not edit the dump. Its SHA-256 continues to identify the exact source artifact, while
-the report records the exclusion and correction separately.
+the report records placeholder IDs and source corrections separately.
 
 ## Rehearsal on beta and the final cutover
 
@@ -426,7 +463,6 @@ news_dry_run() {
     --dry-run \
     --strict \
     --suppress-notifications \
-    --exclude-system-nid 404 \
     --source-correction infrastructure-928-start-year \
     --confirm-database "$EXPECTED_DATABASE" \
     --confirm-host "$EXPECTED_WRITE_HOST" \
@@ -564,10 +600,10 @@ Do not continue until a human confirms all of the following:
 - the selected source path and SHA-256 identify the intended dump;
 - the Python executable, database, write host and fallback user are exact;
 - all valid Infrastructure News IDs are retained, including historical nid `797`;
-- the expected source exclusion is empty-content nid `404`, and the only correction is nid `928`;
+- no Infrastructure News source record is excluded; nid `404` receives the documented empty-body placeholder, and the only correction is nid `928`;
 - every unresolved historical resource reference is accounted for in the plan/report;
-- the October 26 dump's 49 historical creator/editor identities are all present, with
-  usernames stored only as the local part before `@`;
+- all historical creator/editor identities reported for the selected dump are accounted
+  for, with usernames stored only as the local part before `@`;
 - no users are created or modified; missing historical accounts are listed in the report;
 - relationship and planned delete/create counts are sensible;
 - every post date and exact username match in the full report is correct;
