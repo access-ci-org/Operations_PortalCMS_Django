@@ -791,12 +791,6 @@ def parse_drupal_news_dump(
             }
         )
 
-    if any(not record["content"] for record in system_records):
-        empty_ids = [record["source_metadata"]["drupal_nid"] for record in system_records if not record["content"]]
-        warnings.append(
-            "Infrastructure News records with empty content: " + ", ".join(str(value) for value in empty_ids)
-        )
-
     return ParsedDump(
         payload={
             "SystemStatusNews": system_records,

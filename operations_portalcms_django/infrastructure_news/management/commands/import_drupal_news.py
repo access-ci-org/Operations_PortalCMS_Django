@@ -38,6 +38,7 @@ from resources.models import CiderInfrastructure
 
 DEFAULT_INPUT = Path("database/drupal_backups/generated/drupal_news_normalized_for_django.json")
 DEFAULT_REPORT = Path("database/drupal_backups/generated/drupal_news_import_dry_run.md")
+EMPTY_BODY_PLACEHOLDER = "<p>&nbsp;</p>"
 IMPORT_PLAN_SCHEMA = "access-ci.drupal-news-import-plan"
 IMPORT_PLAN_VERSION = 5
 IMPORT_CONTRACT_VERSION = 5
@@ -89,6 +90,7 @@ class ImportResult:
     unresolved_allowed_na: int = 0
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    empty_body_placeholder_nids: List[str] = field(default_factory=list)
 
     def add_warning(self, message: str) -> None:
         self.warnings.append(message)
@@ -645,6 +647,9 @@ class Command(BaseCommand):
         result.total_records = len(system_records) + len(integration_records)
         result.system_records = len(system_records)
         result.integration_records = len(integration_records)
+        result.empty_body_placeholder_nids = [
+            _nid(record) for record in system_records if record.get("content") in (None, "")
+        ]
         result.excluded_system_nids = excluded_system_nids_found
         result.cutoff_excluded_system_nids = cutoff_excluded_system_nids
         result.source_corrections = source_corrections_applied
@@ -1552,7 +1557,7 @@ class Command(BaseCommand):
                 # (see _import_system_record), which normalizes markup (html5lib
                 # reserialization, closing tags, quoted attributes). Compare against
                 # that same normalized form rather than the raw source string.
-                "content": clean_html(record.get("content") or "", full=False),
+                "content": clean_html(record.get("content") or EMPTY_BODY_PLACEHOLDER, full=False),
                 "infrastructure_news_type": record.get("infrastructure_news_type") or "outage_full",
                 "affected_infrastructure": record.get("affected_infrastructure") or "",
                 "start_datetime": _as_dt(record.get("start_datetime")),
@@ -1840,7 +1845,8 @@ class Command(BaseCommand):
 
         obj.author = author
         obj.subject = record.get("subject") or "Untitled"
-        obj.content = record.get("content") or ""
+        source_content = record.get("content")
+        obj.content = source_content if source_content not in (None, "") else EMPTY_BODY_PLACEHOLDER
         obj.infrastructure_news_type = record.get("infrastructure_news_type") or "outage_full"
         obj.affected_infrastructure = record.get("affected_infrastructure") or ""
         obj.start_datetime = _as_dt(record.get("start_datetime"))
@@ -2048,6 +2054,12 @@ class Command(BaseCommand):
             "",
             f"- Total staged records: `{result.total_records}`",
             f"- `SystemStatusNews` staged: `{result.system_records}`",
+            "- Empty Infrastructure News bodies populated with `<p>&nbsp;</p>`: "
+            + (
+                ", ".join(f"`{nid}`" for nid in result.empty_body_placeholder_nids)
+                if result.empty_body_placeholder_nids
+                else "None"
+            ),
             f"- `IntegrationNews` staged: `{result.integration_records}`",
             f"- Source infrastructure relationships: `{result.system_relationships}`",
             f"- Expected integration-element relationships: `{result.integration_relationships}`",
