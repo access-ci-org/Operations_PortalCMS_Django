@@ -19,7 +19,7 @@
                     {% if redirect_field_value %}
                         <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}"/>
                     {% endif %}
-                    <a class="btn btn-secondary" href="{% url 'portal:index' %}"  role="button">Back to Home</a>
+                    <a class="btn btn-secondary" href="/"  role="button">Back</a>
                     <button class="primaryAction btn btn-access-auth" type="submit">{% trans "LOGOUT OF ACCESS CI" %}</button>
                 </form>
             </div><!-- div card-body -->
