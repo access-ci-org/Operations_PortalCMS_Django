@@ -1,3 +1,6 @@
+v1.0.1 jlambertson 2026-11-03
+- adding a wrapping label for affecet elements to integration news
+
 v1.0.0 jlambertson 2026-11-03
 - wrapping up code into go live production version for November 3, 2026
 

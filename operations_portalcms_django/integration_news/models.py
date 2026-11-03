@@ -44,6 +44,7 @@ class IntegrationNews(models.Model):
         ("ipf", "Information Publishing Framework (IPF) tool for publishing compute resource information"),
         ("accessusage", "accessusage - command line allocation usage lookup"),
         ("access_oauth_mapfile", "access-oauth-mapfile - ACCESS OAuth identity to local account mapping"),
+        ("access_operations_portal", "ACCESS Operations Portal"),
     ]
 
     DISTRIBUTION_OPTIONS = tuple((field_name, label) for field_name, label, _ in DISTRIBUTION_OPTION_FIELDS)
