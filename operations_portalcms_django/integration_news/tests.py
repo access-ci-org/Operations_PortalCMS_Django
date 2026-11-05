@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -49,6 +50,58 @@ class IntegrationNewsFormTests(SimpleTestCase):
         self.assertEqual(form.fields["email_notification"].label, "Email everyone with access")
         self.assertEqual(form.fields["subscriber_notification"].label, "Email only subscribers")
         self.assertEqual(form.fields["slack_notification"].label, "Post to Slack")
+
+
+class IntegrationNewsIdAllocationTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(username="integration_id_author")
+
+    def _create_news(self, integration_news_id=None):
+        news = IntegrationNews(
+            author=self.author,
+            title="Integration ID allocation test",
+            content="Test content",
+            integration_news_id=integration_news_id,
+        )
+        news.save()
+        return news
+
+    def test_missing_ids_start_at_2000_and_increment(self):
+        first = self._create_news()
+        second = self._create_news()
+
+        self.assertEqual(first.integration_news_id, 2000)
+        self.assertEqual(second.integration_news_id, 2001)
+
+    def test_explicit_imported_id_is_preserved_and_next_id_follows_it(self):
+        imported = self._create_news(integration_news_id=2300)
+        new_record = self._create_news()
+
+        self.assertEqual(imported.integration_news_id, 2300)
+        self.assertEqual(new_record.integration_news_id, 2301)
+
+    def test_existing_ids_below_start_do_not_lower_first_generated_id(self):
+        self._create_news(integration_news_id=1999)
+
+        generated = self._create_news()
+
+        self.assertEqual(generated.integration_news_id, 2000)
+
+    def test_retries_if_another_writer_claimed_the_candidate(self):
+        self._create_news(integration_news_id=2000)
+        news = IntegrationNews(
+            author=self.author,
+            title="Concurrent allocation test",
+            content="Test content",
+        )
+
+        with patch(
+            "integration_news.models._next_integration_news_id", side_effect=[2000, 2001]
+        ) as next_id:
+            news.save()
+
+        self.assertEqual(news.integration_news_id, 2001)
+        self.assertEqual(next_id.call_count, 2)
 
 
 class IntegrationNewsDistributionPersistenceTests(TestCase):
@@ -271,7 +324,7 @@ class ApiIntegrationNewsTests(TestCase):
         response = self.client.get("/api/integration_news")
         data = json.loads(response.content)
 
-        self.assertEqual([item["integration_news_id"] for item in data], [None, "100", "900"])
+        self.assertEqual([item["integration_news_id"] for item in data], ["2000", "100", "900"])
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
         page_response = self.client.get("/integration_news")

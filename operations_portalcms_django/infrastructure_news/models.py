@@ -1,8 +1,17 @@
 from cms.models.pluginmodel import CMSPlugin
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import IntegrityError, models, router, transaction
+from django.db.models import Max
 from djangocms_text_ckeditor.fields import HTMLField
 from portal.news_distribution import DISTRIBUTION_OPTION_FIELDS
+
+FIRST_AUTO_OUTAGE_ID = 2000
+OUTAGE_ID_ALLOCATION_ATTEMPTS = 10
+
+
+def _next_outage_id(using):
+    current_max = SystemStatusNews.objects.using(using).aggregate(max_id=Max("outage_id"))["max_id"]
+    return max(FIRST_AUTO_OUTAGE_ID, (current_max or FIRST_AUTO_OUTAGE_ID - 1) + 1)
 
 
 class SystemStatusNews(models.Model):
@@ -111,6 +120,31 @@ class SystemStatusNews(models.Model):
 
     def __str__(self):
         return self.subject
+
+    def save(self, *args, **kwargs):
+        """Assign a stable external ID to new records when one was not supplied."""
+        if self._state.adding and self.outage_id is None:
+            using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+            for _attempt in range(OUTAGE_ID_ALLOCATION_ATTEMPTS):
+                candidate = _next_outage_id(using)
+                self.outage_id = candidate
+                try:
+                    with transaction.atomic(using=using):
+                        return super().save(*args, **kwargs)
+                except IntegrityError:
+                    # Another writer may have claimed the same max + 1 value
+                    # after our query. Retry only when that candidate now exists;
+                    # re-raise unrelated integrity failures unchanged.
+                    candidate_is_taken = type(self).objects.using(using).filter(outage_id=candidate).exists()
+                    self.outage_id = None
+                    if not candidate_is_taken:
+                        raise
+
+            raise IntegrityError(
+                f"Could not allocate a unique outage_id after {OUTAGE_ID_ALLOCATION_ATTEMPTS} attempts."
+            )
+
+        return super().save(*args, **kwargs)
 
     def get_distribution_options(self):
         return [label for field_name, label in self.DISTRIBUTION_OPTIONS if getattr(self, field_name)]
