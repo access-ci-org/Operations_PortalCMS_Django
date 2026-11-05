@@ -1,3 +1,7 @@
+v1.0.5 jlambertson 2026-11-05
+- adding outage_id incremental to new infra news (CTT-1180)
+- adding integration_news_id incremental to integrations news
+
 v1.0.4 dinukadesilva 2026-11-05
 - Adding the google tag manager scripts (CTT-1018)
 

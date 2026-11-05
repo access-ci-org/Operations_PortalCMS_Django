@@ -1,8 +1,17 @@
 from cms.models.pluginmodel import CMSPlugin
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import IntegrityError, models, router, transaction
+from django.db.models import Max
 from djangocms_text_ckeditor.fields import HTMLField
 from portal.news_distribution import DISTRIBUTION_OPTION_FIELDS
+
+FIRST_AUTO_INTEGRATION_NEWS_ID = 2000
+INTEGRATION_NEWS_ID_ALLOCATION_ATTEMPTS = 10
+
+
+def _next_integration_news_id(using):
+    current_max = IntegrationNews.objects.using(using).aggregate(max_id=Max("integration_news_id"))["max_id"]
+    return max(FIRST_AUTO_INTEGRATION_NEWS_ID, (current_max or FIRST_AUTO_INTEGRATION_NEWS_ID - 1) + 1)
 
 
 class IntegrationElement(models.Model):
@@ -115,6 +124,34 @@ class IntegrationNews(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        """Assign a stable external ID to new records when one was not supplied."""
+        if self._state.adding and self.integration_news_id is None:
+            using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+            for _attempt in range(INTEGRATION_NEWS_ID_ALLOCATION_ATTEMPTS):
+                candidate = _next_integration_news_id(using)
+                self.integration_news_id = candidate
+                try:
+                    with transaction.atomic(using=using):
+                        return super().save(*args, **kwargs)
+                except IntegrityError:
+                    # Another writer may have claimed the same max + 1 value
+                    # after our query. Retry only when that candidate now exists;
+                    # re-raise unrelated integrity failures unchanged.
+                    candidate_is_taken = (
+                        type(self).objects.using(using).filter(integration_news_id=candidate).exists()
+                    )
+                    self.integration_news_id = None
+                    if not candidate_is_taken:
+                        raise
+
+            raise IntegrityError(
+                "Could not allocate a unique integration_news_id after "
+                f"{INTEGRATION_NEWS_ID_ALLOCATION_ATTEMPTS} attempts."
+            )
+
+        return super().save(*args, **kwargs)
 
     def get_distribution_options(self):
         return [label for field_name, label in self.DISTRIBUTION_OPTIONS if getattr(self, field_name)]

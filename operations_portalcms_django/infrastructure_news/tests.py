@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from datetime import timezone as datetime_timezone
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -71,6 +72,56 @@ class SystemStatusNewsFormTests(SimpleTestCase):
         self.assertEqual(form.fields["email_notification"].label, "Email everyone with access")
         self.assertEqual(form.fields["subscriber_notification"].label, "Email only subscribers")
         self.assertEqual(form.fields["slack_notification"].label, "Post to Slack")
+
+
+class SystemStatusNewsOutageIdTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(username="outage_id_author")
+
+    def _create_news(self, outage_id=None):
+        news = SystemStatusNews(
+            author=self.author,
+            subject="Outage ID allocation test",
+            content="Test content",
+            outage_id=outage_id,
+        )
+        news.save()
+        return news
+
+    def test_missing_outage_ids_start_at_2000_and_increment(self):
+        first = self._create_news()
+        second = self._create_news()
+
+        self.assertEqual(first.outage_id, 2000)
+        self.assertEqual(second.outage_id, 2001)
+
+    def test_explicit_imported_id_is_preserved_and_next_id_follows_it(self):
+        imported = self._create_news(outage_id=2300)
+        new_record = self._create_news()
+
+        self.assertEqual(imported.outage_id, 2300)
+        self.assertEqual(new_record.outage_id, 2301)
+
+    def test_existing_ids_below_start_do_not_lower_first_generated_id(self):
+        self._create_news(outage_id=1999)
+
+        generated = self._create_news()
+
+        self.assertEqual(generated.outage_id, 2000)
+
+    def test_retries_if_another_writer_claimed_the_candidate(self):
+        self._create_news(outage_id=2000)
+        news = SystemStatusNews(
+            author=self.author,
+            subject="Concurrent allocation test",
+            content="Test content",
+        )
+
+        with patch("infrastructure_news.models._next_outage_id", side_effect=[2000, 2001]) as next_id:
+            news.save()
+
+        self.assertEqual(news.outage_id, 2001)
+        self.assertEqual(next_id.call_count, 2)
 
 
 class SystemStatusNewsDistributionPersistenceTests(TestCase):
@@ -290,10 +341,10 @@ class ApiInfrastructureNewsTests(TestCase):
         response = self.client.get("/api/infrastructure_news_v2")
         data = json.loads(response.content)
 
-        self.assertEqual([item["outage_id"] for item in data], [None, "100", "900"])
-        missing_timestamp_item = next(item for item in data if item["outage_id"] is None)
-        self.assertEqual(missing_timestamp_item["start_timestamp"], "")
-        self.assertEqual(missing_timestamp_item["end_timestamp"], "")
+        self.assertEqual([item["outage_id"] for item in data], ["2000", "100", "900"])
+        auto_id_item = next(item for item in data if item["outage_id"] == "2000")
+        self.assertEqual(auto_id_item["start_timestamp"], "")
+        self.assertEqual(auto_id_item["end_timestamp"], "")
 
     def test_anonymous_page_and_api_use_the_same_public_filter(self):
         page_response = self.client.get("/infrastructure_news_view")
