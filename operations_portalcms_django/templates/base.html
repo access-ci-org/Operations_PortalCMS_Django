@@ -2,6 +2,23 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr" class="h-100">
 <head>
+
+    <!-- Google Tag Manager -->
+    <script>(function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            'gtm.start':
+                new Date().getTime(), event: 'gtm.js'
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : '';
+        j.async = true;
+        j.src =
+            'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', 'GTM-5XV3K7T');</script>
+    <!-- End Google Tag Manager -->
+
     <meta charset="utf-8"/>
     <meta name="Generator" content="Django CMS 5 (https://www.django-cms.org)"/>
     <meta name="MobileOptimized" content="width"/>
@@ -37,6 +54,14 @@
     {% render_block "css" %}
 </head>
 <body class="d-flex flex-column h-100">
+
+<!-- Google Tag Manager (noscript) -->
+<noscript>
+    <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5XV3K7T"
+            height="0" width="0" style="display:none;visibility:hidden"></iframe>
+</noscript>
+<!-- End Google Tag Manager (noscript) -->
+
 <a href="#main-content" class="visually-hidden focusable skip-link">
     Skip to main content
 </a>
