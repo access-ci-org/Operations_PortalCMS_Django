@@ -1,3 +1,6 @@
+v1.0.6 jlambertson 2026-11-10
+- adding listing and read only IDs to both news views in admin
+
 v1.0.5 jlambertson 2026-11-05
 - adding outage_id incremental to new infra news (CTT-1180)
 - adding integration_news_id incremental to integrations news

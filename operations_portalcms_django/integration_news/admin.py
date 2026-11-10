@@ -6,14 +6,14 @@ from .models import IntegrationNews
 @admin.register(IntegrationNews)
 class IntegrationNewsAdmin(admin.ModelAdmin):
     ordering = ("-created_at", "-pk")
-    list_display = ["title", "affected_elements_display", "author", "created_at", "is_active"]
+    list_display = ["integration_news_id", "title", "affected_elements_display", "author", "created_at", "is_active"]
     list_filter = ["is_active", "created_at"]
     search_fields = ["title", "content"]
-    readonly_fields = ["created_at", "updated_at", "author"]
+    readonly_fields = ["integration_news_id", "created_at", "updated_at", "author"]
     filter_horizontal = ["affected_elements"]
 
     fieldsets = (
-        ("Basic Information", {"fields": ("title", "content", "is_active")}),
+        ("Basic Information", {"fields": ("integration_news_id", "title", "content", "is_active")}),
         ("Integration Details", {"fields": ("news_type", "affected_elements", "effective_date", "expiration_date")}),
         (
             "Distribution Options",
@@ -26,7 +26,10 @@ class IntegrationNewsAdmin(admin.ModelAdmin):
                 "classes": ("collapse",),
             },
         ),
-        ("Metadata", {"fields": ("author", "created_at", "updated_at"), "classes": ("collapse",)}),
+        (
+            "Metadata",
+            {"fields": ("author", "created_at", "updated_at"), "classes": ("collapse",)},
+        ),
     )
 
     def save_model(self, request, obj, form, change):
