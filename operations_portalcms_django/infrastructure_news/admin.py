@@ -7,6 +7,7 @@ from .models import SystemStatusNews
 class SystemStatusNewsAdmin(admin.ModelAdmin):
     ordering = ("-created_at", "-pk")
     list_display = [
+        "outage_id",
         "subject",
         "infrastructure_news_type",
         "start_datetime",
@@ -16,11 +17,11 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
     ]
     list_filter = ["is_active", "infrastructure_news_type", "start_datetime"]
     search_fields = ["subject", "content", "affected_infrastructure"]
-    readonly_fields = ["created_at", "updated_at", "author"]
+    readonly_fields = ["outage_id", "created_at", "updated_at", "author"]
     filter_horizontal = ["affected_infrastructure_items"]
 
     fieldsets = (
-        ("Basic Information", {"fields": ("subject", "content", "is_active")}),
+        ("Basic Information", {"fields": ("outage_id", "subject", "content", "is_active")}),
         (
             "Infrastructure Details",
             {"fields": ("infrastructure_news_type", "affected_infrastructure_items", "start_datetime", "end_datetime")},
@@ -36,7 +37,10 @@ class SystemStatusNewsAdmin(admin.ModelAdmin):
                 "classes": ("collapse",),
             },
         ),
-        ("Metadata", {"fields": ("author", "created_at", "updated_at"), "classes": ("collapse",)}),
+        (
+            "Metadata",
+            {"fields": ("author", "created_at", "updated_at"), "classes": ("collapse",)},
+        ),
     )
 
     def save_model(self, request, obj, form, change):
