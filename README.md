@@ -88,4 +88,4 @@ production.
 
 ---
 
-Original Django server produced by Claude 4.5 & Claude 4.6, Sonnet with assistance from ChatGPT Codex 5.2 & 5.3.
+Original Django server produced by Claude 4.5 & Claude 4.6, Sonnet with assistance from ChatGPT Codex of various versions
