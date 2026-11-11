@@ -5,6 +5,8 @@ from django.db.models import Max
 from djangocms_text_ckeditor.fields import HTMLField
 from portal.news_distribution import DISTRIBUTION_OPTION_FIELDS
 
+NEWS_TIME_ZONE = "America/Chicago"
+
 FIRST_AUTO_OUTAGE_ID = 2000
 OUTAGE_ID_ALLOCATION_ATTEMPTS = 10
 
@@ -52,13 +54,20 @@ class SystemStatusNews(models.Model):
         null=True,
         blank=True,
         verbose_name="Start Date and Time",
-        help_text="When the infrastructure outage or reconfiguration starts (in your local timezone)",
+        help_text="Enter and display in Central Time (America/Chicago).",
     )
     end_datetime = models.DateTimeField(
         null=True,
         blank=True,
         verbose_name="End Date and Time",
-        help_text="When this outage or configuration change ends. May be left blank for permanent configuration changes.",
+        help_text="Enter and display in Central Time (America/Chicago). May be left blank for permanent configuration changes.",
+    )
+    schedule_timezone = models.CharField(
+        max_length=64,
+        default=NEWS_TIME_ZONE,
+        editable=False,
+        verbose_name="Schedule Time Zone",
+        help_text="IANA time zone used to enter and display the start and end dates.",
     )
     effective_date = models.DateField(null=True, blank=True)
     expiration_date = models.DateField(null=True, blank=True)

@@ -1,10 +1,32 @@
+from django import forms
 from django.contrib import admin
 
+from .forms import CentralDateTimeField
 from .models import SystemStatusNews
+
+
+class SystemStatusNewsAdminForm(forms.ModelForm):
+    start_datetime = CentralDateTimeField(
+        required=False,
+        label="Start Date and Time (Central Time)",
+        widget=forms.DateTimeInput(format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}),
+        help_text="Enter in Central Time (America/Chicago). Daylight saving time is applied automatically.",
+    )
+    end_datetime = CentralDateTimeField(
+        required=False,
+        label="End Date and Time (Central Time)",
+        widget=forms.DateTimeInput(format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}),
+        help_text="Enter in Central Time (America/Chicago).",
+    )
+
+    class Meta:
+        model = SystemStatusNews
+        fields = "__all__"
 
 
 @admin.register(SystemStatusNews)
 class SystemStatusNewsAdmin(admin.ModelAdmin):
+    form = SystemStatusNewsAdminForm
     ordering = ("-created_at", "-pk")
     list_display = [
         "outage_id",

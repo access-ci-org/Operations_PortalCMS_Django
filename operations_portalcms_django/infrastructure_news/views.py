@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -34,16 +34,42 @@ def system_status_news(request):
         .prefetch_related(infrastructure_prefetch)
         .order_by("-created_at", "-pk")
     )
-    paginator = Paginator(news_items, 20)
-    page_obj = paginator.get_page(request.GET.get("page"))
+    now = timezone.now()
+    current_news = news_items.filter(
+        (Q(start_datetime__isnull=True) | Q(start_datetime__lte=now))
+        & (Q(end_datetime__isnull=True) | Q(end_datetime__gte=now))
+    )
+    future_news = news_items.filter(start_datetime__gt=now)
+    past_news = news_items.filter(end_datetime__lt=now).exclude(start_datetime__gt=now)
+
+    page_params = {
+        "current": "current_page",
+        "future": "future_page",
+        "past": "past_page",
+    }
+    paginated_news = {
+        tab: Paginator(items, 20).get_page(request.GET.get(page_param))
+        for tab, items, page_param in (
+            ("current", current_news, page_params["current"]),
+            ("future", future_news, page_params["future"]),
+            ("past", past_news, page_params["past"]),
+        )
+    }
+    selected_tab = request.GET.get("tab", "current")
+    if selected_tab not in page_params:
+        selected_tab = "current"
 
     return render(
         request,
         "portal/infrastructure_news.html",
         {
             "page": "system_status_news",
-            "system_status_news": page_obj,
-            "page_obj": page_obj,
+            "system_status_news": news_items,
+            "current_news": paginated_news["current"],
+            "future_news": paginated_news["future"],
+            "past_news": paginated_news["past"],
+            "selected_tab": selected_tab,
+            "page_params": page_params,
             "can_publish": (
                 request.user.has_perm("infrastructure_news.can_publish_systemstatusnews")
                 if request.user.is_authenticated

@@ -1,9 +1,26 @@
 from django import forms
+from django.utils import timezone
+from zoneinfo import ZoneInfo
 
 from resources.models import CiderInfrastructure
 from resources.services import get_active_infrastructure_queryset
 
 from .models import SystemStatusNews
+
+NEWS_TIME_ZONE = ZoneInfo("America/Chicago")
+
+
+class CentralDateTimeField(forms.DateTimeField):
+    """Parse and render schedule dates in Central time, independent of site settings."""
+
+    def clean(self, value):
+        with timezone.override(NEWS_TIME_ZONE):
+            return super().clean(value)
+
+    def prepare_value(self, value):
+        if value is not None and timezone.is_aware(value):
+            value = timezone.localtime(value, NEWS_TIME_ZONE)
+        return super().prepare_value(value)
 
 
 class SystemStatusNewsForm(forms.ModelForm):
@@ -25,17 +42,21 @@ class SystemStatusNewsForm(forms.ModelForm):
         label="Post to Slack",
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
-    start_datetime = forms.DateTimeField(
+    start_datetime = CentralDateTimeField(
         required=True,
         label="Start Date and Time",
-        widget=forms.DateTimeInput(attrs={"class": "form-control", "type": "datetime-local"}),
-        help_text="When the infrastructure outage or reconfiguration starts (in your local timezone)",
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M", attrs={"class": "form-control", "type": "datetime-local"}
+        ),
+        help_text="Enter in Central Time (America/Chicago). Daylight saving time is applied automatically.",
     )
-    end_datetime = forms.DateTimeField(
+    end_datetime = CentralDateTimeField(
         required=False,
         label="End Date and Time",
-        widget=forms.DateTimeInput(attrs={"class": "form-control", "type": "datetime-local"}),
-        help_text="When this outage or configuration change ends. May be left blank for permanent configuration changes.",
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M", attrs={"class": "form-control", "type": "datetime-local"}
+        ),
+        help_text="Enter in Central Time (America/Chicago). May be left blank for permanent configuration changes.",
     )
     affected_infrastructure_items = forms.ModelMultipleChoiceField(
         queryset=CiderInfrastructure.objects.none(),
