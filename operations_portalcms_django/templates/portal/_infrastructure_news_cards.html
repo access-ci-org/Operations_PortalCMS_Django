@@ -1,0 +1,74 @@
+{% load tz %}
+{% if news_items %}
+    <div class="row">
+        {% for news in news_items %}
+            <div class="col-md-12 mb-4">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h3 class="card-title fw-bold text-dark mb-0">{{ news.subject }}</h3>
+                            <span class="badge bg-{% if news.status == 'published' %}success{% else %}secondary{% endif %}">{{ news.get_status_display }}</span>
+                        </div>
+                        <hr class="border-dark mt-2 mb-3">
+                        <p class="card-text mb-1"><span class="fw-bold text-dark">Infrastructure News Type:</span> <code>{{ news.get_infrastructure_news_type_display }}</code></p>
+                        {% with affected_values=news.get_affected_infrastructure_values %}
+                            {% if affected_values %}<p class="card-text mb-1"><span class="fw-bold text-dark">Affected Infrastructure:</span> <code>{{ affected_values|join:", " }}</code></p>{% endif %}
+                        {% endwith %}
+                        {% timezone "America/Chicago" %}
+                            <p class="card-text mb-1"><span class="fw-bold text-dark">Start Date (Central Time):</span> {% if news.start_datetime %}{{ news.start_datetime|date:"F j, Y, g:i a" }}{% else %}Not Specified{% endif %}</p>
+                            <p class="card-text mb-3"><span class="fw-bold text-dark">End Date (Central Time):</span> {% if news.end_datetime %}{{ news.end_datetime|date:"F j, Y, g:i a" }}{% else %}Not Specified{% endif %}</p>
+                        {% endtimezone %}
+                        <div class="card-text">{{ news.content }}</div>
+                        <p class="text-muted">
+                            <small>Posted: {{ news.created_at|date:"F j, Y" }}</small>
+                            <small class="ms-2">• Author: {{ news.author.get_full_name|default:news.author.username }}</small>
+                        </p>
+                        {% if user.is_authenticated %}
+                            <div class="btn-group" role="group">
+                                {% if news.status == 'draft' %}
+                                    {% if perms.infrastructure_news.change_systemstatusnews or user.is_superuser %}
+                                        <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
+                                    {% endif %}
+                                    {% if can_publish %}
+                                        <form method="post" action="{% url 'infrastructure_news:publish_systemstatus_news' news.id %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-info">Publish</button></form>
+                                    {% endif %}
+                                {% endif %}
+                                {% if news.status == 'published' %}
+                                    {% if perms.infrastructure_news.change_systemstatusnews %}
+                                        <a href="{% url 'infrastructure_news:update_system_status_news' news.id %}" class="btn btn-sm btn-accent-primary">Edit</a>
+                                    {% endif %}
+                                    {% if can_publish %}
+                                        <form method="post" action="{% url 'infrastructure_news:unpublish_systemstatus_news' news.id %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-secondary" onclick="return confirm('Are you sure you want to unpublish this news item? It will no longer be visible to the public.');">Unpublish</button></form>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="{{ tab_key|capfirst }} status news pagination" class="mt-3">
+            <ul class="pagination justify-content-center flex-wrap">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?tab={{ tab_key }}&amp;{{ page_param }}={{ page_obj.previous_page_number }}#{{ tab_key }}-news">Previous</a>
+                    </li>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?tab={{ tab_key }}&amp;{{ page_param }}={{ page_obj.next_page_number }}#{{ tab_key }}-news">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+{% else %}
+    <p>No system and infrastructure status news available.</p>
+{% endif %}
