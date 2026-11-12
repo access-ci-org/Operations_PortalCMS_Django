@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
@@ -35,12 +37,14 @@ def system_status_news(request):
         .order_by("-created_at", "-pk")
     )
     now = timezone.now()
+    # Keep open-ended items visible, but move them to Past after 90 days.
+    stale_open_ended = Q(end_datetime__isnull=True, start_datetime__lt=now - timedelta(days=90))
     current_news = news_items.filter(
         (Q(start_datetime__isnull=True) | Q(start_datetime__lte=now))
         & (Q(end_datetime__isnull=True) | Q(end_datetime__gte=now))
-    )
+    ).exclude(stale_open_ended)
     future_news = news_items.filter(start_datetime__gt=now)
-    past_news = news_items.filter(end_datetime__lt=now).exclude(start_datetime__gt=now)
+    past_news = news_items.filter(Q(end_datetime__lt=now) | stale_open_ended).exclude(start_datetime__gt=now)
 
     page_params = {
         "current": "current_page",
